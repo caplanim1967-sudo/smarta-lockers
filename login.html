@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smarta — כניסה למערכת</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0c14;
+  --surface: #1a1d27;
+  --surface2: #22263a;
+  --border: #2e3348;
+  --accent: #4f8ef7;
+  --accent2: #7c3aed;
+  --green: #22c55e;
+  --red: #ef4444;
+  --text: #f0f2ff;
+  --muted: #7b82a0;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Heebo', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  direction: rtl;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Animated background blobs */
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.12;
+  animation: float 8s ease-in-out infinite;
+  pointer-events: none;
+}
+.blob-1 { width: 500px; height: 500px; background: var(--accent); top: -150px; right: -150px; animation-delay: 0s; }
+.blob-2 { width: 400px; height: 400px; background: var(--accent2); bottom: -100px; left: -100px; animation-delay: -4s; }
+@keyframes float {
+  0%, 100% { transform: translate(0,0) scale(1); }
+  50% { transform: translate(20px, 30px) scale(1.05); }
+}
+
+/* Card */
+.card {
+  position: relative;
+  z-index: 10;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 44px 48px;
+  width: 400px;
+  max-width: 95vw;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+}
+
+/* Logo */
+.logo-wrap { text-align: center; margin-bottom: 8px; }
+.logo {
+  font-size: 36px;
+  font-weight: 900;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -1px;
+}
+.logo-sub { font-size: 13px; color: var(--muted); margin-top: 4px; margin-bottom: 32px; text-align:center; }
+
+/* Role badges preview */
+.roles-preview {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+.role-chip {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* Form */
+.form-group { margin-bottom: 14px; }
+.form-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.form-group input {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: 'Heebo', sans-serif;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.form-group input:focus { border-color: var(--accent); }
+
+.btn-login {
+  width: 100%;
+  padding: 13px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: 'Heebo', sans-serif;
+  cursor: pointer;
+  margin-top: 6px;
+  transition: opacity 0.15s, transform 0.1s;
+  position: relative;
+}
+.btn-login:hover { opacity: 0.9; }
+.btn-login:active { transform: scale(0.98); }
+.btn-login:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.err-box {
+  display: none;
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--red);
+  margin-top: 12px;
+  text-align: center;
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Footer */
+.card-footer {
+  text-align: center;
+  margin-top: 24px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.card-footer strong { color: var(--text); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+
+<div class="card">
+  <div class="logo-wrap">
+    <div class="logo">Smarta</div>
+    <div class="logo-sub">מערכת ניהול לוקרים חכמים</div>
+  </div>
+
+  <div class="roles-preview">
+    <span class="role-chip">🏘️ מנהל ישוב</span>
+    <span class="role-chip">📦 אחראי דואר</span>
+    <span class="role-chip">⚙️ מנהל מערכת</span>
+  </div>
+
+  <div class="form-group">
+    <label>שם משתמש</label>
+    <input type="text" id="username" placeholder="הכנס שם משתמש" autocomplete="username" autofocus>
+  </div>
+  <div class="form-group">
+    <label>סיסמה</label>
+    <input type="password" id="password" placeholder="הכנס סיסמה" autocomplete="current-password">
+  </div>
+
+  <button class="btn-login" id="btn-login" onclick="doLogin()">כניסה למערכת</button>
+  <div class="err-box" id="err-box">שם משתמש או סיסמה שגויים</div>
+
+  <div class="card-footer">
+    גרסה 1.0 &nbsp;·&nbsp; <strong>Smarta Lockers</strong>
+  </div>
+</div>
+
+<script>
+var API_BASE = 'https://smarta-api.smarta-api.workers.dev';
+
+// Role → tab key mapping
+var ROLE_TAB = {
+  smarta_admin:        'admin',
+  community_manager:   'manager',
+  mail_manager:        'app',
+  courier:             'courier',
+  finance:             'finance'
+};
+
+// Allowed tabs per role (others will be hidden in shell)
+var ROLE_TABS = {
+  smarta_admin:      ['app','manager','admin','courier','finance','test'],
+  community_manager: ['manager'],
+  mail_manager:      ['app'],
+  courier:           ['courier'],
+  finance:           ['finance']
+};
+
+document.getElementById('password').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doLogin();
+});
+document.getElementById('username').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') document.getElementById('password').focus();
+});
+
+function doLogin() {
+  var username = document.getElementById('username').value.trim();
+  var password = document.getElementById('password').value;
+  var errBox   = document.getElementById('err-box');
+  var btn      = document.getElementById('btn-login');
+
+  errBox.style.display = 'none';
+
+  if (!username || !password) {
+    errBox.textContent = 'יש למלא שם משתמש וסיסמה';
+    errBox.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = 'מתחבר... <span class="spinner"></span>';
+
+  fetch(API_BASE + '/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: username, password: password })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (!data.token) {
+      errBox.textContent = data.error || 'שגיאת כניסה';
+      errBox.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'כניסה למערכת';
+      return;
+    }
+
+    var role = data.role;
+    var user = {
+      full_name:      data.name || username,
+      username:       username,
+      role:           role,
+      community_name: data.community_name || ''
+    };
+
+    // ── Generic keys (used by shell) ──────────────────────
+    sessionStorage.setItem('smarta_token', data.token);
+    sessionStorage.setItem('smarta_role',  role);
+    sessionStorage.setItem('smarta_user',  JSON.stringify(user));
+    sessionStorage.setItem('smarta_tabs',  JSON.stringify(ROLE_TABS[role] || ['app']));
+
+    // ── Role-specific keys (used by each sub-page) ────────
+    if (role === 'community_manager') {
+      sessionStorage.setItem('manager_token', data.token);
+      sessionStorage.setItem('manager_user',  JSON.stringify(user));
+    }
+    if (role === 'mail_manager') {
+      sessionStorage.setItem('app_token', data.token);
+      sessionStorage.setItem('app_user',  JSON.stringify(user));
+    }
+    if (role === 'smarta_admin') {
+      sessionStorage.setItem('admin_token', data.token);
+      sessionStorage.setItem('admin_user',  JSON.stringify(user));
+      // admin can also open other pages
+      sessionStorage.setItem('manager_token', data.token);
+      sessionStorage.setItem('manager_user',  JSON.stringify(user));
+      sessionStorage.setItem('app_token', data.token);
+      sessionStorage.setItem('app_user',  JSON.stringify(user));
+    }
+
+    // ── Redirect to shell with the right tab ──────────────
+    var tab = ROLE_TAB[role] || 'app';
+    window.location.href = './smarta-all-v2.html#' + tab;
+  })
+  .catch(function() {
+    errBox.textContent = 'שגיאת תקשורת עם השרת';
+    errBox.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'כניסה למערכת';
+  });
+}
+
+// If already logged in, redirect immediately
+(function() {
+  var role  = sessionStorage.getItem('smarta_role');
+  var token = sessionStorage.getItem('smarta_token');
+  if (role && token) {
+    var tab = ROLE_TAB[role] || 'app';
+    window.location.href = './smarta-all-v2.html#' + tab;
+  }
+})();
+</script>
+</body>
+</html>
