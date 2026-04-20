@@ -198,6 +198,11 @@ body {
 
   <div class="card-footer">
     גרסה 1.0 &nbsp;·&nbsp; <strong>Smarta Lockers</strong>
+    <div style="margin-top:10px">
+      <a href="login.html?switch=1" style="color:var(--muted);font-size:11px;text-decoration:none">
+        החלף משתמש
+      </a>
+    </div>
   </div>
 </div>
 
@@ -269,29 +274,37 @@ function doLogin() {
       community_name: data.community_name || ''
     };
 
-    // ── Generic keys (used by shell) ──────────────────────
+    // ── Clear previous session, then set new one ─────────
+    sessionStorage.clear();
     sessionStorage.setItem('smarta_token', data.token);
     sessionStorage.setItem('smarta_role',  role);
     sessionStorage.setItem('smarta_user',  JSON.stringify(user));
     sessionStorage.setItem('smarta_tabs',  JSON.stringify(ROLE_TABS[role] || ['app']));
 
     // ── Role-specific keys (used by each sub-page) ────────
+    var t = data.token, u = JSON.stringify(user);
     if (role === 'community_manager') {
-      sessionStorage.setItem('manager_token', data.token);
-      sessionStorage.setItem('manager_user',  JSON.stringify(user));
+      sessionStorage.setItem('manager_token', t);
+      sessionStorage.setItem('manager_user',  u);
     }
     if (role === 'mail_manager') {
-      sessionStorage.setItem('app_token', data.token);
-      sessionStorage.setItem('app_user',  JSON.stringify(user));
+      sessionStorage.setItem('app_token', t);
+      sessionStorage.setItem('app_user',  u);
+    }
+    if (role === 'courier') {
+      sessionStorage.setItem('courier_token', t);
+      sessionStorage.setItem('courier_user',  u);
+    }
+    if (role === 'finance') {
+      sessionStorage.setItem('finance_token', t);
+      sessionStorage.setItem('finance_user',  u);
     }
     if (role === 'smarta_admin') {
-      sessionStorage.setItem('admin_token', data.token);
-      sessionStorage.setItem('admin_user',  JSON.stringify(user));
-      // admin can also open other pages
-      sessionStorage.setItem('manager_token', data.token);
-      sessionStorage.setItem('manager_user',  JSON.stringify(user));
-      sessionStorage.setItem('app_token', data.token);
-      sessionStorage.setItem('app_user',  JSON.stringify(user));
+      // Admin gets access to all sub-pages
+      ['admin','manager','app','courier','finance'].forEach(function(k) {
+        sessionStorage.setItem(k + '_token', t);
+        sessionStorage.setItem(k + '_user',  u);
+      });
     }
 
     // ── Redirect to shell with the right tab ──────────────
@@ -306,8 +319,10 @@ function doLogin() {
   });
 }
 
-// If already logged in, redirect immediately
+// If already logged in, redirect immediately (unless ?switch=1 in URL)
 (function() {
+  var forceNew = location.search.indexOf('switch') >= 0;
+  if (forceNew) { sessionStorage.clear(); return; }
   var role  = sessionStorage.getItem('smarta_role');
   var token = sessionStorage.getItem('smarta_token');
   if (role && token) {
