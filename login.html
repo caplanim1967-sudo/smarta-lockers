@@ -286,6 +286,62 @@ function toggleForgot() {
   }
 }
 
+function hashPassword(pass) {
+  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(pass))
+    .then(function(buf) {
+      return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+    });
+}
+
+function tryLocalLogin(username, password, errBox, btn) {
+  try {
+    var users = JSON.parse(localStorage.getItem('smarta_users') || '[]');
+    var u = users.find(function(x) { return x.username === username; });
+    if (!u || !u.passwordHash) {
+      errBox.textContent = 'שם משתמש או סיסמה שגויים';
+      errBox.style.display = 'block';
+      btn.disabled = false; btn.textContent = 'כניסה למערכת';
+      return;
+    }
+    hashPassword(password).then(function(hash) {
+      if (hash !== u.passwordHash) {
+        errBox.textContent = 'שם משתמש או סיסמה שגויים';
+        errBox.style.display = 'block';
+        btn.disabled = false; btn.textContent = 'כניסה למערכת';
+        return;
+      }
+      // ✅ Local login success
+      var role = u.role || 'community_manager';
+      var settlements = JSON.parse(localStorage.getItem('smarta_settlements') || '[]');
+      var settlement = settlements.find(function(s) { return s.id === u.community_id; });
+      var communityName = (settlement && settlement.name) || u.community_id || '';
+      var userObj = {
+        full_name: [u.first_name, u.last_name].filter(Boolean).join(' ') || username,
+        username: username,
+        role: role,
+        community_id: u.community_id,
+        community_name: communityName
+      };
+      var fakeToken = 'local_' + u.id;
+      sessionStorage.clear();
+      sessionStorage.setItem('smarta_token', fakeToken);
+      sessionStorage.setItem('smarta_role',  role);
+      sessionStorage.setItem('smarta_user',  JSON.stringify(userObj));
+      sessionStorage.setItem('smarta_tabs',  JSON.stringify(ROLE_TABS[role] || ['manager']));
+      if (role === 'community_manager') {
+        sessionStorage.setItem('manager_token', fakeToken);
+        sessionStorage.setItem('manager_user',  JSON.stringify(userObj));
+      }
+      var tab = ROLE_TAB[role] || 'manager';
+      window.location.href = './smarta-all-v2.html#' + tab;
+    });
+  } catch(e) {
+    errBox.textContent = 'שגיאה בכניסה מקומית';
+    errBox.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'כניסה למערכת';
+  }
+}
+
 function sendForgot() {
   var val = (document.getElementById('forgot-input').value || '').trim();
   if (!val) return;
@@ -346,10 +402,8 @@ function doLogin() {
   .then(function(r) { return r.json(); })
   .then(function(data) {
     if (!data.token) {
-      errBox.textContent = data.error || 'שגיאת כניסה';
-      errBox.style.display = 'block';
-      btn.disabled = false;
-      btn.textContent = 'כניסה למערכת';
+      // API auth failed — try local users (community_manager stored in localStorage)
+      tryLocalLogin(username, password, errBox, btn);
       return;
     }
 
@@ -399,10 +453,8 @@ function doLogin() {
     window.location.href = './smarta-all-v2.html#' + tab;
   })
   .catch(function() {
-    errBox.textContent = 'שגיאת תקשורת עם השרת';
-    errBox.style.display = 'block';
-    btn.disabled = false;
-    btn.textContent = 'כניסה למערכת';
+    // Network error — try local users
+    tryLocalLogin(username, password, errBox, btn);
   });
 }
 
