@@ -287,25 +287,37 @@ function toggleForgot() {
 }
 
 function hashPassword(pass) {
-  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(pass))
-    .then(function(buf) {
-      return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
-    });
+  try {
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(pass))
+      .then(function(buf) {
+        return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+      });
+  } catch(e) {
+    return Promise.resolve('fallback:' + btoa(unescape(encodeURIComponent(pass))));
+  }
 }
 
 function tryLocalLogin(username, password, errBox, btn) {
   try {
     var users = JSON.parse(localStorage.getItem('smarta_users') || '[]');
-    var u = users.find(function(x) { return x.username === username; });
-    if (!u || !u.passwordHash) {
-      errBox.textContent = 'שם משתמש או סיסמה שגויים';
+    var u = users.find(function(x) { return (x.username||'').toLowerCase().trim() === username.toLowerCase().trim(); });
+    if (!u) {
+      errBox.textContent = 'שם משתמש לא נמצא — פנה למנהל Smarta';
       errBox.style.display = 'block';
       btn.disabled = false; btn.textContent = 'כניסה למערכת';
       return;
     }
+    if (!u.passwordHash) {
+      errBox.textContent = 'המשתמש לא הוגדר כראוי — בקש ממנהל Smarta ליצור מחדש';
+      errBox.style.display = 'block';
+      btn.disabled = false; btn.textContent = 'כניסה למערכת';
+      return;
+    }
+    var fallbackHash = 'fallback:' + btoa(unescape(encodeURIComponent(password)));
     hashPassword(password).then(function(hash) {
-      if (hash !== u.passwordHash) {
-        errBox.textContent = 'שם משתמש או סיסמה שגויים';
+      var match = (hash === u.passwordHash) || (fallbackHash === u.passwordHash);
+      if (!match) {
+        errBox.textContent = 'סיסמה שגויה';
         errBox.style.display = 'block';
         btn.disabled = false; btn.textContent = 'כניסה למערכת';
         return;
