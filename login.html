@@ -165,6 +165,39 @@ body {
   color: var(--muted);
 }
 .card-footer strong { color: var(--text); font-weight: 600; }
+
+/* Password eye toggle */
+.pass-wrap { position: relative; }
+.pass-wrap input { width: 100%; padding-left: 40px !important; }
+.pass-eye {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; font-size: 17px;
+  color: var(--muted); padding: 0; line-height: 1;
+}
+.pass-eye:hover { color: var(--text); }
+
+/* Forgot link */
+.forgot-link {
+  display: block; text-align: center; margin-top: 14px;
+  font-size: 12px; color: var(--muted); cursor: pointer;
+  text-decoration: underline; text-decoration-color: transparent;
+  transition: color 0.15s;
+}
+.forgot-link:hover { color: var(--accent); }
+
+/* Forgot panel */
+.forgot-panel {
+  display: none; margin-top: 14px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px 18px;
+}
+.forgot-panel.open { display: block; }
+.forgot-panel label { font-size: 12px; color: var(--muted); font-weight: 600; display: block; margin-bottom: 6px; }
+.forgot-panel input { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px 12px; color:var(--text); font-size:13px; font-family:'Heebo',sans-serif; outline:none; }
+.forgot-panel input:focus { border-color:var(--accent); }
+.forgot-panel .btn-send { width:100%; margin-top:10px; padding:10px; background:var(--accent); border:none; border-radius:8px; color:#fff; font-size:13px; font-weight:700; font-family:'Heebo',sans-serif; cursor:pointer; }
+.forgot-panel .btn-send:hover { opacity:0.88; }
+.forgot-ok { color: var(--green); font-size: 13px; text-align: center; margin-top: 10px; display:none; }
 </style>
 </head>
 <body>
@@ -193,11 +226,23 @@ body {
   </div>
   <div class="form-group">
     <label>סיסמה</label>
-    <input type="password" id="password" placeholder="הכנס סיסמה" autocomplete="new-password">
+    <div class="pass-wrap">
+      <input type="password" id="password" placeholder="הכנס סיסמה" autocomplete="new-password">
+      <button type="button" class="pass-eye" id="login-eye" onclick="toggleLoginEye()" title="הצג/הסתר סיסמה">👁</button>
+    </div>
   </div>
 
   <button class="btn-login" id="btn-login" onclick="doLogin()">כניסה למערכת</button>
   <div class="err-box" id="err-box">שם משתמש או סיסמה שגויים</div>
+
+  <span class="forgot-link" onclick="toggleForgot()">שכחתי שם משתמש / סיסמה</span>
+
+  <div class="forgot-panel" id="forgot-panel">
+    <label>שם משתמש או מספר נייד</label>
+    <input type="text" id="forgot-input" dir="ltr" placeholder="הכנס שם משתמש או נייד">
+    <button class="btn-send" onclick="sendForgot()">שלח לאיפוס →</button>
+    <div class="forgot-ok" id="forgot-ok">✅ אם הפרטים קיימים במערכת — תשלח הודעה לנייד הרשום</div>
+  </div>
 
   <div class="card-footer">
     גרסה 1.0 &nbsp;·&nbsp; <strong>Smarta Lockers</strong>
@@ -225,6 +270,37 @@ var ROLE_TABS = {
   finance:           ['finance']
 };
 
+function toggleLoginEye() {
+  var inp = document.getElementById('password');
+  var btn = document.getElementById('login-eye');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+}
+
+function toggleForgot() {
+  var panel = document.getElementById('forgot-panel');
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) {
+    document.getElementById('forgot-input').focus();
+    document.getElementById('forgot-ok').style.display = 'none';
+  }
+}
+
+function sendForgot() {
+  var val = (document.getElementById('forgot-input').value || '').trim();
+  if (!val) return;
+  var okEl = document.getElementById('forgot-ok');
+  fetch(API_BASE + '/api/auth/forgot-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identifier: val })
+  }).catch(function(){}).finally(function() {
+    // Always show success message — don't reveal if user exists
+    okEl.style.display = 'block';
+    document.getElementById('forgot-input').value = '';
+  });
+}
+
 document.getElementById('password').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') doLogin();
 });
@@ -238,8 +314,11 @@ window.addEventListener('pageshow', function() {
   btn.disabled = false;
   btn.textContent = 'כניסה למערכת';
   document.getElementById('username').value = '';
-  document.getElementById('password').value = '';
+  var passEl = document.getElementById('password');
+  passEl.value = ''; passEl.type = 'password';
+  var eyeEl = document.getElementById('login-eye'); if(eyeEl) eyeEl.textContent = '👁';
   document.getElementById('err-box').style.display = 'none';
+  var fp = document.getElementById('forgot-panel'); if(fp) fp.classList.remove('open');
 });
 
 function doLogin() {
