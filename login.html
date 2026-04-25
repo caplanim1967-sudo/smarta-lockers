@@ -414,7 +414,14 @@ function doLogin() {
   .then(function(r) { return r.json(); })
   .then(function(data) {
     if (!data.token) {
-      // API auth failed — try local users (community_manager stored in localStorage)
+      // אם ה-API החזיר שגיאה מפורשת (401 סיסמה/משתמש) — הצג אותה ישירות
+      if (data.error) {
+        errBox.textContent = data.error;
+        errBox.style.display = 'block';
+        btn.disabled = false; btn.textContent = 'כניסה למערכת';
+        return;
+      }
+      // אחרת — נסה fallback מקומי (community_manager ב-localStorage)
       tryLocalLogin(username, password, errBox, btn);
       return;
     }
