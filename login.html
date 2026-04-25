@@ -472,8 +472,11 @@ function doLogin() {
     window.location.href = './smarta-all-v2.html#' + tab;
   })
   .catch(function() {
-    // Network error — try local users
-    tryLocalLogin(username, password, errBox, btn);
+    // Network error — smarta_admin is API-only, show clear error
+    errEl = document.getElementById('err-box');
+    errEl.textContent = 'שגיאת תקשורת — בדוק חיבור לאינטרנט';
+    errEl.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'כניסה למערכת';
   });
 }
 
