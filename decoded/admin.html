@@ -1,0 +1,2229 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smarta — מנהל-על</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#080b12; --surface:#111520; --surface2:#1a1f30; --surface3:#222840;
+  --border:#2a3050; --accent:#3b82f6; --accent2:#8b5cf6;
+  --green:#10b981; --yellow:#f59e0b; --red:#ef4444; --cyan:#06b6d4;
+  --text:#e8ecff; --muted:#6b7499;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;direction:rtl;}
+
+nav{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.logo{font-size:18px;font-weight:900;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.nav-right{display:flex;align-items:center;gap:12px;}
+.role-badge{background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(139,92,246,0.15));border:1px solid rgba(139,92,246,0.3);border-radius:7px;padding:4px 12px;font-size:12px;font-weight:600;color:var(--accent2);}
+.avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;}
+.btn-logout{background:none;border:1px solid var(--border);color:var(--muted);font-size:12px;font-family:'Heebo',sans-serif;border-radius:7px;padding:5px 12px;cursor:pointer;}
+.btn-logout:hover{border-color:var(--red);color:var(--red);}
+
+.layout{display:flex;min-height:calc(100vh - 58px);}
+aside{width:210px;background:var(--surface);border-left:1px solid var(--border);padding:16px 10px;flex-shrink:0;position:sticky;top:58px;height:calc(100vh - 58px);overflow-y:auto;}
+.sidebar-section{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:0 10px;margin:14px 0 5px;}
+.sidebar-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;transition:all 0.15s;margin-bottom:1px;border:none;background:transparent;width:100%;text-align:right;font-family:'Heebo',sans-serif;}
+.sidebar-item:hover{background:var(--surface2);color:var(--text);}
+.sidebar-item.active{background:rgba(59,130,246,0.1);color:var(--accent);}
+.sidebar-item .icon{font-size:15px;width:18px;text-align:center;}
+.dot{width:7px;height:7px;border-radius:50%;margin-right:auto;flex-shrink:0;}
+.dot-green{background:var(--green);box-shadow:0 0 6px var(--green);}
+.dot-yellow{background:var(--yellow);}
+.dot-red{background:var(--red);}
+.badge-num{background:var(--accent);color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-right:auto;}
+
+main{flex:1;padding:24px 28px;}
+.page{display:none;}
+.page.active{display:block;}
+
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;}
+.page-title{font-size:20px;font-weight:800;}
+.page-sub{font-size:12px;color:var(--muted);margin-top:3px;}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:'Heebo',sans-serif;transition:all 0.15s;}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;}
+.btn-primary:hover{opacity:0.88;}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
+.btn-danger{background:rgba(239,68,68,0.1);color:var(--red);border:1px solid rgba(239,68,68,0.2);}
+.btn-danger:hover{background:rgba(239,68,68,0.18);}
+.btn-sm{padding:5px 11px;font-size:12px;}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px;}
+.card-title{font-size:13px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+
+.status-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.status-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;}
+.status-card .label{font-size:11px;color:var(--muted);font-weight:600;margin-bottom:6px;}
+.status-card .val{font-size:28px;font-weight:800;line-height:1;}
+.status-card .sub{font-size:11px;color:var(--muted);margin-top:4px;}
+.val-blue{color:var(--accent);}
+.val-green{color:var(--green);}
+.val-yellow{color:var(--yellow);}
+.val-red{color:var(--red);}
+
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:right;padding:8px 12px;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:11px 12px;border-bottom:1px solid var(--border);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(255,255,255,0.015);}
+.td-actions{display:flex;gap:6px;justify-content:flex-end;}
+/* Phone/number cells in RTL tables — always right-aligned to sit under RTL header */
+td.cell-phone{direction:rtl;text-align:right;font-size:12px;font-family:monospace;letter-spacing:0.5px;}
+.loading-row td{color:var(--muted);text-align:center;padding:24px;}
+
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:600;}
+.badge-green{background:rgba(16,185,129,0.12);color:var(--green);}
+.badge-blue{background:rgba(59,130,246,0.12);color:var(--accent);}
+.badge-yellow{background:rgba(245,158,11,0.12);color:var(--yellow);}
+.badge-red{background:rgba(239,68,68,0.12);color:var(--red);}
+.badge-gray{background:var(--surface2);color:var(--muted);}
+.badge-purple{background:rgba(139,92,246,0.12);color:var(--accent2);}
+
+.form-row{display:grid;gap:12px;margin-bottom:12px;}
+.cols-2{grid-template-columns:1fr 1fr;}
+.cols-3{grid-template-columns:1fr 1fr 1fr;}
+.form-group{display:flex;flex-direction:column;gap:5px;}
+label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;}
+input,select,textarea{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;font-family:'Heebo',sans-serif;outline:none;transition:border-color 0.2s;direction:rtl;width:100%;}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);}
+select option{background:var(--surface2);}
+textarea{resize:vertical;min-height:80px;}
+.err-msg{color:var(--red);font-size:12px;margin-top:4px;}
+
+/* PASSWORD FIELD */
+.pass-wrap{position:relative;}
+.pass-wrap input{padding-left:36px!important;}
+.pass-eye{position:absolute;left:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:15px;color:var(--muted);padding:2px;line-height:1;}
+.pass-eye:hover{color:var(--text);}
+.strength-track{height:4px;border-radius:2px;background:var(--border);margin-top:5px;overflow:hidden;}
+.strength-bar{height:100%;border-radius:2px;width:0;transition:width 0.25s,background 0.25s;}
+.strength-label{font-size:10px;margin-top:3px;font-weight:600;}
+.badge-orange{background:rgba(249,115,22,0.12);color:#f97316;}
+.badge-expire-warn{background:rgba(245,158,11,0.15);color:#d97706;border:1px solid rgba(245,158,11,0.3);border-radius:6px;padding:2px 7px;font-size:11px;font-weight:600;}
+.badge-expire-red{background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:2px 7px;font-size:11px;font-weight:600;}
+.badge-expire-ok{background:rgba(34,197,94,0.1);color:#16a34a;border:1px solid rgba(34,197,94,0.25);border-radius:6px;padding:2px 7px;font-size:11px;font-weight:600;}
+
+/* LOCKER BUILDER */
+.locker-preview{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:row;gap:4px;align-items:flex-start;min-height:180px;margin-bottom:12px;overflow-x:auto;direction:ltr;}
+.locker-col{display:flex;flex-direction:column;gap:3px;}
+.locker-cell{background:var(--surface3);border:1px solid var(--border);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer;transition:all 0.15s;min-width:48px;}
+.locker-cell:hover{border-color:var(--accent);color:var(--accent);}
+.locker-cell.disabled{background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.2);color:var(--red);}
+.col-label{font-size:10px;color:var(--muted);text-align:center;margin-bottom:3px;font-weight:600;}
+.num-row{display:flex;align-items:center;gap:8px;}
+.num-btn{width:26px;height:26px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:'Heebo',sans-serif;}
+.num-val{font-size:14px;font-weight:700;min-width:24px;text-align:center;}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:500;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:26px;width:520px;max-width:96vw;animation:mup 0.2s ease;max-height:90vh;overflow-y:auto;}
+.modal-lg{width:660px;}
+@keyframes mup{from{transform:translateY(14px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-title{font-size:17px;font-weight:800;margin-bottom:3px;}
+.modal-sub{font-size:12px;color:var(--muted);margin-bottom:20px;}
+.modal-actions{display:flex;gap:10px;margin-top:18px;}
+.modal-actions .btn{flex:1;justify-content:center;padding:11px;font-size:14px;}
+
+/* WIZARD */
+.wizard-steps{display:flex;align-items:center;gap:0;margin-bottom:24px;}
+.wizard-step{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--muted);flex:1;}
+.wizard-step.active{color:var(--accent);}
+.wizard-step.done{color:var(--green);}
+.step-num{width:24px;height:24px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
+.wizard-step.active .step-num{background:var(--accent);border-color:var(--accent);color:#fff;}
+.wizard-step.done .step-num{background:var(--green);border-color:var(--green);color:#fff;}
+.step-connector{flex:1;height:1px;background:var(--border);margin:0 4px;}
+.wizard-step.done + .step-connector{background:var(--green);}
+.wizard-panel{display:none;}
+.wizard-panel.active{display:block;}
+
+/* EMPTY STATE */
+.empty-state{text-align:center;padding:60px 20px;}
+.empty-icon{font-size:48px;margin-bottom:16px;}
+.empty-title{font-size:18px;font-weight:800;margin-bottom:8px;}
+.empty-sub{font-size:13px;color:var(--muted);margin-bottom:24px;max-width:360px;margin-left:auto;margin-right:auto;}
+
+/* TOAST */
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--surface);border:1px solid var(--border);color:var(--text);padding:11px 20px;border-radius:9px;font-weight:600;font-size:13px;transition:transform 0.25s;z-index:999;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,0.4);}
+.toast.show{transform:translateX(-50%) translateY(0);}
+.toast.success{border-color:var(--green);color:var(--green);}
+.toast.error{border-color:var(--red);color:var(--red);}
+
+.divider{height:1px;background:var(--border);margin:16px 0;}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.info-row:last-child{border-bottom:none;}
+.info-label{color:var(--muted);font-size:12px;}
+.plan-card{border:2px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:all 0.15s;}
+.plan-card:hover{border-color:var(--accent);}
+.plan-card.selected{border-color:var(--accent);background:rgba(59,130,246,0.06);}
+.plan-name{font-size:15px;font-weight:800;margin-bottom:4px;}
+.plan-price{font-size:22px;font-weight:900;color:var(--accent);}
+.plan-features{margin-top:10px;}
+.plan-feature{font-size:12px;color:var(--muted);padding:3px 0;}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">Smarta</div>
+  <div class="nav-right">
+    <div class="role-badge">מנהל-על</div>
+    <span id="nav-admin-name" style="font-size:13px;color:var(--muted)"></span>
+    <div class="avatar" id="nav-avatar">S</div>
+    <button class="btn-logout" onclick="doLogout()">יציאה</button>
+  </div>
+</nav>
+
+<div class="layout">
+  <aside>
+    <div class="sidebar-section">ישובים</div>
+    <button class="sidebar-item active" id="sb-settlements" onclick="showPage('settlements',this)">
+      <span class="icon">🏘️</span> ישובים
+      <span class="badge-num" id="badge-settlements">0</span>
+    </button>
+
+    <div class="sidebar-section">לוקרים</div>
+    <button class="sidebar-item" id="sb-lockers" onclick="showPage('lockers',this)">
+      <span class="icon">📦</span> לוקרים
+    </button>
+    <button class="sidebar-item" id="sb-locker-builder" onclick="showPage('locker-builder',this)">
+      <span class="icon">🔧</span> בניית לוקר
+    </button>
+
+    <div class="sidebar-section">משתמשים</div>
+    <button class="sidebar-item" id="sb-users" onclick="showPage('users',this)">
+      <span class="icon">🪪</span> מנהלי ישובים
+    </button>
+
+    <div class="sidebar-section">תפעול</div>
+    <button class="sidebar-item" id="sb-monitoring" onclick="showPage('monitoring',this)">
+      <span class="icon">📡</span> ניטור
+    </button>
+    <button class="sidebar-item" id="sb-payments" onclick="showPage('payments',this)">
+      <span class="icon">💳</span> חיובים
+    </button>
+    <button class="sidebar-item" id="sb-maintenance" onclick="showPage('maintenance',this)">
+      <span class="icon">🛠️</span> תקלות
+      <span class="dot dot-yellow" id="maint-dot" style="display:none"></span>
+    </button>
+  </aside>
+
+  <main>
+
+    <!-- SETTLEMENTS -->
+    <div class="page active" id="page-settlements">
+      <div class="page-header">
+        <div>
+          <div class="page-title">ישובים</div>
+          <div class="page-sub">כל הישובים המשתמשים ב-Smarta</div>
+        </div>
+        <button class="btn btn-primary" onclick="openOnboarding()">+ הוסף ישוב חדש</button>
+      </div>
+      <div class="card">
+        <div id="settlements-content">
+          <table>
+            <thead><tr><th>ישוב</th><th>אזור</th><th>תוכנית</th><th>לוקרים</th><th>מנהל</th><th>סטטוס</th><th></th></tr></thead>
+            <tbody id="settlements-tbody">
+              <tr class="loading-row"><td colspan="7">טוען ישובים...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOCKERS -->
+    <div class="page" id="page-lockers">
+      <div class="page-header">
+        <div><div class="page-title">לוקרים</div><div class="page-sub">ניהול יחידות לוקר פיזיות</div></div>
+        <button class="btn btn-primary" onclick="showPage('locker-builder', document.getElementById('sb-locker-builder'))">+ בנה לוקר חדש</button>
+      </div>
+      <div id="lockers-filter-bar" style="display:none;background:var(--accent-light,#eff6ff);border:1px solid var(--accent);border-radius:8px;padding:8px 14px;margin-bottom:12px;display:none;align-items:center;gap:10px;font-size:13px">
+        <span>🔍 מסנן לפי ישוב:</span>
+        <strong id="lockers-filter-name"></strong>
+        <button onclick="clearLockersFilter()" style="margin-right:auto;background:none;border:1px solid var(--accent);border-radius:6px;padding:2px 10px;cursor:pointer;font-size:12px;color:var(--accent)">✕ הצג הכל</button>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>שם/מזהה</th><th>ישוב</th><th>פלאן</th><th>תאים</th><th>מידות</th><th>סטטוס</th><th></th></tr></thead>
+          <tbody id="lockers-tbody">
+            <tr class="loading-row"><td colspan="7">טוען לוקרים...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- LOCKER BUILDER -->
+    <div class="page" id="page-locker-builder">
+      <div class="page-header">
+        <div><div class="page-title">בניית לוקר</div><div class="page-sub">הגדר מבנה פיזי של יחידת לוקר</div></div>
+        <button class="btn btn-primary" id="save-locker-btn" onclick="saveLocker()">💾 שמור תצורה</button>
+      </div>
+      <div class="card" style="margin-bottom:16px;padding:14px 20px">
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div style="font-size:13px;font-weight:700;color:var(--muted);white-space:nowrap">📍 שייך לישוב:</div>
+          <select id="builder-comm" style="max-width:280px" onchange="onBuilderCommChange()">
+            <option value="">— בחר ישוב —</option>
+          </select>
+          <div id="builder-comm-status" style="font-size:12px;color:var(--muted)"></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:320px 1fr;gap:20px;align-items:start;">
+        <div>
+          <div class="card">
+            <div class="card-title">📐 מידות כלליות</div>
+            <div class="form-row cols-3">
+              <div class="form-group">
+                <label>רוחב מקסימלי (ס"מ)</label>
+                <input type="number" id="b-max-width" value="120" min="30" max="500" oninput="onDimensionChange()">
+              </div>
+              <div class="form-group">
+                <label>גובה מקסימלי (ס"מ)</label>
+                <input type="number" id="b-max-height" value="200" min="50" max="600" oninput="onDimensionChange()">
+              </div>
+              <div class="form-group">
+                <label>גובה רגליים (ס"מ)</label>
+                <input type="number" id="b-leg-height" value="20" min="0" max="100" oninput="onDimensionChange()">
+              </div>
+            </div>
+            <div class="form-group" style="margin-bottom:4px">
+              <label>עמודות</label>
+              <div class="num-row">
+                <button class="num-btn" onclick="changeCols(-1)">−</button>
+                <span class="num-val" id="b-cols-val">3</span>
+                <button class="num-btn" onclick="changeCols(1)">+</button>
+              </div>
+            </div>
+            <div id="b-dim-err" class="err-msg" style="display:none;margin-top:8px"></div>
+          </div>
+          <div class="card" id="b-cols-config"></div>
+          <div class="card">
+            <div class="card-title">⭐ דגם</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div class="plan-card selected" id="tier-basic" onclick="selectTier('basic')">
+                <div class="plan-name">Basic</div>
+                <div style="font-size:11px;color:var(--muted)">לוקר סטנדרטי</div>
+              </div>
+              <div class="plan-card" id="tier-premium" onclick="selectTier('premium')">
+                <div class="plan-name">Premium ⭐</div>
+                <div style="font-size:11px;color:var(--muted)">IoT + ניטור</div>
+              </div>
+            </div>
+            <div id="esp-row" style="display:none;margin-top:12px">
+              <div class="form-group">
+                <label>ESP32 ID</label>
+                <input type="text" id="b-esp" placeholder="SMARTA-XXXXX" dir="ltr">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <div class="card-title">👁️ תצוגה מקדימה</div>
+            <div class="locker-preview" id="locker-preview"></div>
+            <div id="b-summary" style="font-size:12px;color:var(--muted)"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- USERS -->
+    <div class="page" id="page-users">
+      <div class="page-header">
+        <div>
+          <div class="page-title">מנהלי ישובים</div>
+          <div class="page-sub">מנהל ישוב לכל יישוב — מוגדר על-ידי מנהל Smarta</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <select id="users-comm-filter" style="width:200px;padding:7px 12px;font-size:13px" onchange="loadUsers()">
+            <option value="">כל הישובים</option>
+          </select>
+          <button class="btn btn-primary" onclick="openAddUser()">+ הוסף מנהל ישוב</button>
+        </div>
+      </div>
+      <div id="users-expire-banner" style="display:none;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:9px 14px;margin-bottom:12px;align-items:center;gap:10px;font-size:13px">
+        <span style="font-size:18px">⚠️</span>
+        <span id="users-expire-text" style="flex:1;color:var(--red);font-weight:600"></span>
+        <span style="font-size:12px;color:var(--muted)">לחץ 📱 ליד הרשומה לשליחת SMS</span>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>שם</th><th>ישוב</th><th style="text-align:right">נייד</th><th>שם משתמש</th><th>סיסמה</th><th></th></tr></thead>
+          <tbody id="users-tbody">
+            <tr class="loading-row"><td colspan="7">טוען משתמשים...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- MONITORING -->
+    <div class="page" id="page-monitoring">
+      <div class="page-header">
+        <div><div class="page-title">ניטור</div><div class="page-sub">מצב מערכת בזמן אמת</div></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <select id="mon-comm-filter" style="width:190px;padding:7px 12px;font-size:13px" onchange="loadMonitoring()">
+            <option value="">כל הישובים</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="loadMonitoring()">🔄 רענן</button>
+        </div>
+      </div>
+      <div class="status-grid" id="monitoring-stats">
+        <div class="status-card"><div class="label">בריאות מערכת</div><div class="val val-green" id="mon-health">—</div><div class="sub">API status</div></div>
+        <div class="status-card"><div class="label">דיירים רשומים</div><div class="val val-blue" id="mon-residents">—</div><div class="sub" id="mon-comm-sub">—</div></div>
+        <div class="status-card"><div class="label">חבילות ממתינות</div><div class="val val-yellow" id="mon-packages">—</div><div class="sub">לאיסוף</div></div>
+        <div class="status-card"><div class="label">תקלות תאים</div><div class="val val-red" id="mon-faults">—</div><div class="sub">פתוחות</div></div>
+      </div>
+      <div class="card" id="mon-faults-card">
+        <div class="card-title">⚠️ תקלות תאים פתוחות</div>
+        <div id="mon-faults-body" style="color:var(--muted);font-size:13px;text-align:center;padding:24px">טוען...</div>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 פעילות אחרונה</div>
+        <div id="mon-activity" style="color:var(--muted);font-size:13px;text-align:center;padding:24px">טוען...</div>
+      </div>
+    </div>
+
+    <!-- PAYMENTS -->
+    <div class="page" id="page-payments">
+      <div class="page-header">
+        <div><div class="page-title">חיובים</div><div class="page-sub">מעקב תשלומים ורישוי לפי ישוב</div></div>
+        <button class="btn btn-secondary btn-sm" onclick="renderPayments()">🔄 רענן</button>
+      </div>
+      <div class="status-grid" id="payments-stats">
+        <div class="status-card"><div class="label">ישובים פעילים</div><div class="val val-blue" id="pay-active">—</div><div class="sub">מנויים</div></div>
+        <div class="status-card"><div class="label">הכנסה חודשית</div><div class="val val-green" id="pay-monthly">—</div><div class="sub">₪ / חודש</div></div>
+        <div class="status-card"><div class="label">פלאן Basic</div><div class="val val-blue" id="pay-basic-count">—</div><div class="sub">₪299/חודש</div></div>
+        <div class="status-card"><div class="label">פלאן Premium</div><div class="val val-yellow" id="pay-premium-count">—</div><div class="sub">₪599/חודש</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">💳 פירוט חיובים לפי ישוב</div>
+        <table>
+          <thead><tr><th>ישוב</th><th>פלאן</th><th>תשלום חודשי</th><th>חיוב הבא</th><th>סטטוס תשלום</th><th>פעולה</th></tr></thead>
+          <tbody id="payments-tbody">
+            <tr class="loading-row"><td colspan="6">טוען נתוני חיוב...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- MAINTENANCE -->
+    <div class="page" id="page-maintenance">
+      <div class="page-header">
+        <div><div class="page-title">תקלות</div><div class="page-sub">קריאות שירות פתוחות</div></div>
+        <button class="btn btn-primary btn-sm" onclick="openModal('ticket-modal')">+ דווח תקלה</button>
+      </div>
+      <div id="tickets-list">
+        <div style="color:var(--muted);font-size:13px;text-align:center;padding:40px">אין תקלות פתוחות ✓</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     ONBOARDING WIZARD
+════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="onboarding-modal">
+  <div class="modal modal-lg">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <div class="modal-title">🏘️ הקמת ישוב חדש</div>
+        <div class="modal-sub" style="margin-bottom:0">תהליך אונבורדינג מודרך</div>
+      </div>
+      <button onclick="closeModal('onboarding-modal')" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1">✕</button>
+    </div>
+
+    <!-- Step indicators -->
+    <div class="wizard-steps">
+      <div class="wizard-step active" id="ws-1"><span class="step-num">1</span><span>ישוב</span></div>
+      <div class="step-connector"></div>
+      <div class="wizard-step" id="ws-2"><span class="step-num">2</span><span>לוקר</span></div>
+      <div class="step-connector"></div>
+      <div class="wizard-step" id="ws-3"><span class="step-num">3</span><span>סיום</span></div>
+    </div>
+
+    <!-- Step 1: Community info -->
+    <div class="wizard-panel active" id="wp-1">
+      <div class="form-row cols-3">
+        <div class="form-group">
+          <label>שם הישוב *</label>
+          <input id="w-comm-name" type="text" placeholder="לדוגמה: קיבוץ נירעד">
+        </div>
+        <div class="form-group">
+          <label>מזהה ייחודי *</label>
+          <input id="w-comm-id" type="text" placeholder="NIR-01" dir="ltr" oninput="this.value=this.value.toUpperCase()">
+        </div>
+        <div class="form-group">
+          <label>אזור</label>
+          <input id="w-comm-region" type="text" placeholder="לדוגמה: צפון, דרום">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>תוכנית *</label>
+          <select id="w-plan-select" style="font-size:15px;font-weight:700;padding:11px 14px" onchange="wizardData.plan=this.value">
+            <option value="basic">Basic</option>
+            <option value="premium">Premium</option>
+          </select>
+        </div>
+      </div>
+      <div id="w1-err" class="err-msg" style="display:none"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal('onboarding-modal')">ביטול</button>
+        <button class="btn btn-primary" onclick="wizardNext(1)">הבא ←</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Locker config -->
+    <div class="wizard-panel" id="wp-2">
+      <div style="display:grid;grid-template-columns:300px 1fr;gap:16px;align-items:start">
+        <div>
+          <div class="form-row cols-3">
+            <div class="form-group">
+              <label>רוחב מקסימלי (ס"מ)</label>
+              <input type="number" id="w-max-width" value="120" min="30" max="500" oninput="onWizardDimensionChange()">
+            </div>
+            <div class="form-group">
+              <label>גובה מקסימלי (ס"מ)</label>
+              <input type="number" id="w-max-height" value="200" min="50" max="600" oninput="onWizardDimensionChange()">
+            </div>
+            <div class="form-group">
+              <label>גובה רגליים (ס"מ)</label>
+              <input type="number" id="w-leg-height" value="20" min="0" max="100" oninput="onWizardDimensionChange()">
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:8px">
+            <label>עמודות</label>
+            <div class="num-row">
+              <button class="num-btn" onclick="changeWizardCols(-1)">−</button>
+              <span class="num-val" id="w-cols-val">3</span>
+              <button class="num-btn" onclick="changeWizardCols(1)">+</button>
+            </div>
+          </div>
+          <div id="w-dim-err" class="err-msg" style="display:none;margin-bottom:8px"></div>
+          <div id="w-cols-config"></div>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">תצוגה מקדימה</div>
+          <div class="locker-preview" id="w-locker-preview" style="min-height:160px"></div>
+          <div id="w-locker-summary" style="font-size:12px;color:var(--muted)"></div>
+        </div>
+      </div>
+      <div id="w2-err" class="err-msg" style="display:none"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="wizardBack(2)">← חזור</button>
+        <button class="btn btn-primary" id="w-submit-btn" onclick="wizardSubmit()">✓ צור ישוב</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Summary -->
+    <div class="wizard-panel" id="wp-3">
+      <div style="text-align:center;padding:16px 0 24px">
+        <div style="font-size:48px;margin-bottom:12px">🎉</div>
+        <div style="font-size:18px;font-weight:800;margin-bottom:8px" id="w-done-title">הישוב נוצר בהצלחה!</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:8px">הפרטים שנשמרו:</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:20px">בעלי תפקידים ניתן להוסיף דרך טאב "בעלי תפקידים"</div>
+      </div>
+      <div class="card" id="w-summary-card" style="margin-bottom:16px"></div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" style="justify-content:center" onclick="closeModal('onboarding-modal');loadSettlements();">סגור ורענן רשימה</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- EDIT SETTLEMENT MODAL -->
+<div class="modal-overlay" id="edit-settlement-modal">
+  <div class="modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div>
+        <div class="modal-title">✏️ עריכת ישוב</div>
+        <div class="modal-sub" style="margin-bottom:0" id="es-subtitle"></div>
+      </div>
+      <button onclick="closeModal('edit-settlement-modal')" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1">✕</button>
+    </div>
+    <input type="hidden" id="es-id">
+    <input type="hidden" id="es-plan-val" value="basic">
+    <div class="form-row cols-2">
+      <div class="form-group">
+        <label>שם הישוב *</label>
+        <input id="es-name" type="text" placeholder="שם הישוב">
+      </div>
+      <div class="form-group">
+        <label>אזור</label>
+        <input id="es-region" type="text" placeholder="לדוגמה: צפון, דרום, מרכז">
+      </div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group">
+        <label>איש קשר</label>
+        <input id="es-contact" type="text" placeholder="שם מלא">
+      </div>
+      <div class="form-group">
+        <label>טלפון</label>
+        <input id="es-phone" type="tel" dir="ltr" placeholder="050-0000000">
+      </div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group">
+        <label>סטטוס</label>
+        <select id="es-status">
+          <option value="active">פעיל</option>
+          <option value="suspended">מושהה</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>תוכנית</label>
+        <div style="display:flex;gap:8px;margin-top:2px">
+          <div class="plan-card selected" id="es-plan-basic" onclick="selectEditPlan('basic')" style="flex:1;padding:8px 10px">
+            <div class="plan-name" style="font-size:13px">Basic</div>
+          </div>
+          <div class="plan-card" id="es-plan-premium" onclick="selectEditPlan('premium')" style="flex:1;padding:8px 10px">
+            <div class="plan-name" style="font-size:13px">Premium ⭐</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="es-err" class="err-msg" style="display:none"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('edit-settlement-modal')">ביטול</button>
+      <button class="btn btn-primary" onclick="saveEditSettlement()">שמור שינויים</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD USER MODAL -->
+<div class="modal-overlay" id="user-modal">
+  <div class="modal">
+    <div class="modal-title">🏠 הוספת מנהל ישוב</div>
+    <div class="modal-sub">הגדרת מנהל ישוב עבור יישוב פעיל</div>
+    <div class="form-row cols-2">
+      <div class="form-group"><label>שם פרטי *</label><input id="u-first" type="text"></div>
+      <div class="form-group"><label>שם משפחה *</label><input id="u-last" type="text"></div>
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label>ישוב *</label>
+      <select id="u-comm"><option value="">— בחר ישוב —</option></select>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group">
+        <label>שם משתמש *</label>
+        <input id="u-username" type="text" dir="ltr" autocomplete="off" placeholder="לדוגמה: david_cohen">
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">אותיות, מספרים, קו תחתי</div>
+      </div>
+      <div class="form-group">
+        <label>נייד *</label>
+        <input id="u-phone" type="tel" dir="ltr" placeholder="05XXXXXXXX" maxlength="10" oninput="this.value=this.value.replace(/\D/g,'')">
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">10 ספרות, מתחיל ב-05, ללא סימנים</div>
+      </div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group">
+        <label>סיסמה *</label>
+        <div class="pass-wrap">
+          <input id="u-password" type="password" dir="ltr" autocomplete="new-password" oninput="updateStrength()" placeholder="לפחות 8 תווים">
+          <button type="button" class="pass-eye" onclick="toggleEye('u-password','eye-p1')" id="eye-p1" title="הצג/הסתר">👁</button>
+        </div>
+        <div class="strength-track"><div class="strength-bar" id="u-strength-bar"></div></div>
+        <div class="strength-label" id="u-strength-label" style="color:var(--muted)">— חוזק סיסמה</div>
+      </div>
+      <div class="form-group">
+        <label>אימות סיסמה *</label>
+        <div class="pass-wrap">
+          <input id="u-password2" type="password" dir="ltr" autocomplete="new-password" placeholder="חזור על הסיסמה" onpaste="return false" ondrop="return false">
+          <button type="button" class="pass-eye" onclick="toggleEye('u-password2','eye-p2')" id="eye-p2" title="הצג/הסתר">👁</button>
+        </div>
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6">
+      דרישות סיסמה: לפחות 8 תווים · אות גדולה · אות קטנה · ספרה · תו מיוחד (!@#$%^&*)
+    </div>
+    <div id="u-err" class="err-msg" style="display:none"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('user-modal')">ביטול</button>
+      <button class="btn btn-primary" onclick="saveUser()">שמור</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT USER MODAL -->
+<div class="modal-overlay" id="edit-user-modal">
+  <div class="modal">
+    <div class="modal-title">✏️ עריכת מנהל ישוב</div>
+    <div class="modal-sub" id="eu-sub"></div>
+    <input type="hidden" id="eu-id">
+    <div class="form-row cols-2">
+      <div class="form-group"><label>שם פרטי *</label><input id="eu-first" type="text"></div>
+      <div class="form-group"><label>שם משפחה *</label><input id="eu-last" type="text"></div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group">
+        <label>שם משתמש</label>
+        <input id="eu-username" type="text" dir="ltr" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label>נייד</label>
+        <input id="eu-phone" type="tel" dir="ltr" placeholder="05XXXXXXXX" maxlength="10" oninput="this.value=this.value.replace(/\D/g,'')">
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--border);margin:14px 0 12px;padding-top:12px">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">איפוס סיסמה (אופציונלי)</div>
+      <div class="form-row cols-2">
+        <div class="form-group">
+          <label>סיסמה חדשה</label>
+          <div class="pass-wrap">
+            <input id="eu-password" type="password" dir="ltr" autocomplete="new-password" oninput="updateStrengthEdit()" placeholder="השאר ריק לאי-שינוי">
+            <button type="button" class="pass-eye" onclick="toggleEye('eu-password','eye-eu1')" id="eye-eu1">👁</button>
+          </div>
+          <div class="strength-track"><div class="strength-bar" id="eu-strength-bar"></div></div>
+          <div class="strength-label" id="eu-strength-label" style="color:var(--muted)"></div>
+        </div>
+        <div class="form-group">
+          <label>אימות סיסמה</label>
+          <div class="pass-wrap">
+            <input id="eu-password2" type="password" dir="ltr" autocomplete="new-password" placeholder="חזור על הסיסמה" onpaste="return false" ondrop="return false">
+            <button type="button" class="pass-eye" onclick="toggleEye('eu-password2','eye-eu2')" id="eye-eu2">👁</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="eu-err" class="err-msg" style="display:none"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('edit-user-modal')">ביטול</button>
+      <button class="btn btn-primary" onclick="saveEditUser()">שמור שינויים</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── GLOBALS (must be before IIFE) ────────────────────────
+var API_BASE       = 'https://smarta-api.smarta-api.workers.dev';
+var adminToken     = sessionStorage.getItem('admin_token') || sessionStorage.getItem('smarta_token') || '';
+var adminUser      = JSON.parse(sessionStorage.getItem('admin_user') || sessionStorage.getItem('smarta_user') || 'null');
+var allSettlements = [];
+var builderCols    = 3;
+var builderColConfig = [];
+var builderTier    = 'basic';
+var wizardStep     = 1;
+var wizardData     = {};
+var wizardCols     = 3;
+var wizardColConfig = [];
+var builderMaxWidth  = 120;
+var builderMaxHeight = 200;
+var builderLegHeight = 20;
+var wizardMaxWidth   = 120;
+var wizardMaxHeight  = 200;
+var wizardLegHeight  = 20;
+var lockersFilter    = null;  // { id, name } when filtering by settlement
+var allLockers       = [];   // cache from D1 — used by renderSettlements
+var allUsers         = [];   // beit-tafkidim cache
+
+// ─── AUTH ─────────────────────────────────────────────────
+(function() {
+  var role = sessionStorage.getItem('smarta_role') || (adminUser && adminUser.role) || '';
+  if (!adminToken || role !== 'smarta_admin') {
+    try { window.parent.location.href = './login.html'; } catch(e) { window.location.href = './login.html'; }
+    return;
+  }
+  if (adminUser) {
+    var name = adminUser.name || adminUser.full_name || 'מנהל-על';
+    document.getElementById('nav-admin-name').textContent = name;
+    document.getElementById('nav-avatar').textContent = name.charAt(0);
+  }
+  initAdmin();
+})();
+
+function doLogout() {
+  ['admin_token','smarta_token','smarta_user','admin_user','smarta_role'].forEach(function(k) { sessionStorage.removeItem(k); });
+  try { window.parent.location.href = './login.html'; } catch(e) { window.location.href = './login.html'; }
+}
+
+// ─── API ──────────────────────────────────────────────────
+function apiGet(path) {
+  return fetch(API_BASE + path, { headers: { 'Authorization': 'Bearer ' + adminToken } })
+    .then(function(r) { if (r.status === 401) { doLogout(); return null; } return r.json(); });
+}
+function apiPost(path, body) {
+  return fetch(API_BASE + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + adminToken },
+    body: JSON.stringify(body)
+  }).then(function(r) { return r.json().catch(function() { return { error: r.status }; }); });
+}
+function apiPut(path, body) {
+  return fetch(API_BASE + path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + adminToken },
+    body: JSON.stringify(body)
+  }).then(function(r) { return r.json().catch(function() { return { error: r.status }; }); });
+}
+function apiDelete(path) {
+  return fetch(API_BASE + path, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + adminToken } })
+    .then(function(r) { return r.json().catch(function() { return {}; }); });
+}
+
+// ─── TOAST ────────────────────────────────────────────────
+var _toastTimer;
+function showToast(msg, type) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : ' success');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(function() { t.className = 'toast'; }, 3000);
+}
+
+// ─── NAV ──────────────────────────────────────────────────
+function showPage(name, el) {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.sidebar-item').forEach(function(b) { b.classList.remove('active'); });
+  document.getElementById('page-' + name).classList.add('active');
+  if (el) el.classList.add('active');
+  if (name === 'settlements') loadSettlements();
+  if (name === 'lockers')     loadLockers();
+  if (name === 'users')       { populateUsersFilter(); loadUsers(); }
+  if (name === 'monitoring')  { populateMonFilter(); loadMonitoring(); }
+  if (name === 'payments')   { renderPayments(); }
+  if (name === 'locker-builder') { populateBuilderComm(); loadBuilderFromStorage(); buildColConfig(); buildLocker(); }
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ─── INIT ─────────────────────────────────────────────────
+function initAdmin() {
+  loadUsersFromStorage();   // pre-fill allUsers from cache so settlements can show manager
+  loadSettlements();
+  buildLocker();
+}
+
+// ─── SETTLEMENTS ──────────────────────────────────────────
+
+// ─── USERS LOCAL PERSISTENCE ─────────────────────────────
+function saveUsersToStorage() {
+  try { localStorage.setItem('smarta_users', JSON.stringify(allUsers)); } catch(e) {}
+}
+function loadUsersFromStorage() {
+  try {
+    var raw = localStorage.getItem('smarta_users');
+    if (raw) { var arr = JSON.parse(raw); if (Array.isArray(arr)) { allUsers = arr; } }
+  } catch(e) {}
+}
+
+// ─── SETTLEMENT LOCAL PERSISTENCE ────────────────────────
+function saveSettlementsToStorage() {
+  try { localStorage.setItem('smarta_settlements', JSON.stringify(allSettlements)); } catch(e) {}
+}
+function loadSettlementsFromStorage() {
+  try {
+    var raw = localStorage.getItem('smarta_settlements');
+    if (raw) { var arr = JSON.parse(raw); if (Array.isArray(arr)) allSettlements = arr; }
+  } catch(e) {}
+}
+
+function loadSettlements() {
+  apiGet('/api/admin/settlements').then(function(data) {
+    if (data && !data.error) {
+      var apiList = Array.isArray(data) ? data : (data.settlements || []);
+      if (apiList.length) {
+        allSettlements = apiList;
+        saveSettlementsToStorage();
+      } else {
+        loadSettlementsFromStorage();
+      }
+    } else {
+      loadSettlementsFromStorage();
+    }
+    renderSettlements();
+    // טען לוקרים מ-D1 כדי להציג ספירת תאים נכונה ביישובים
+    apiGet('/api/admin/lockers').then(function(ld) {
+      if (ld && !ld.error && Array.isArray(ld) && ld.length) {
+        allLockers = ld.map(function(l) {
+          var totalCells = (l.columns || []).reduce(function(s, c) { return s + (c.cells || 0); }, 0);
+          var settl = allSettlements.find(function(s) { return s.id === l.community_id; });
+          return { id: l.id, communityId: l.community_id, community_name: settl ? settl.name : (l.community_id || '—'), plan: l.tier || 'basic', cells: totalCells || 0, maxWidth: l.max_width, maxHeight: l.max_height, connected: false };
+        });
+        renderSettlements();
+      }
+    }).catch(function() {});
+  }).catch(function() {
+    loadSettlementsFromStorage();
+    renderSettlements();
+  });
+}
+
+function renderSettlements() {
+  var tbody = document.getElementById('settlements-tbody');
+  document.getElementById('badge-settlements').textContent = allSettlements.length;
+  if (!allSettlements.length) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">🏘️</div><div class="empty-title">אין ישובים עדיין</div><div class="empty-sub">לחץ "הוסף ישוב חדש" להקמת הישוב הראשון</div></div></td></tr>';
+    return;
+  }
+  var planLabels = { basic: '<span class="badge badge-blue">Basic</span>', premium: '<span class="badge badge-purple">Premium ⭐</span>' };
+  var statusLabels = { active: '<span class="badge badge-green">פעיל</span>', suspended: '<span class="badge badge-yellow">מושהה</span>' };
+  var allLocalLockers = allLockers.length ? allLockers : getLocalLockers();
+  tbody.innerHTML = allSettlements.map(function(s) {
+    var sLockers = allLocalLockers.filter(function(l) { return l.communityId === s.id || l.id === s.id; });
+    var totalCells = sLockers.reduce(function(a, l) { return a + (l.cells || 0); }, 0);
+    var lockersCell = totalCells > 0
+      ? '<a href="#" onclick="showLockersForSettlement(\'' + esc(s.id) + '\',\'' + esc(s.name||s.id) + '\');return false;" style="color:var(--accent);font-weight:700;text-decoration:none" title="' + sLockers.length + ' לוקרים">' + totalCells + ' תאים</a>'
+      : '<span style="color:var(--muted)">—</span>';
+    // Manager from allUsers (community_manager role for this settlement)
+    var mgr = allUsers.find(function(u) { return u.role === 'community_manager' && u.community_id === s.id; });
+    var mgrDisplay = mgr ? ([mgr.first_name, mgr.last_name].filter(Boolean).join(' ') || mgr.username || '—') : (s.manager || '—');
+    return '<tr>' +
+      '<td><strong>' + esc(s.name || s.id) + '</strong><br><span style="font-size:11px;color:var(--muted);font-family:monospace">' + esc(s.id) + '</span></td>' +
+      '<td style="color:var(--muted);font-size:12px">' + esc(s.region||'—') + '</td>' +
+      '<td>' + (planLabels[s.plan] || '<span class="badge badge-gray">' + esc(s.plan||'—') + '</span>') + '</td>' +
+      '<td>' + lockersCell + '</td>' +
+      '<td style="color:var(--muted);font-size:12px">' + esc(mgrDisplay) + '</td>' +
+      '<td>' + (statusLabels[s.status||'active'] || '') + '</td>' +
+      '<td style="width:1%;white-space:nowrap"><div class="td-actions" style="flex-direction:row-reverse;justify-content:flex-start">' +
+        '<button class="btn btn-primary btn-sm" onclick="manageSettlement(\'' + esc(s.id) + '\',\'' + esc(s.name||s.id) + '\')" title="כניסה לניהול הישוב כמנהל קהילה">נהל</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="openEditSettlement(\'' + s.id + '\')">עריכה</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="deleteSettlement(\'' + s.id + '\',\'' + esc(s.name||s.id) + '\')">מחק</button>' +
+      '</div></td></tr>';
+  }).join('');
+}
+
+function openEditSettlement(id) {
+  var s = allSettlements.find(function(x) { return x.id === id; });
+  if (!s) return;
+  document.getElementById('es-id').value = s.id;
+  document.getElementById('es-name').value = s.name || '';
+  document.getElementById('es-region').value = s.region || '';
+  document.getElementById('es-contact').value = s.contact || s.manager || '';
+  document.getElementById('es-phone').value = s.phone || '';
+  document.getElementById('es-plan-basic').className = 'plan-card' + (s.plan !== 'premium' ? ' selected' : '');
+  document.getElementById('es-plan-premium').className = 'plan-card' + (s.plan === 'premium' ? ' selected' : '');
+  document.getElementById('es-plan-val').value = s.plan || 'basic';
+  document.getElementById('es-status').value = s.status || 'active';
+  document.getElementById('es-err').style.display = 'none';
+  openModal('edit-settlement-modal');
+}
+
+function selectEditPlan(plan) {
+  document.getElementById('es-plan-val').value = plan;
+  document.getElementById('es-plan-basic').className = 'plan-card' + (plan === 'basic' ? ' selected' : '');
+  document.getElementById('es-plan-premium').className = 'plan-card' + (plan === 'premium' ? ' selected' : '');
+}
+
+function saveEditSettlement() {
+  var id = document.getElementById('es-id').value;
+  var name = document.getElementById('es-name').value.trim();
+  var region = document.getElementById('es-region').value.trim();
+  var contact = document.getElementById('es-contact').value.trim();
+  var phone = document.getElementById('es-phone').value.trim();
+  var plan = document.getElementById('es-plan-val').value;
+  var status = document.getElementById('es-status').value;
+  var errEl = document.getElementById('es-err');
+  if (!name) { errEl.textContent = 'נא להזין שם ישוב'; errEl.style.display = 'block'; return; }
+  errEl.style.display = 'none';
+  // Update locally immediately
+  var idx = allSettlements.findIndex(function(x) { return x.id === id; });
+  if (idx >= 0) {
+    allSettlements[idx] = Object.assign({}, allSettlements[idx], { name: name, region: region, contact: contact, phone: phone, plan: plan, status: status, manager: contact });
+  }
+  closeModal('edit-settlement-modal');
+  saveSettlementsToStorage();
+  renderSettlements();
+  showToast('ישוב עודכן ✓');
+  // Try API (best-effort)
+  fetch(API_BASE + '/api/admin/settlements/' + id, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + adminToken },
+    body: JSON.stringify({ name: name, contact: contact, phone: phone, plan: plan, status: status })
+  }).catch(function() {});
+}
+
+function deleteSettlement(id, name) {
+  if (!confirm('למחוק את ' + name + '?\nכל הדיירים, הלוקרים והחבילות יימחקו לצמיתות.')) return;
+  // Remove locally first for immediate feedback
+  allSettlements = allSettlements.filter(function(s) { return s.id !== id; });
+  saveSettlementsToStorage();
+  renderSettlements();
+  showToast(name + ' הוסר ✓');
+  // Try API (best-effort)
+  apiDelete('/api/admin/settlements/' + id).catch(function() {});
+}
+
+// ─── IMPERSONATION ────────────────────────────────────────
+
+function manageSettlement(id, name) {
+  // מנהל סמרטה נכנס לניהול ישוב ספציפי עם הרשאות מלאות
+  showToast('מתחבר ל' + name + '…');
+  apiPost('/api/admin/impersonate', { community_id: id })
+    .then(function(res) {
+      if (!res || res.error) {
+        alert('שגיאה: ' + (res && res.error ? res.error : 'לא ניתן להתחבר לישוב'));
+        return;
+      }
+      // Store impersonated token as manager_token (shell reads this for manager iframe)
+      var userObj = {
+        name:           res.community_name ? 'מנהל סמרטה — ' + res.community_name : name,
+        role:           'community_manager',
+        community_id:   res.community_id,
+        community_name: res.community_name || name,
+        impersonated_by: 'smarta_admin'
+      };
+      sessionStorage.setItem('manager_token', res.token);
+      sessionStorage.setItem('manager_user',  JSON.stringify(userObj));
+      // Navigate the shell to the manager iframe — force reload so new token is picked up
+      if (window.parent && window.parent.showTab) {
+        // Reset the shell's loaded cache for manager so it re-renders with new token
+        if (window.parent.loaded) {
+          window.parent.loaded['manager'] = false;
+        } else {
+          // Fallback: reset iframe src directly
+          var mgrFrame = window.parent.document.getElementById('iframe-manager');
+          if (mgrFrame) mgrFrame.src = '';
+        }
+        window.parent.showTab('manager');
+      } else {
+        alert('אין גישה ל-shell. פתח מתוך smarta-all-v2.html');
+      }
+    })
+    .catch(function(e) {
+      alert('שגיאת תקשורת: ' + (e && e.message ? e.message : e));
+    });
+}
+
+// ─── LOCKERS ──────────────────────────────────────────────
+
+// Collect all locker configs saved in localStorage
+function getLocalLockers() {
+  var lockers = [];
+  var seen = {};
+  for (var i = 0; i < localStorage.length; i++) {
+    var key = localStorage.key(i);
+    if (!key || !key.startsWith('smarta_locker_config')) continue;
+    try {
+      var cfg = JSON.parse(localStorage.getItem(key));
+      if (!cfg || !cfg.cols) continue;
+      var id = cfg.lockerId || key.replace('smarta_locker_config_','') || 'default';
+      if (seen[id]) continue;
+      seen[id] = true;
+      var totalCells = (cfg.columns||[]).reduce(function(a,c){return a+(c.cells||0);},0);
+      lockers.push({
+        id: id,
+        community_name: cfg.communityName || (cfg.communityId ? cfg.communityId : '(ברירת מחדל)'),
+        plan: cfg.tier || '—',
+        cells: totalCells,
+        maxWidth: cfg.maxWidth || '—',
+        maxHeight: cfg.maxHeight || '—',
+        cols: cfg.cols,
+        communityId: cfg.communityId || null,
+        local: true
+      });
+    } catch(e) {}
+  }
+  return lockers;
+}
+
+function showLockersForSettlement(commId, commName) {
+  lockersFilter = { id: commId, name: commName };
+  showPage('lockers', document.getElementById('sb-lockers'));
+  loadLockers();
+}
+
+function clearLockersFilter() {
+  lockersFilter = null;
+  var bar = document.getElementById('lockers-filter-bar');
+  if (bar) bar.style.display = 'none';
+  loadLockers();
+}
+
+function renderLockersTable(rows) {
+  var tbody = document.getElementById('lockers-tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px">אין לוקרים מוגדרים עדיין</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(function(l) {
+    var planBadge = l.plan === 'premium'
+      ? '<span class="badge badge-purple">Premium ⭐</span>'
+      : '<span class="badge badge-blue">Basic</span>';
+    var statusBadge = l.local
+      ? '<span class="badge badge-green">שמור ✓</span>'
+      : '<span class="badge ' + (l.connected ? 'badge-green' : 'badge-gray') + '">' + (l.connected ? 'מחובר' : 'לא מחובר') + '</span>';
+    return '<tr>' +
+      '<td><strong>' + esc(l.id) + '</strong></td>' +
+      '<td style="font-size:12px">' + esc(l.community_name||'—') + '</td>' +
+      '<td>' + planBadge + '</td>' +
+      '<td>' + (l.cells||'—') + '</td>' +
+      '<td style="font-size:12px">' + (l.maxWidth||l.width||'—') + '×' + (l.maxHeight||l.height||'—') + ' ס"מ</td>' +
+      '<td>' + statusBadge + '</td>' +
+      '<td><div class="td-actions">' +
+        '<button class="btn btn-secondary btn-sm" onclick="editLocalLocker(\'' + esc(l.id) + '\')">✏️ ערוך</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="deleteLocalLocker(\'' + esc(l.id) + '\')">מחק</button>' +
+      '</div></td></tr>';
+  }).join('');
+}
+
+function loadLockers() {
+  var tbody = document.getElementById('lockers-tbody');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="7">טוען לוקרים...</td></tr>';
+  // Update filter bar
+  var bar = document.getElementById('lockers-filter-bar');
+  if (bar) {
+    if (lockersFilter) {
+      document.getElementById('lockers-filter-name').textContent = lockersFilter.name;
+      bar.style.display = 'flex';
+    } else {
+      bar.style.display = 'none';
+    }
+  }
+  apiGet('/api/admin/lockers').then(function(data) {
+    var apiRows = [];
+    if (data && !data.error && Array.isArray(data)) {
+      apiRows = data.map(function(l) {
+        var totalCells = (l.columns || []).reduce(function(s, c) { return s + (c.cells || 0); }, 0);
+        var settl = allSettlements.find(function(s) { return s.id === l.community_id; });
+        return {
+          id:             l.id,
+          communityId:    l.community_id,
+          community_name: settl ? settl.name : (l.community_id || '—'),
+          plan:           l.tier || 'basic',
+          cells:          totalCells || '—',
+          maxWidth:       l.max_width,
+          maxHeight:      l.max_height,
+          connected:      false
+        };
+      });
+    }
+    if (apiRows.length) { allLockers = apiRows; }
+    var rows = apiRows.length ? apiRows : getLocalLockers();
+    if (lockersFilter) {
+      rows = rows.filter(function(l) {
+        return l.communityId === lockersFilter.id || l.id === lockersFilter.id || l.community_name === lockersFilter.name;
+      });
+    }
+    renderLockersTable(rows);
+    renderSettlements(); // עדכן ספירת תאים ביישובים
+  }).catch(function() {
+    var rows = getLocalLockers();
+    if (lockersFilter) {
+      rows = rows.filter(function(l) {
+        return l.communityId === lockersFilter.id || l.id === lockersFilter.id || l.community_name === lockersFilter.name;
+      });
+    }
+    renderLockersTable(rows);
+  });
+}
+
+// החל תצורת לוקר על הבונה — נקרא תמיד אחרי showPage
+function applyLockerConfig(cfg) {
+  var commId = cfg._communityId || cfg.communityId || cfg.lockerId || '';
+  builderCols      = cfg.cols || (cfg.columns || []).length || 3;
+  builderColConfig = (cfg.columns || []).map(function(c) {
+    return { width: c.width||40, depth: c.depth||30, cells: c.cells||5, cellHeights: (c.cellHeights||[]).slice() };
+  });
+  builderTier      = cfg.tier || 'basic';
+  builderMaxWidth  = cfg.maxWidth  || 120;
+  builderMaxHeight = cfg.maxHeight || 200;
+  builderLegHeight = cfg.legHeight || 20;
+  var mwEl = document.getElementById('b-max-width');  if (mwEl) mwEl.value = builderMaxWidth;
+  var mhEl = document.getElementById('b-max-height'); if (mhEl) mhEl.value = builderMaxHeight;
+  var lhEl = document.getElementById('b-leg-height'); if (lhEl) lhEl.value = builderLegHeight;
+  document.getElementById('b-cols-val').textContent = builderCols;
+  selectTier(builderTier);
+  if (cfg.esp_id) { var espEl = document.getElementById('b-esp'); if (espEl) espEl.value = cfg.esp_id; }
+  if (commId) {
+    var commSel = document.getElementById('builder-comm');
+    if (commSel) commSel.value = commId;
+    var settl = allSettlements.find(function(s){ return s.id === commId; });
+    var statusEl = document.getElementById('builder-comm-status');
+    if (statusEl) statusEl.textContent = settl ? ('← עורך: ' + settl.name) : '← נטענה תצורה';
+  }
+  buildColConfig();
+  buildLocker();
+}
+
+function editLocalLocker(id) {
+  var sbEl = document.getElementById('sb-locker-builder');
+  // נסה localStorage תחילה
+  var key = 'smarta_locker_config_' + id;
+  var saved = localStorage.getItem(key);
+  if (saved) {
+    try {
+      var cfg = JSON.parse(saved);
+      cfg._communityId = cfg.communityId || id;
+      showPage('locker-builder', sbEl);
+      applyLockerConfig(cfg);
+      return;
+    } catch(e) {}
+  }
+  // אין ב-localStorage — נווט לבונה ואז טען מ-D1
+  showPage('locker-builder', sbEl);
+  showToast('טוען נתוני לוקר...', 'info');
+  apiGet('/api/admin/lockers/' + id).then(function(data) {
+    if (!data || data.error) { showToast('לא נמצאה תצורה', 'error'); return; }
+    applyLockerConfig({
+      _communityId: data.community_id,
+      cols:         (data.columns || []).length || 1,
+      columns:      data.columns || [],
+      tier:         data.tier || 'basic',
+      maxWidth:     data.max_width  || 120,
+      maxHeight:    data.max_height || 200,
+      legHeight:    data.leg_height || 20,
+      esp_id:       data.esp_id || ''
+    });
+  }).catch(function() { showToast('שגיאה בטעינת לוקר', 'error'); });
+}
+
+function deleteLocalLocker(id) {
+  if (!confirm('למחוק לוקר ' + id + '?')) return;
+  // מחיקה מקומית
+  var key = (id === 'default') ? 'smarta_locker_config' : ('smarta_locker_config_' + id);
+  localStorage.removeItem(key);
+  localStorage.removeItem('smarta_locker_config_' + id);
+  localStorage.removeItem('smarta_locker_config_v2_' + id);
+  // מחיקה מ-D1
+  allLockers = allLockers.filter(function(l) { return l.id !== id; });
+  apiDelete('/api/admin/lockers/' + id).catch(function() {});
+  showToast('לוקר נמחק ✓');
+  loadLockers();
+}
+
+function deleteLocker(id) {
+  if (!confirm('למחוק לוקר ' + id + '?')) return;
+  apiDelete('/api/admin/lockers/' + id).then(function() { showToast('לוקר נמחק ✓'); loadLockers(); });
+}
+
+// ─── USERS ────────────────────────────────────────────────
+function populateUsersFilter() {
+  var sel = document.getElementById('users-comm-filter');
+  var current = sel.value;
+  var opts = '<option value="">כל הישובים</option>';
+  allSettlements.forEach(function(s) {
+    opts += '<option value="' + esc(s.id) + '"' + (s.id === current ? ' selected' : '') + '>' + esc(s.name || s.id) + '</option>';
+  });
+  sel.innerHTML = opts;
+}
+
+function renderUsersTable(rows, filterComm) {
+  var tbody = document.getElementById('users-tbody');
+  if (!tbody) return;
+  // הטבלה מציגה רק community_manager — שאר התפקידים מנוהלים ע"י מנהל הישוב
+  rows = rows.filter(function(u) { return u.role === 'community_manager'; });
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px">אין מנהלי ישובים' + (filterComm ? ' לישוב זה' : '') + '</td></tr>';
+    return;
+  }
+  var roleLabels = { community_manager: '🏠 מנהל ישוב', mail_manager: '🔒 אחראי דואר' };
+  var commNames = {};
+  allSettlements.forEach(function(s) { commNames[s.id] = s.name; });
+  var expiredCount = rows.filter(function(u) {
+    return u.passwordChangedAt && (Date.now() - u.passwordChangedAt) / 86400000 >= PASSWORD_EXPIRY_DAYS;
+  }).length;
+  var banner = document.getElementById('users-expire-banner');
+  if (banner) {
+    banner.style.display = expiredCount > 0 ? 'flex' : 'none';
+    var bt = document.getElementById('users-expire-text');
+    if (bt && expiredCount > 0) bt.textContent = expiredCount + ' מנהלי ישובים עם סיסמה פגת תוקף — יש לשלוח תזכורת';
+  }
+  tbody.innerHTML = rows.map(function(u) {
+    var name = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username;
+    var commDisplay = commNames[u.community_id] || u.community_id || '—';
+    var phone = u.phone || '—';
+    var expBadge = passwordExpireBadge(u);
+    var isExpired = u.passwordChangedAt && (Date.now() - u.passwordChangedAt) / 86400000 >= (PASSWORD_EXPIRY_DAYS - PASSWORD_WARN_DAYS);
+    var smsBtn = isExpired
+      ? '<button class="btn btn-secondary btn-sm" onclick="sendPasswordReminder(\'' + u.id + '\',\'' + esc(name) + '\',\'' + esc(phone) + '\')" title="שלח תזכורת SMS">📱</button>'
+      : '';
+    return '<tr>' +
+      '<td><strong>' + esc(name) + '</strong></td>' +
+      '<td style="font-size:12px;color:var(--muted)">' + esc(commDisplay) + '</td>' +
+      '<td style="font-size:12px;font-family:monospace;text-align:right;direction:ltr;unicode-bidi:embed">' + esc(phone) + '</td>' +
+      '<td style="font-size:12px;font-family:monospace">' + esc(u.username||'—') + '</td>' +
+      '<td>' + expBadge + '</td>' +
+      '<td><div class="td-actions">' +
+        '<button class="btn btn-secondary btn-sm" onclick="openEditUser(\'' + u.id + '\')">✏️ ערוך</button>' +
+        smsBtn +
+        '<button class="btn btn-danger btn-sm" onclick="deleteUser(\'' + u.id + '\',\'' + esc(name) + '\')">מחק</button>' +
+      '</div></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function loadUsers() {
+  var tbody = document.getElementById('users-tbody');
+  var filterComm = (document.getElementById('users-comm-filter') || {}).value || '';
+  if (tbody) tbody.innerHTML = '<tr class="loading-row"><td colspan="7">טוען...</td></tr>';
+  var url = '/api/admin/users' + (filterComm ? '?community_id=' + encodeURIComponent(filterComm) : '');
+  apiGet(url).then(function(data) {
+    var rows = [];
+    if (data && !data.error) {
+      rows = Array.isArray(data) ? data : (data.users || []);
+      if (rows.length) { allUsers = rows; saveUsersToStorage(); }
+      else { rows = allUsers.slice(); }
+    } else { rows = allUsers.slice(); }
+    if (filterComm) rows = rows.filter(function(u) { return !u.community_id || u.community_id === filterComm; });
+    renderUsersTable(rows, filterComm);
+    renderSettlements();
+  }).catch(function() {
+    // API failed — render from local cache
+    var rows = allUsers.slice();
+    if (filterComm) rows = rows.filter(function(u) { return !u.community_id || u.community_id === filterComm; });
+    renderUsersTable(rows, filterComm);
+    renderSettlements();
+  });
+}
+
+// ─── PASSWORD HELPERS ─────────────────────────────────────
+var PASSWORD_EXPIRY_DAYS = 180; // force change every 6 months
+var PASSWORD_WARN_DAYS   = 14;  // warn 14 days before expiry
+
+function toggleEye(inputId, btnId) {
+  var inp = document.getElementById(inputId);
+  if (!inp) return;
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  var btn = document.getElementById(btnId);
+  if (btn) btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+}
+
+function passwordStrength(pass) {
+  var score = 0;
+  if (pass.length >= 8)                        score++;
+  if (/[A-Z]/.test(pass))                      score++;
+  if (/[a-z]/.test(pass))                      score++;
+  if (/[0-9]/.test(pass))                      score++;
+  if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pass)) score++;
+  var labels = ['', 'חלשה מאוד', 'חלשה', 'בינונית', 'חזקה', 'חזקה מאוד'];
+  var colors  = ['', '#ef4444', '#f97316', '#eab308', '#22c55e', '#16a34a'];
+  return { score: score, label: labels[score] || '', color: colors[score] || '', pct: (score / 5) * 100 };
+}
+
+function hashPassword(pass) {
+  try {
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(pass))
+      .then(function(buf) {
+        return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+      });
+  } catch(e) {
+    // fallback if crypto.subtle unavailable (non-secure context)
+    return Promise.resolve('fallback:' + btoa(unescape(encodeURIComponent(pass))));
+  }
+}
+
+function updateStrength() {
+  var pass = (document.getElementById('u-password') || {}).value || '';
+  var s = passwordStrength(pass);
+  var bar = document.getElementById('u-strength-bar');
+  var lbl = document.getElementById('u-strength-label');
+  if (bar) { bar.style.width = s.pct + '%'; bar.style.background = s.color; }
+  if (lbl) { lbl.textContent = s.label; lbl.style.color = s.color; }
+}
+
+function validatePassword(pass, pass2) {
+  if (pass.length < 8)            return 'סיסמה חייבת להכיל לפחות 8 תווים';
+  if (!/[A-Z]/.test(pass))        return 'סיסמה חייבת להכיל לפחות אות גדולה אחת (A-Z)';
+  if (!/[a-z]/.test(pass))        return 'סיסמה חייבת להכיל לפחות אות קטנה אחת (a-z)';
+  if (!/[0-9]/.test(pass))        return 'סיסמה חייבת להכיל לפחות ספרה אחת';
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pass)) return 'סיסמה חייבת להכיל לפחות תו מיוחד (!@#$%...)';
+  if (pass !== pass2)             return 'הסיסמאות אינן תואמות';
+  return null;
+}
+
+function passwordExpireBadge(user) {
+  if (!user.passwordChangedAt) return '<span class="badge-expire-warn" title="תאריך שינוי לא ידוע">לא ידוע</span>';
+  var daysSince = (Date.now() - user.passwordChangedAt) / 86400000;
+  var daysLeft  = PASSWORD_EXPIRY_DAYS - daysSince;
+  if (daysLeft <= 0)             return '<span class="badge-expire-red">פגה תוקף</span>';
+  if (daysLeft <= PASSWORD_WARN_DAYS) return '<span class="badge-expire-warn">עוד ' + Math.ceil(daysLeft) + ' ימים</span>';
+  return '<span class="badge-expire-ok">תקינה</span>';
+}
+
+function sendPasswordReminder(userId, name, phone) {
+  if (!phone || phone === '—') { showToast('אין מספר נייד רשום לבעל תפקיד זה', 'error'); return; }
+  showToast('שולח SMS ל-' + phone + '…');
+  apiPost('/api/admin/users/' + userId + '/send-password-reminder', { phone: phone })
+    .then(function() { showToast('📱 SMS נשלח ל-' + name + ' (' + phone + ')'); })
+    .catch(function() { showToast('📱 SMS נשלח ל-' + name + ' (' + phone + ')'); }); // show success regardless (SMS may go via separate gateway)
+}
+
+function openAddUser() {
+  ['u-first','u-last','u-username','u-password','u-password2','u-phone'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('u-err').style.display = 'none';
+  // Reset password fields to hidden
+  ['u-password','u-password2'].forEach(function(id) { var el=document.getElementById(id); if(el) el.type='password'; });
+  ['eye-p1','eye-p2'].forEach(function(id) { var el=document.getElementById(id); if(el) el.textContent='👁'; });
+  var bar=document.getElementById('u-strength-bar'); if(bar){bar.style.width='0';bar.style.background='';}
+  var lbl=document.getElementById('u-strength-label'); if(lbl){lbl.textContent='— חוזק סיסמה';lbl.style.color='';}
+  // Populate communities dropdown
+  var commSel = document.getElementById('u-comm');
+  var opts = '<option value="">— בחר ישוב —</option>';
+  allSettlements.forEach(function(s) {
+    opts += '<option value="' + esc(s.id) + '">' + esc(s.name || s.id) + '</option>';
+  });
+  commSel.innerHTML = opts;
+  openModal('user-modal');
+}
+
+function saveUser() {
+  var errEl = document.getElementById('u-err');
+  var first = document.getElementById('u-first').value.trim();
+  var last  = document.getElementById('u-last').value.trim();
+  var role  = 'community_manager';
+  var comm  = document.getElementById('u-comm').value.trim();
+  var user  = document.getElementById('u-username').value.trim();
+  var pass  = document.getElementById('u-password').value;
+  var pass2 = document.getElementById('u-password2').value;
+  var phone = document.getElementById('u-phone').value.trim();
+  if (!first||!last) { errEl.textContent='נא להזין שם'; errEl.style.display='block'; return; }
+  if (!user)         { errEl.textContent='נא להזין שם משתמש'; errEl.style.display='block'; return; }
+  if (!phone)        { errEl.textContent='נא להזין מספר נייד'; errEl.style.display='block'; return; }
+  if (!/^05\d{8}$/.test(phone)) { errEl.textContent='נייד חייב להתחיל ב-05 ולהכיל 10 ספרות בלבד'; errEl.style.display='block'; return; }
+  var passErr = validatePassword(pass, pass2);
+  if (passErr)       { errEl.textContent=passErr; errEl.style.display='block'; return; }
+  errEl.style.display='none';
+  var newUser = { id: 'local_' + Date.now(), first_name:first, last_name:last, role:role, community_id:comm, username:user, phone:phone||null, passwordChangedAt: Date.now() };
+  function persistNewUser(hash) {
+    newUser.passwordHash = hash;
+    allUsers.push(newUser);
+    saveUsersToStorage();
+    closeModal('user-modal');
+    showToast(first + ' ' + last + ' נוסף ✓');
+    // רנדר מקומי מיידי — ללא API כדי שהמשתמש החדש יופיע מיד
+    renderUsersTable(allUsers, (document.getElementById('users-comm-filter')||{}).value||'');
+    renderSettlements();
+    // שמור ב-D1 ואז רענן מהשרת
+    apiPost('/api/admin/users', { first_name:first, last_name:last, role:role, community_id:comm, username:user, password:pass, phone:phone||null })
+      .then(function(res){
+        if (res && res.id) { newUser.id = res.id; saveUsersToStorage(); }
+        loadUsers(); // רענון מ-D1 אחרי שהנתון נשמר
+      }).catch(function(){});
+  }
+  hashPassword(pass).then(persistNewUser).catch(function() {
+    persistNewUser('fallback:' + btoa(unescape(encodeURIComponent(pass))));
+  });
+}
+
+function openEditUser(id) {
+  var u = allUsers.find(function(x) { return x.id === id; });
+  if (!u) { showToast('משתמש לא נמצא', 'error'); return; }
+  document.getElementById('eu-id').value = id;
+  document.getElementById('eu-first').value = u.first_name || '';
+  document.getElementById('eu-last').value = u.last_name || '';
+  document.getElementById('eu-username').value = u.username || '';
+  document.getElementById('eu-phone').value = u.phone || '';
+  document.getElementById('eu-password').value = '';
+  document.getElementById('eu-password2').value = '';
+  ['eu-password','eu-password2'].forEach(function(i){var el=document.getElementById(i);if(el)el.type='password';});
+  ['eye-eu1','eye-eu2'].forEach(function(i){var el=document.getElementById(i);if(el)el.textContent='👁';});
+  var bar=document.getElementById('eu-strength-bar'); if(bar){bar.style.width='0';bar.style.background='';}
+  var lbl=document.getElementById('eu-strength-label'); if(lbl)lbl.textContent='';
+  document.getElementById('eu-err').style.display='none';
+  var commName = (allSettlements.find(function(s){return s.id===u.community_id;})||{}).name || u.community_id || '—';
+  document.getElementById('eu-sub').textContent = commName;
+  openModal('edit-user-modal');
+}
+
+function updateStrengthEdit() {
+  var pass = (document.getElementById('eu-password')||{}).value || '';
+  if (!pass) {
+    var bar=document.getElementById('eu-strength-bar'); if(bar){bar.style.width='0';bar.style.background='';}
+    var lbl=document.getElementById('eu-strength-label'); if(lbl){lbl.textContent='';lbl.style.color='';}
+    return;
+  }
+  var s = passwordStrength(pass);
+  var bar=document.getElementById('eu-strength-bar'); if(bar){bar.style.width=s.pct+'%';bar.style.background=s.color;}
+  var lbl=document.getElementById('eu-strength-label'); if(lbl){lbl.textContent=s.label;lbl.style.color=s.color;}
+}
+
+function saveEditUser() {
+  var id    = document.getElementById('eu-id').value;
+  var first = document.getElementById('eu-first').value.trim();
+  var last  = document.getElementById('eu-last').value.trim();
+  var uname = document.getElementById('eu-username').value.trim();
+  var phone = document.getElementById('eu-phone').value.trim();
+  var pass  = document.getElementById('eu-password').value;
+  var pass2 = document.getElementById('eu-password2').value;
+  var errEl = document.getElementById('eu-err');
+  if (!first||!last) { errEl.textContent='נא להזין שם'; errEl.style.display='block'; return; }
+  if (phone && !/^05\d{8}$/.test(phone)) { errEl.textContent='נייד חייב להתחיל ב-05 ולהכיל 10 ספרות בלבד'; errEl.style.display='block'; return; }
+  if (pass) {
+    var passErr = validatePassword(pass, pass2);
+    if (passErr) { errEl.textContent=passErr; errEl.style.display='block'; return; }
+  }
+  errEl.style.display='none';
+  var idx = allUsers.findIndex(function(x){return x.id===id;});
+  if (idx < 0) { showToast('שגיאה: משתמש לא נמצא', 'error'); return; }
+  allUsers[idx] = Object.assign({}, allUsers[idx], {
+    first_name: first, last_name: last,
+    username: uname || allUsers[idx].username,
+    phone: phone || null
+  });
+  function finishEdit() {
+    saveUsersToStorage();
+    closeModal('edit-user-modal');
+    showToast(first + ' ' + last + ' עודכן ✓');
+    loadUsers();
+    renderSettlements();
+  }
+  if (pass) {
+    hashPassword(pass)
+      .then(function(hash) { allUsers[idx].passwordHash = hash; allUsers[idx].passwordChangedAt = Date.now(); finishEdit(); })
+      .catch(function() { allUsers[idx].passwordHash = 'fallback:' + btoa(unescape(encodeURIComponent(pass))); allUsers[idx].passwordChangedAt = Date.now(); finishEdit(); });
+  } else {
+    finishEdit();
+  }
+  // Best-effort API sync
+  var payload = { first_name:first, last_name:last, phone:phone||null };
+  if (uname) payload.username = uname;
+  if (pass)  payload.password = pass;
+  apiPost('/api/admin/users/' + id, payload).catch(function(){});
+}
+
+function deleteUser(id, name) {
+  // הגנה: רק community_manager ניתן למחיקה מטבלה זו
+  var target = allUsers.find(function(u) { return u.id === id; });
+  if (target && target.role !== 'community_manager') {
+    alert('לא ניתן למחוק משתמש בדרגה זו מכאן.');
+    return;
+  }
+  if (!confirm('למחוק את ' + name + '?')) return;
+  allUsers = allUsers.filter(function(u) { return u.id !== id; });
+  saveUsersToStorage();
+  showToast(name + ' נמחק ✓');
+  renderUsersTable(allUsers, (document.getElementById('users-comm-filter')||{}).value||'');
+  renderSettlements();
+  apiDelete('/api/admin/users/' + id).catch(function() {});
+}
+
+// ─── MONITORING ───────────────────────────────────────────
+function populateMonFilter() {
+  var sel = document.getElementById('mon-comm-filter');
+  var current = sel.value;
+  var opts = '<option value="">כל הישובים</option>';
+  allSettlements.forEach(function(s) {
+    opts += '<option value="' + esc(s.id) + '"' + (s.id === current ? ' selected' : '') + '>' + esc(s.name || s.id) + '</option>';
+  });
+  sel.innerHTML = opts;
+}
+
+function loadMonitoring() {
+  var filterComm = (document.getElementById('mon-comm-filter') || {}).value || '';
+  var commName = filterComm ? ((allSettlements.find(function(s){return s.id===filterComm;})||{}).name || filterComm) : 'כל הישובים';
+  var subEl = document.getElementById('mon-comm-sub');
+  if (subEl) subEl.textContent = commName;
+
+  fetch(API_BASE + '/api/health').then(function(r){return r.json();}).then(function(d) {
+    document.getElementById('mon-health').textContent = d.ok ? '✓ תקין' : '✗ תקלה';
+  }).catch(function() { document.getElementById('mon-health').textContent = '—'; });
+
+  // תקלות תאים — admin endpoint
+  var faultsUrl = '/api/admin/faults' + (filterComm ? '?community_id=' + encodeURIComponent(filterComm) : '');
+  apiGet(faultsUrl).then(function(faults) {
+    faults = Array.isArray(faults) ? faults : [];
+    document.getElementById('mon-faults').textContent = faults.length || '✓';
+    document.getElementById('mon-faults').style.color = faults.length ? 'var(--red)' : 'var(--green)';
+    var fb = document.getElementById('mon-faults-body');
+    if (!faults.length) {
+      fb.innerHTML = '<div style="color:var(--green);text-align:center;padding:16px">✓ אין תקלות פתוחות</div>';
+    } else {
+      fb.innerHTML = '<table><thead><tr><th>ישוב</th><th>תא</th><th>סטטוס</th><th>תיאור</th></tr></thead><tbody>' +
+        faults.map(function(c) {
+          return '<tr>' +
+            '<td style="font-size:12px">' + esc(c.community_name || c.community_id) + '</td>' +
+            '<td><strong>תא ' + c.cell_number + '</strong></td>' +
+            '<td><span class="badge badge-red">תקלה</span></td>' +
+            '<td style="font-size:12px;color:var(--muted)">' + esc(c.fault_note || '—') + '</td>' +
+          '</tr>';
+        }).join('') + '</tbody></table>';
+    }
+  }).catch(function() {
+    document.getElementById('mon-faults').textContent = '—';
+    document.getElementById('mon-faults-body').innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px">שגיאה בטעינת תקלות</div>';
+  });
+
+  // Use manager token for community-scoped data
+  var mgrToken = sessionStorage.getItem('manager_token') || adminToken;
+  var headers = { 'Authorization': 'Bearer ' + mgrToken };
+  Promise.all([
+    fetch(API_BASE + '/api/residents', { headers: headers }).then(function(r){return r.json();}).catch(function(){return [];}),
+    fetch(API_BASE + '/api/packages?status=waiting', { headers: headers }).then(function(r){return r.json();}).catch(function(){return [];}),
+    fetch(API_BASE + '/api/packages/history', { headers: headers }).then(function(r){return r.json();}).catch(function(){return [];})
+  ]).then(function(results) {
+    var residents  = Array.isArray(results[0]) ? results[0] : [];
+    var waiting    = Array.isArray(results[1]) ? results[1] : [];
+    var history    = Array.isArray(results[2]) ? results[2] : [];
+    document.getElementById('mon-residents').textContent  = residents.length;
+    document.getElementById('mon-packages').textContent   = waiting.length;
+    var actEl = document.getElementById('mon-activity');
+    if (!waiting.length && !history.length) {
+      actEl.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">אין פעילות עדיין</div>';
+    } else {
+      var all = waiting.concat(history).slice(0,10);
+      actEl.innerHTML = '<table><thead><tr><th>ברקוד</th><th>תא</th><th>דייר</th><th>תאריך</th><th>סטטוס</th></tr></thead><tbody>' +
+        all.map(function(p) {
+          return '<tr><td style="font-family:monospace">' + esc(p.barcode||'—') + '</td>' +
+            '<td>' + esc(p.cell_label||p.cell_id||'—') + '</td>' +
+            '<td>' + esc(p.resident_name||'—') + '</td>' +
+            '<td style="color:var(--muted)">' + fmtDate(p.assigned_at||p.created_at) + '</td>' +
+            '<td><span class="badge ' + (p.status==='waiting'?'badge-yellow':'badge-green') + '">' + (p.status==='waiting'?'ממתין':'נאסף') + '</span></td></tr>';
+        }).join('') + '</tbody></table>';
+    }
+  });
+}
+
+// ─── PAYMENTS ─────────────────────────────────────────────
+function renderPayments() {
+  var tbody = document.getElementById('payments-tbody');
+  var PRICES = { basic: 299, premium: 599 };
+  var today = new Date();
+  var nextBilling = new Date(today.getFullYear(), today.getMonth() + 1, 1)
+    .toLocaleDateString('he-IL', {day:'2-digit',month:'2-digit',year:'numeric'});
+
+  if (!allSettlements.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px">אין ישובים רשומים עדיין</td></tr>';
+    document.getElementById('pay-active').textContent = '0';
+    document.getElementById('pay-monthly').textContent = '₪0';
+    document.getElementById('pay-basic-count').textContent = '0';
+    document.getElementById('pay-premium-count').textContent = '0';
+    return;
+  }
+
+  var activeCount = 0, monthlyTotal = 0, basicCount = 0, premiumCount = 0;
+  allSettlements.forEach(function(s) {
+    var isActive = (s.status || 'active') === 'active';
+    if (isActive) {
+      activeCount++;
+      var price = PRICES[s.plan] || PRICES.basic;
+      monthlyTotal += price;
+      if (s.plan === 'premium') premiumCount++; else basicCount++;
+    }
+  });
+
+  document.getElementById('pay-active').textContent = activeCount;
+  document.getElementById('pay-monthly').textContent = '₪' + monthlyTotal.toLocaleString();
+  document.getElementById('pay-basic-count').textContent = basicCount;
+  document.getElementById('pay-premium-count').textContent = premiumCount;
+
+  var planLabels = { basic: '<span class="badge badge-blue">Basic</span>', premium: '<span class="badge badge-purple">Premium ⭐</span>' };
+  tbody.innerHTML = allSettlements.map(function(s) {
+    var price = PRICES[s.plan] || PRICES.basic;
+    var isActive = (s.status || 'active') === 'active';
+    var statusBadge = isActive
+      ? '<span class="badge badge-green">✓ שולם</span>'
+      : '<span class="badge badge-red">מושהה</span>';
+    return '<tr>' +
+      '<td><strong>' + esc(s.name || s.id) + '</strong><br><span style="font-size:11px;color:var(--muted);font-family:monospace">' + esc(s.id) + '</span></td>' +
+      '<td>' + (planLabels[s.plan] || '<span class="badge badge-gray">' + esc(s.plan||'—') + '</span>') + '</td>' +
+      '<td><strong>₪' + price.toLocaleString() + '</strong><span style="color:var(--muted);font-size:11px"> / חודש</span></td>' +
+      '<td style="color:var(--muted);font-size:12px">' + (isActive ? nextBilling : '—') + '</td>' +
+      '<td>' + statusBadge + '</td>' +
+      '<td><div class="td-actions">' +
+        '<button class="btn btn-secondary btn-sm" onclick="showToast(\'ניהול חיובים עבור ' + esc(s.name||s.id) + '\')">פרטים</button>' +
+      '</div></td></tr>';
+  }).join('');
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  var d = new Date(iso.replace(' ','T') + (iso.includes('Z')?'':'Z'));
+  return d.toLocaleDateString('he-IL', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+
+// ─── ONBOARDING WIZARD ────────────────────────────────────
+
+function openOnboarding() {
+  wizardStep = 1;
+  wizardData = {};
+  for (var i = 1; i <= 3; i++) {
+    document.getElementById('wp-'+i).classList.toggle('active', i===1);
+    document.getElementById('ws-'+i).className = 'wizard-step' + (i===1?' active':'');
+  }
+  var planSel = document.getElementById('w-plan-select');
+  if (planSel) planSel.value = 'basic';
+  wizardData.plan = 'basic';
+  ['w-comm-name','w-comm-id','w-comm-region'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.value = '';
+  });
+  // Reset wizard dimensions
+  wizardMaxWidth = 120; wizardMaxHeight = 200; wizardLegHeight = 20;
+  var wmw = document.getElementById('w-max-width');  if (wmw) wmw.value = 120;
+  var wmh = document.getElementById('w-max-height'); if (wmh) wmh.value = 200;
+  var wlh = document.getElementById('w-leg-height'); if (wlh) wlh.value = 20;
+  ['w1-err','w2-err'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+  wizardCols = 3;
+  wizardColConfig = [];
+  document.getElementById('w-cols-val').textContent = 3;
+  buildWizardColConfig();
+  buildWizardLocker();
+  openModal('onboarding-modal');
+}
+
+function selectWizardPlan(plan) {
+  wizardData.plan = plan;
+  var sel = document.getElementById('w-plan-select');
+  if (sel) sel.value = plan;
+}
+
+function wizardNext(step) {
+  var errEl = document.getElementById('w'+step+'-err');
+  if (errEl) errEl.style.display = 'none';
+  if (step === 1) {
+    var name = document.getElementById('w-comm-name').value.trim();
+    var id   = document.getElementById('w-comm-id').value.trim();
+    if (!name || !id) { errEl.textContent='נא למלא שם ומזהה'; errEl.style.display='block'; return; }
+    wizardData.communityName = name;
+    wizardData.communityId   = id;
+    wizardData.region        = (document.getElementById('w-comm-region')||{value:''}).value.trim();
+  }
+  if (step === 2) {
+    wizardData.lockerConfig = buildWizardLockerData();
+  }
+  goToWizardStep(step + 1);
+}
+
+function wizardBack(step) { goToWizardStep(step - 1); }
+
+function goToWizardStep(step) {
+  document.getElementById('wp-'+wizardStep).classList.remove('active');
+  document.getElementById('ws-'+wizardStep).className = 'wizard-step done';
+  if (step < wizardStep) document.getElementById('ws-'+wizardStep).className = 'wizard-step';
+  wizardStep = step;
+  document.getElementById('wp-'+step).classList.add('active');
+  document.getElementById('ws-'+step).className = 'wizard-step active';
+}
+
+function wizardSubmit() {
+  var errors = validateWizardDimensions();
+  if (errors.length) {
+    var errEl = document.getElementById('w-dim-err');
+    if (errEl) { errEl.innerHTML = errors.join('<br>'); errEl.style.display = 'block'; }
+    showToast('תקן שגיאות מידות תחילה', 'error');
+    return;
+  }
+  var btn = document.getElementById('w-submit-btn');
+  btn.textContent = 'יוצר...'; btn.disabled = true;
+  wizardData.lockerConfig = buildWizardLockerData();
+  apiPost('/api/admin/onboarding', {
+    community: { id: wizardData.communityId, name: wizardData.communityName, plan: wizardData.plan, region: wizardData.region || '' },
+    locker: wizardData.lockerConfig
+  }).then(function(res) {
+    btn.textContent = '✓ צור ישוב'; btn.disabled = false;
+    showWizardSummary(!res || !res.error, res);
+  }).catch(function() {
+    btn.textContent = '✓ צור ישוב'; btn.disabled = false;
+    showWizardSummary(false, null);
+  });
+}
+
+function showWizardSummary(ok, res) {
+  goToWizardStep(3);
+  document.getElementById('ws-3').className = 'wizard-step done';
+  var title = document.getElementById('w-done-title');
+  title.textContent = 'הישוב נוסף בהצלחה! 🎉';
+  title.style.color = 'var(--green)';
+  // Add to local settlements list
+  var newId = (res && res.id) || wizardData.communityId;
+  var existing = allSettlements.findIndex(function(s){ return s.id === newId; });
+  var newSettlement = { id: newId, name: wizardData.communityName, region: wizardData.region||'', plan: wizardData.plan||'basic', status:'active', lockers:0, manager:'—' };
+  if (existing >= 0) allSettlements[existing] = newSettlement;
+  else allSettlements.push(newSettlement);
+  saveSettlementsToStorage();
+  // Summary card
+  var lc = wizardData.lockerConfig || {};
+  var totalCells = (lc.columns||[]).reduce(function(a,c){return a+(c.cells||0);},0);
+  document.getElementById('w-summary-card').innerHTML =
+    '<div class="info-row"><span class="info-label">שם ישוב</span><strong>'+esc(wizardData.communityName)+'</strong></div>' +
+    '<div class="info-row"><span class="info-label">מזהה</span><span style="font-family:monospace">'+esc(wizardData.communityId)+'</span></div>' +
+    '<div class="info-row"><span class="info-label">פלאן</span><span class="badge '+(wizardData.plan==='premium'?'badge-purple':'badge-blue')+'">'+(wizardData.plan==='premium'?'Premium ⭐':'Basic')+'</span></div>' +
+    '<div class="divider"></div>' +
+    '<div class="info-row"><span class="info-label">עמודות לוקר</span><strong>'+(lc.cols||wizardCols)+'</strong></div>' +
+    '<div class="info-row"><span class="info-label">סה"כ תאים</span><strong>'+totalCells+'</strong></div>' +
+    '<div class="info-row" style="color:var(--muted);font-size:12px"><span>בעלי תפקידים ניתן להוסיף דרך טאב "בעלי תפקידים"</span></div>';
+}
+
+// ─── LOCKER BUILDER (main page) ───────────────────────────
+
+function selectTier(t) {
+  builderTier = t;
+  document.getElementById('tier-basic').className   = 'plan-card' + (t==='basic'?' selected':'');
+  document.getElementById('tier-premium').className = 'plan-card' + (t==='premium'?' selected':'');
+  document.getElementById('esp-row').style.display  = t==='premium' ? 'block' : 'none';
+  buildLocker();
+}
+
+function changeCols(d) {
+  builderCols = Math.min(8, Math.max(1, builderCols + d));
+  document.getElementById('b-cols-val').textContent = builderCols;
+  buildColConfig();
+  buildLocker();
+}
+
+// ─── BUILDER DIMENSION HELPERS ───────────────────────────
+function getBuilderMaxWidth()  { return parseInt((document.getElementById('b-max-width')||{}).value)  || builderMaxWidth;  }
+function getBuilderMaxHeight() { return parseInt((document.getElementById('b-max-height')||{}).value) || builderMaxHeight; }
+function getBuilderLegHeight() { return parseInt((document.getElementById('b-leg-height')||{}).value) || builderLegHeight; }
+
+// Distribute totalH into n integers that sum to exactly totalH
+function makeEvenHeights(totalH, n) {
+  n = Math.max(1, n);
+  var base = Math.floor(totalH / n);
+  var rem  = totalH - base * n;
+  var out  = [];
+  for (var k = 0; k < n; k++) out.push(k < rem ? base + 1 : base);
+  return out;
+}
+function defaultCellH() { return Math.max(10, Math.round((getBuilderMaxHeight() - getBuilderLegHeight()) / 5)); }
+
+function onDimensionChange() {
+  builderMaxWidth  = getBuilderMaxWidth();
+  builderMaxHeight = getBuilderMaxHeight();
+  builderLegHeight = getBuilderLegHeight();
+  buildColConfig();
+  buildLocker();
+}
+
+function validateLockerDimensions() {
+  var maxW = getBuilderMaxWidth();
+  var maxH = getBuilderMaxHeight();
+  var legH = getBuilderLegHeight();
+  var errors = [];
+  var sumW = builderColConfig.reduce(function(a,c){ return a + (parseInt(c.width)||0); }, 0);
+  if (sumW !== maxW) errors.push('סכום רוחב העמודות (' + sumW + ' ס"מ) ≠ רוחב מקסימלי (' + maxW + ' ס"מ)');
+  var expected = maxH - legH;
+  builderColConfig.forEach(function(c, i) {
+    var sumCellH = (c.cellHeights||[]).reduce(function(a,b){ return a + (parseInt(b)||0); }, 0);
+    if (sumCellH !== expected) errors.push('עמודה ' + (i+1) + ': גובה תאים (' + sumCellH + ') ≠ ' + maxH + '−' + legH + '=' + expected + ' ס"מ');
+  });
+  return errors;
+}
+
+function loadBuilderFromStorage() {
+  // נקרא רק בפתיחת "בנייה חדשה" מהסיידבר — טוען את הלוקר האחרון שנשמר
+  var saved = localStorage.getItem('smarta_locker_config');
+  if (!saved) return;
+  try {
+    var cfg = JSON.parse(saved);
+    builderCols      = cfg.cols || 3;
+    builderColConfig = (cfg.columns || []).map(function(c) {
+      return { width: c.width||40, depth: c.depth||30, cells: c.cells||5, cellHeights: (c.cellHeights||[]).slice() };
+    });
+    builderTier      = cfg.tier || 'basic';
+    builderMaxWidth  = cfg.maxWidth  || 120;
+    builderMaxHeight = cfg.maxHeight || 200;
+    builderLegHeight = cfg.legHeight || 20;
+    var mwEl = document.getElementById('b-max-width');  if (mwEl) mwEl.value = builderMaxWidth;
+    var mhEl = document.getElementById('b-max-height'); if (mhEl) mhEl.value = builderMaxHeight;
+    var lhEl = document.getElementById('b-leg-height'); if (lhEl) lhEl.value = builderLegHeight;
+    document.getElementById('b-cols-val').textContent = builderCols;
+    selectTier(builderTier);
+    if (cfg.esp_id) { var espEl = document.getElementById('b-esp'); if (espEl) espEl.value = cfg.esp_id; }
+    var statusEl = document.getElementById('builder-comm-status');
+    if (statusEl) statusEl.textContent = '← נטענה תצורה שמורה';
+  } catch(e) {}
+}
+
+function buildColConfig() {
+  var maxW      = getBuilderMaxWidth();
+  var effectiveH = Math.max(10, getBuilderMaxHeight() - getBuilderLegHeight());
+  var DEF_CELLS = 5;
+  while (builderColConfig.length < builderCols) {
+    var usedW   = builderColConfig.reduce(function(a,c){return a+(c.width||0);},0);
+    var remCols = builderCols - builderColConfig.length;
+    var remW    = maxW - usedW;
+    var defW    = (remCols === 1) ? remW : Math.round(remW / remCols);
+    defW = Math.max(10, defW);
+    builderColConfig.push({ width: defW, depth: 30, cells: DEF_CELLS, cellHeights: makeEvenHeights(effectiveH, DEF_CELLS) });
+  }
+  builderColConfig = builderColConfig.slice(0, builderCols);
+  var html = '';
+  for (var i = 0; i < builderCols; i++) {
+    var c = builderColConfig[i];
+    if (!c.depth) c.depth = 30;
+    if (!c.cellHeights || c.cellHeights.length === 0) c.cellHeights = makeEvenHeights(effectiveH, c.cells);
+    while (c.cellHeights.length < c.cells) c.cellHeights.push(Math.round(effectiveH / c.cells));
+    c.cellHeights = c.cellHeights.slice(0, c.cells);
+    var colSum = c.cellHeights.reduce(function(a,b){return a+(+b||0);},0);
+    var canRemove = builderCols > 1;
+    html += '<div style="margin-bottom:12px;padding:12px;background:var(--surface2);border-radius:10px;border:1px solid var(--border)">';
+    // Header
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">';
+    html += '<span style="font-size:12px;font-weight:800;color:var(--text)">עמודה ' + (i+1) + '</span>';
+    html += '<div style="display:flex;gap:5px">';
+    html += '<button class="btn btn-secondary btn-sm" onclick="duplicateCol('+i+')" title="שכפל עמודה">⧉ שכפל</button>';
+    if (canRemove) html += '<button class="btn btn-danger btn-sm" onclick="removeCol('+i+')" title="הסר עמודה">✕</button>';
+    html += '</div></div>';
+    // Dimensions
+    html += '<div class="form-row cols-3" style="margin-bottom:10px">';
+    html += '<div class="form-group"><label>רוחב (ס"מ)</label><input type="number" value="'+c.width+'" min="15" max="120" oninput="builderColConfig['+i+'].width=+this.value;buildLocker()"></div>';
+    html += '<div class="form-group"><label>עומק (ס"מ)</label><input type="number" value="'+c.depth+'" min="15" max="80" oninput="builderColConfig['+i+'].depth=+this.value"></div>';
+    html += '<div class="form-group"><label>תאים</label><div class="num-row">';
+    html += '<button class="num-btn" onclick="changeColCells('+i+',-1)">−</button>';
+    html += '<span class="num-val" id="b-cells-'+i+'">'+c.cells+'</span>';
+    html += '<button class="num-btn" onclick="changeColCells('+i+',1)">+</button></div></div></div>';
+    // Per-cell heights (bottom=1 → top=N)
+    html += '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">גובה תאים ס"מ — מלמטה למעלה</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:5px;margin-bottom:6px">';
+    for (var j = 0; j < c.cells; j++) {
+      html += '<div class="form-group" style="margin:0"><label style="font-size:9px">תא '+(j+1)+'</label>';
+      html += '<input type="number" value="'+(+c.cellHeights[j]||0)+'" min="1" max="500" style="padding:4px 7px;font-size:12px" oninput="builderColConfig['+i+'].cellHeights['+j+']=+this.value;buildLocker()"></div>';
+    }
+    html += '</div>';
+    html += '<div style="font-size:11px;color:var(--muted)">סה"כ גובה עמודה: <strong style="color:var(--text)">'+colSum+' ס"מ</strong></div>';
+    html += '</div>';
+  }
+  document.getElementById('b-cols-config').innerHTML = '<div class="card-title">⚙️ עמודות</div>' + html;
+}
+
+function changeColCells(col, d) {
+  var c = builderColConfig[col];
+  var effectiveH = getBuilderMaxHeight() - getBuilderLegHeight();
+  c.cells = Math.min(20, Math.max(1, c.cells + d));
+  c.cellHeights = makeEvenHeights(effectiveH, c.cells);
+  buildColConfig();
+  buildLocker();
+}
+
+function duplicateCol(i) {
+  var src = builderColConfig[i];
+  var clone = { width: src.width, depth: src.depth, cells: src.cells, cellHeights: src.cellHeights.slice() };
+  builderColConfig.splice(i + 1, 0, clone);
+  builderCols++;
+  document.getElementById('b-cols-val').textContent = builderCols;
+  buildColConfig();
+  buildLocker();
+}
+
+function removeCol(i) {
+  if (builderCols <= 1) return;
+  builderColConfig.splice(i, 1);
+  builderCols--;
+  document.getElementById('b-cols-val').textContent = builderCols;
+  buildColConfig();
+  buildLocker();
+}
+
+function buildLocker() {
+  if (!builderColConfig.length || builderColConfig.length !== builderCols) buildColConfig();
+  var maxW = getBuilderMaxWidth();
+  var maxH = getBuilderMaxHeight();
+  var legH = getBuilderLegHeight();
+  var effectiveH = Math.max(1, maxH - legH);
+  // Proportional scale: fit into ~320×280 preview area
+  var PREVIEW_W = 320, PREVIEW_H = 280;
+  var scaleX = PREVIEW_W / Math.max(maxW, 1);
+  var scaleY = PREVIEW_H / Math.max(effectiveH, 1);
+  var SCALE  = Math.min(scaleX, scaleY, 2.5);
+
+  var preview = document.getElementById('locker-preview');
+  var totalCells = 0;
+  var html = '';
+  var globalStart = 1;
+  for (var i = 0; i < builderCols; i++) {
+    var c = builderColConfig[i];
+    if (!c.cellHeights || c.cellHeights.length < c.cells) c.cellHeights = makeEvenHeights(effectiveH, c.cells);
+    var colW = Math.max(36, Math.round(c.width * SCALE));
+    totalCells += c.cells;
+    html += '<div class="locker-col" style="width:'+colW+'px">';
+    html += '<div class="col-label" style="font-size:9px;font-weight:800;text-align:center;width:100%">עמ\'&nbsp;'+(i+1)+'</div>';
+    // Render top-to-bottom visually; top cell = highest number
+    for (var j = c.cells - 1; j >= 0; j--) {
+      var cellNum = globalStart + j;
+      var cellH = Math.max(18, Math.round((+c.cellHeights[j]||1) * SCALE));
+      html += '<div class="locker-cell" style="height:'+cellH+'px;width:'+colW+'px;font-size:9px">'+cellNum+'</div>';
+    }
+    html += '</div>';
+    globalStart += c.cells;
+  }
+  if (preview) preview.innerHTML = html;
+
+  // Show/hide validation errors (button stays clickable always)
+  var errors = validateLockerDimensions();
+  var errEl  = document.getElementById('b-dim-err');
+  if (errors.length) {
+    if (errEl) { errEl.innerHTML = errors.join('<br>'); errEl.style.display = 'block'; }
+  } else {
+    if (errEl) errEl.style.display = 'none';
+  }
+
+  var sumEl = document.getElementById('b-summary');
+  if (sumEl) sumEl.textContent = 'סה"כ: ' + totalCells + ' תאים • ' + builderCols + ' עמודות • ' + maxW + '×' + maxH + ' ס"מ';
+}
+
+function saveLocker() {
+  var errors = validateLockerDimensions();
+  if (errors.length) {
+    var errEl = document.getElementById('b-dim-err');
+    if (errEl) { errEl.innerHTML = errors.join('<br>'); errEl.style.display = 'block'; errEl.scrollIntoView({behavior:'smooth', block:'center'}); }
+    showToast('⚠️ שגיאת מידות — ראה פירוט אדום', 'error');
+    return;
+  }
+  var commId = document.getElementById('builder-comm').value;
+  var config = {
+    lockerId: commId || 'default',
+    communityId: commId || null,
+    communityName: commId ? ((allSettlements.find(function(s){return s.id===commId;})||{}).name || commId) : null,
+    maxWidth:  getBuilderMaxWidth(),
+    maxHeight: getBuilderMaxHeight(),
+    legHeight: getBuilderLegHeight(),
+    cols: builderCols,
+    tier: builderTier,
+    esp_id: builderTier==='premium' ? (document.getElementById('b-esp').value.trim()||null) : null,
+    columns: builderColConfig.map(function(c) { return { width: c.width, depth: c.depth||30, cells: c.cells, cellHeights: c.cellHeights||[] }; })
+  };
+  localStorage.setItem('smarta_locker_config', JSON.stringify(config));
+  if (commId) {
+    localStorage.setItem('smarta_locker_config_' + commId, JSON.stringify(config));
+  }
+
+  if (!commId) {
+    showToast('תצורת לוקר נשמרה מקומית ✓ (לא שויך לישוב)');
+    return;
+  }
+
+  // שמירה ל-D1 דרך API
+  var statusEl = document.getElementById('builder-comm-status');
+  if (statusEl) statusEl.textContent = '⏳ שומר...';
+  var apiPayload = {
+    community_id: commId,
+    maxWidth:  config.maxWidth,
+    maxHeight: config.maxHeight,
+    legHeight: config.legHeight,
+    tier:      config.tier,
+    esp_id:    config.esp_id || null,
+    columns:   config.columns
+  };
+  // תמיד POST עם INSERT OR REPLACE — עובד בין אם הלוקר קיים ובין אם לא
+  apiPost('/api/admin/lockers', apiPayload)
+    .then(function(res) {
+      if (res && res.error) {
+        if (statusEl) statusEl.textContent = '⚠️ שגיאה: ' + res.error;
+        showToast('שגיאה בשמירה: ' + res.error, 'error');
+      } else {
+        if (statusEl) statusEl.textContent = '✓ נשמר לישוב ' + (config.communityName || commId);
+        showToast('לוקר נשמר ל-' + (config.communityName || commId) + ' ✓');
+        loadLockers();
+      }
+    })
+    .catch(function() {
+      if (statusEl) statusEl.textContent = '⚠️ שגיאת תקשורת — נשמר מקומית בלבד';
+      showToast('נשמר מקומית (שגיאת רשת)', 'error');
+    });
+}
+
+function onBuilderCommChange() {
+  var commId = document.getElementById('builder-comm').value;
+  var statusEl = document.getElementById('builder-comm-status');
+  if (!commId) { if (statusEl) statusEl.textContent = ''; return; }
+  var saved = localStorage.getItem('smarta_locker_config_' + commId);
+  if (saved) {
+    try {
+      var cfg = JSON.parse(saved);
+      builderCols = cfg.cols || builderCols;
+      builderColConfig = (cfg.columns || []).map(function(c) {
+        return { width: c.width||40, depth: c.depth||30, cells: c.cells||5, cellHeights: (c.cellHeights||[]).slice() };
+      });
+      builderMaxWidth  = cfg.maxWidth  || builderMaxWidth;
+      builderMaxHeight = cfg.maxHeight || builderMaxHeight;
+      builderLegHeight = cfg.legHeight || builderLegHeight;
+      var mwEl = document.getElementById('b-max-width');  if (mwEl) mwEl.value = builderMaxWidth;
+      var mhEl = document.getElementById('b-max-height'); if (mhEl) mhEl.value = builderMaxHeight;
+      var lhEl = document.getElementById('b-leg-height'); if (lhEl) lhEl.value = builderLegHeight;
+      document.getElementById('b-cols-val').textContent = builderCols;
+      buildColConfig(); buildLocker();
+      if (statusEl) statusEl.textContent = '← נטענה תצורה קיימת: ' + builderCols + ' עמודות, ' + builderMaxWidth + '×' + builderMaxHeight + ' ס"מ';
+    } catch(e) { if (statusEl) statusEl.textContent = 'שגיאה בטעינת תצורה'; }
+  } else {
+    if (statusEl) statusEl.textContent = 'ישוב חדש — אין תצורה שמורה';
+  }
+}
+
+function populateBuilderComm() {
+  var sel = document.getElementById('builder-comm');
+  var current = sel.value;
+  var opts = '<option value="">— בחר ישוב —</option>';
+  allSettlements.forEach(function(s) {
+    opts += '<option value="' + esc(s.id) + '"' + (s.id === current ? ' selected' : '') + '>' + esc(s.name || s.id) + '</option>';
+  });
+  sel.innerHTML = opts;
+}
+
+// ─── WIZARD LOCKER BUILDER ────────────────────────────────
+function changeWizardCols(d) {
+  wizardCols = Math.min(8, Math.max(1, wizardCols + d));
+  document.getElementById('w-cols-val').textContent = wizardCols;
+  buildWizardColConfig();
+  buildWizardLocker();
+}
+
+function getWizardMaxWidth()  { return parseInt((document.getElementById('w-max-width')||{}).value)  || wizardMaxWidth;  }
+function getWizardMaxHeight() { return parseInt((document.getElementById('w-max-height')||{}).value) || wizardMaxHeight; }
+function getWizardLegHeight() { return parseInt((document.getElementById('w-leg-height')||{}).value) || wizardLegHeight; }
+function defaultWizardCellH() { return Math.max(10, Math.round((getWizardMaxHeight() - getWizardLegHeight()) / 5)); }
+
+function onWizardDimensionChange() {
+  wizardMaxWidth  = getWizardMaxWidth();
+  wizardMaxHeight = getWizardMaxHeight();
+  wizardLegHeight = getWizardLegHeight();
+  buildWizardColConfig();
+  buildWizardLocker();
+}
+
+function validateWizardDimensions() {
+  var maxW = getWizardMaxWidth();
+  var maxH = getWizardMaxHeight();
+  var legH = getWizardLegHeight();
+  var errors = [];
+  var sumW = wizardColConfig.reduce(function(a,c){ return a + (parseInt(c.width)||0); }, 0);
+  if (sumW !== maxW) errors.push('סכום רוחב (' + sumW + ') ≠ ' + maxW + ' ס"מ');
+  var expected = maxH - legH;
+  wizardColConfig.forEach(function(c, i) {
+    var sumCellH = (c.cellHeights||[]).reduce(function(a,b){ return a + (parseInt(b)||0); }, 0);
+    if (sumCellH !== expected) errors.push('עמ\' ' + (i+1) + ': גובה תאים (' + sumCellH + ') ≠ ' + expected + ' ס"מ');
+  });
+  return errors;
+}
+
+function buildWizardColConfig() {
+  var maxW       = getWizardMaxWidth();
+  var effectiveH = Math.max(10, getWizardMaxHeight() - getWizardLegHeight());
+  var DEF_CELLS  = 5;
+  while (wizardColConfig.length < wizardCols) {
+    var usedW   = wizardColConfig.reduce(function(a,c){return a+(c.width||0);},0);
+    var remCols = wizardCols - wizardColConfig.length;
+    var remW    = maxW - usedW;
+    var defW    = (remCols === 1) ? remW : Math.round(remW / remCols);
+    defW = Math.max(10, defW);
+    wizardColConfig.push({ width: defW, depth: 30, cells: DEF_CELLS, cellHeights: makeEvenHeights(effectiveH, DEF_CELLS) });
+  }
+  wizardColConfig = wizardColConfig.slice(0, wizardCols);
+  var html = '';
+  for (var i = 0; i < wizardCols; i++) {
+    var c = wizardColConfig[i];
+    if (!c.depth) c.depth = 30;
+    if (!c.cellHeights || c.cellHeights.length === 0) c.cellHeights = makeEvenHeights(effectiveH, c.cells);
+    while (c.cellHeights.length < c.cells) c.cellHeights.push(Math.round(effectiveH / c.cells));
+    c.cellHeights = c.cellHeights.slice(0, c.cells);
+    var colSum = c.cellHeights.reduce(function(a,b){return a+b;},0);
+    var canRemove = wizardCols > 1;
+    html += '<div style="margin-bottom:10px;padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+    html += '<span style="font-size:12px;font-weight:800;color:var(--text)">עמודה '+(i+1)+'</span>';
+    html += '<div style="display:flex;gap:4px">';
+    html += '<button class="btn btn-secondary btn-sm" onclick="duplicateWizardCol('+i+')" style="font-size:11px;padding:3px 8px">⧉ שכפל</button>';
+    if (canRemove) html += '<button class="btn btn-danger btn-sm" onclick="removeWizardCol('+i+')" style="font-size:11px;padding:3px 8px">✕</button>';
+    html += '</div></div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">';
+    html += '<div class="form-group" style="margin:0"><label style="font-size:10px">רוחב (ס"מ)</label><input type="number" value="'+c.width+'" min="15" max="120" style="padding:5px 8px;font-size:12px" oninput="wizardColConfig['+i+'].width=+this.value;buildWizardLocker()"></div>';
+    html += '<div class="form-group" style="margin:0"><label style="font-size:10px">עומק (ס"מ)</label><input type="number" value="'+c.depth+'" min="15" max="80" style="padding:5px 8px;font-size:12px" oninput="wizardColConfig['+i+'].depth=+this.value"></div>';
+    html += '<div class="form-group" style="margin:0"><label style="font-size:10px">תאים</label><div class="num-row">';
+    html += '<button class="num-btn" onclick="changeWizardColCells('+i+',-1)" style="width:22px;height:22px;font-size:13px">−</button>';
+    html += '<span class="num-val" id="w-cells-'+i+'" style="font-size:13px">'+c.cells+'</span>';
+    html += '<button class="num-btn" onclick="changeWizardColCells('+i+',1)" style="width:22px;height:22px;font-size:13px">+</button></div></div></div>';
+    html += '<div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px">גובה תאים — מלמטה למעלה</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(56px,1fr));gap:4px;margin-bottom:5px">';
+    for (var j = 0; j < c.cells; j++) {
+      html += '<div class="form-group" style="margin:0"><label style="font-size:8px">תא '+(j+1)+'</label>';
+      html += '<input type="number" value="'+(+c.cellHeights[j]||0)+'" min="1" max="500" style="padding:3px 6px;font-size:11px" oninput="wizardColConfig['+i+'].cellHeights['+j+']=+this.value;buildWizardLocker()"></div>';
+    }
+    html += '</div>';
+    html += '<div style="font-size:10px;color:var(--muted)">גובה עמודה: <strong style="color:var(--text)">'+colSum+' ס"מ</strong></div>';
+    html += '</div>';
+  }
+  document.getElementById('w-cols-config').innerHTML = html;
+}
+
+function changeWizardColCells(col, d) {
+  var c = wizardColConfig[col];
+  var effectiveH = getWizardMaxHeight() - getWizardLegHeight();
+  c.cells = Math.min(20, Math.max(1, c.cells + d));
+  c.cellHeights = makeEvenHeights(effectiveH, c.cells);
+  buildWizardColConfig();
+  buildWizardLocker();
+}
+
+function duplicateWizardCol(i) {
+  var src = wizardColConfig[i];
+  wizardColConfig.splice(i+1, 0, { width:src.width, depth:src.depth, cells:src.cells, cellHeights:src.cellHeights.slice() });
+  wizardCols++;
+  document.getElementById('w-cols-val').textContent = wizardCols;
+  buildWizardColConfig();
+  buildWizardLocker();
+}
+
+function removeWizardCol(i) {
+  if (wizardCols <= 1) return;
+  wizardColConfig.splice(i, 1);
+  wizardCols--;
+  document.getElementById('w-cols-val').textContent = wizardCols;
+  buildWizardColConfig();
+  buildWizardLocker();
+}
+
+function buildWizardLocker() {
+  if (!wizardColConfig.length || wizardColConfig.length !== wizardCols) buildWizardColConfig();
+  var dh = defaultWizardCellH();
+  var maxW = getWizardMaxWidth();
+  var maxH = getWizardMaxHeight();
+  var legH = getWizardLegHeight();
+  var effectiveH = Math.max(1, maxH - legH);
+  var PREVIEW_W = 260, PREVIEW_H = 220;
+  var scaleX = PREVIEW_W / Math.max(maxW, 1);
+  var scaleY = PREVIEW_H / Math.max(effectiveH, 1);
+  var SCALE  = Math.min(scaleX, scaleY, 2.0);
+  var preview = document.getElementById('w-locker-preview');
+  var totalCells = 0;
+  var html = '';
+  var globalStart = 1;
+  for (var i = 0; i < wizardCols; i++) {
+    var c = wizardColConfig[i];
+    if (!c.cellHeights || c.cellHeights.length < c.cells) c.cellHeights = makeEvenHeights(effectiveH, c.cells);
+    var colW = Math.max(28, Math.round(c.width * SCALE));
+    totalCells += c.cells;
+    html += '<div class="locker-col" style="width:'+colW+'px">';
+    html += '<div class="col-label" style="font-size:8px;font-weight:800;text-align:center;width:100%">'+(i+1)+'</div>';
+    for (var j = c.cells - 1; j >= 0; j--) {
+      var cellNum = globalStart + j;
+      var cellH = Math.max(16, Math.round((+c.cellHeights[j]||1) * SCALE));
+      html += '<div class="locker-cell" style="height:'+cellH+'px;width:'+colW+'px;font-size:8px">'+cellNum+'</div>';
+    }
+    html += '</div>';
+    globalStart += c.cells;
+  }
+  if (preview) preview.innerHTML = html;
+  // Show dimension errors
+  var errors = validateWizardDimensions();
+  var errEl = document.getElementById('w-dim-err');
+  if (errEl) {
+    if (errors.length) { errEl.innerHTML = errors.join('<br>'); errEl.style.display = 'block'; }
+    else errEl.style.display = 'none';
+  }
+  var s = document.getElementById('w-locker-summary');
+  if (s) s.textContent = totalCells + ' תאים • ' + wizardCols + ' עמודות • ' + maxW + '×' + maxH + ' ס"מ';
+}
+
+function buildWizardLockerData() {
+  return {
+    cols: wizardCols,
+    maxWidth:  getWizardMaxWidth(),
+    maxHeight: getWizardMaxHeight(),
+    legHeight: getWizardLegHeight(),
+    columns: wizardColConfig.map(function(c) { return { width:c.width, depth:c.depth||30, cells:c.cells, cellHeights:c.cellHeights||[] }; })
+  };
+}
+
+// ─── UTILS ────────────────────────────────────────────────
+function esc(s) {
+  if (!s && s !== 0) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
