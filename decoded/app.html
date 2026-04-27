@@ -2038,14 +2038,26 @@ function buildLockerGrid() {
   function updateFault() {
     const selected = document.querySelector('input[name="fault-type"]:checked');
     if (!selected) { showToast('יש לבחור סוג תקלה', 'var(--red)'); return; }
-    if (!packageData[window._faultCellNum]) {
-      packageData[window._faultCellNum] = { resident:null, courier:null, time:null, days:'0', status:'faulty' };
+    const cellNum = window._faultCellNum;
+    const note = selected.value;
+    if (!packageData[cellNum]) {
+      packageData[cellNum] = { resident:null, courier:null, time:null, days:'0', status:'faulty' };
     }
-    packageData[window._faultCellNum].faultType = selected.value;
-    packageData[window._faultCellNum].status = 'faulty';
+    packageData[cellNum].faultType = note;
+    packageData[cellNum].status = 'faulty';
     closeModal('fault-modal');
-    showToast('תקלה דווחה ל-Smarta: תא ' + window._faultCellNum + ' — ' + selected.value, '#f59e0b');
     buildLockerGrid();
+    apiPost('/api/cells/fault', { cell_id: cellNum, note: note })
+      .then(function(res) {
+        if (res && res.error) {
+          showToast('שגיאה בשמירת תקלה: ' + res.error, 'var(--red)');
+        } else {
+          showToast('תקלה דווחה ל-Smarta: תא ' + cellNum + ' — ' + note, '#f59e0b');
+        }
+      })
+      .catch(function() {
+        showToast('שגיאת תקשורת — התקלה לא נשמרה', 'var(--red)');
+      });
   }
 
   function clearFault() {
@@ -2191,12 +2203,14 @@ function buildLockerGrid() {
     ).join('');
   }
 
+  var _toastTimer = null;
   function showToast(msg, color) {
     const t = document.getElementById('toast');
     t.textContent = msg;
     t.style.background = color || 'var(--green)';
     t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
+    if (_toastTimer) clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => { t.classList.remove('show'); _toastTimer = null; }, 3000);
   }
 
   function openModal(id) { document.getElementById(id).classList.add('open'); }
