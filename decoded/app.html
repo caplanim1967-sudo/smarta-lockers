@@ -1087,52 +1087,77 @@
   // ─── טעינת חבילות מה-API ─────────────────────────────────
   async function loadPackagesFromAPI() {
     try {
-      var data = await apiGet('/api/packages?status=waiting');
-      if (!Array.isArray(data)) return;
-      // בנה packageData מחדש מה-API
+      // טעינה מקבילה: חבילות ממתינות + מצב תאים (כולל תקלות)
+      var [pkgData, cellData] = await Promise.all([
+        apiGet('/api/packages?status=waiting'),
+        apiGet('/api/cells').catch(function() { return []; })
+      ]);
+
+      // ── 1. בנה fresh מחבילות ──────────────────────────────
       var fresh = {};
-      data.forEach(function(pkg) {
-        var num = parseInt(pkg.cell_id);
-        if (!num) return;
-        if (!fresh[num]) {
-          fresh[num] = {
-            status: 'occupied',
+      if (Array.isArray(pkgData)) {
+        pkgData.forEach(function(pkg) {
+          var num = parseInt(pkg.cell_id);
+          if (!num) return;
+          if (!fresh[num]) {
+            fresh[num] = {
+              status: 'occupied',
+              resident: pkg.resident_name || '',
+              courier: pkg.courier || '',
+              time: pkg.placed_at ? new Date(pkg.placed_at * 1000).toLocaleString('he-IL', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '',
+              days: String(Math.floor((Date.now()/1000 - pkg.placed_at) / 86400)),
+              code: pkg.lock_code || '',
+              packages: [],
+              _ids: []
+            };
+          }
+          fresh[num].packages.push({
             resident: pkg.resident_name || '',
+            phone: pkg.resident_phone || '',
             courier: pkg.courier || '',
-            time: pkg.placed_at ? new Date(pkg.placed_at * 1000).toLocaleString('he-IL', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '',
-            days: String(Math.floor((Date.now()/1000 - pkg.placed_at) / 86400)),
-            code: pkg.lock_code || '',
-            packages: [],
-            _ids: []
-          };
-        }
-        fresh[num].packages.push({
-          resident: pkg.resident_name || '',
-          phone: pkg.resident_phone || '',
-          courier: pkg.courier || '',
-          barcode: pkg.barcode || '',
-          notes: pkg.notes || '',
-          time: fresh[num].time,
-          _pkgId: pkg.id
+            barcode: pkg.barcode || '',
+            notes: pkg.notes || '',
+            time: fresh[num].time,
+            _pkgId: pkg.id
+          });
+          fresh[num]._ids.push(pkg.id);
+          if (!fresh[num].code && pkg.lock_code) fresh[num].code = pkg.lock_code;
         });
-        fresh[num]._ids.push(pkg.id);
-        // עדכן קוד מנעול (השתמש בראשון שנמצא)
-        if (!fresh[num].code && pkg.lock_code) fresh[num].code = pkg.lock_code;
-      });
-      // מזג: API גובר על cache מקומי — אבל שמור סטטוס loading מקומי
+      }
+
+      // ── 2. מזג תקלות מ-/api/cells ────────────────────────
+      if (Array.isArray(cellData)) {
+        cellData.forEach(function(cell) {
+          var num = parseInt(cell.number || cell.id);
+          if (!num) return;
+          if (cell.status === 'fault' || cell.status === 'faulty') {
+            // תקלה מ-DB גוברת על כל מה שיש מקומית לאותו תא
+            fresh[num] = {
+              status: 'faulty',
+              faultType: cell.fault_note || '',
+              resident: null, courier: null, time: null, days: '0'
+            };
+          }
+        });
+      }
+
+      // ── 3. מזג לתוך packageData ───────────────────────────
       Object.keys(fresh).forEach(function(k) {
-        // אם התא מקומית בטעינה ו-D1 עדיין לא עדכן — שמור loading
         if (packageData[k] && packageData[k].status === 'loading') {
-          fresh[k].status = 'loading';
+          if (fresh[k].status !== 'faulty') fresh[k].status = 'loading';
         }
         packageData[k] = fresh[k];
       });
-      // הסר תאים רק אם D1 מכיל נתונים — אבל אל תמחק תאים בטעינה
+
+      // הסר תאים ישנים — אבל שמור loading ו-faulty מקומי שטרם סונכרן
       if (Object.keys(fresh).length > 0) {
         Object.keys(packageData).forEach(function(k) {
-          if (!fresh[k] && packageData[k].status !== 'loading') delete packageData[k];
+          if (!fresh[k] && packageData[k].status !== 'loading' && packageData[k].status !== 'faulty') {
+            delete packageData[k];
+          }
         });
       }
+
       savePackageData();
       buildLockerGrid();
     } catch(e) { console.warn('packages load failed', e); }
