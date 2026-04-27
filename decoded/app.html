@@ -1033,6 +1033,17 @@
     try { window.parent.location.href = './login.html'; } catch(e) { window.location.href = './login.html'; }
   }
 
+  // פענח JWT לזיהוי תפקיד (ללא אימות חתימה — רק ל-UI)
+  var _jwtPayload = (function() {
+    try {
+      var parts = jwtToken.split('.');
+      if (parts.length !== 3) return {};
+      var b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      return JSON.parse(decodeURIComponent(escape(atob(b64))));
+    } catch(e) { return {}; }
+  })();
+  var _isSuperAdmin = (_jwtPayload.role === 'smarta_admin');
+
   // ===== API =====
   var API_BASE = 'https://smarta-api.smarta-api.workers.dev';
   var _residentsCache = [];
@@ -2000,6 +2011,10 @@ function buildLockerGrid() {
   }
 
   function submitNewFault() {
+    if (_isSuperAdmin) {
+      showToast('מנהל Smarta אינו יכול לדווח תקלות — יש להתחבר כאחראית דואר', 'var(--yellow)');
+      return;
+    }
     const cellNum = parseInt(document.getElementById('fault-cell-select').value);
     const selected = document.querySelector('input[name="new-fault-type"]:checked');
     if (!cellNum) { showToast('יש לבחור תא', 'var(--red)'); return; }
@@ -2036,6 +2051,10 @@ function buildLockerGrid() {
   }
 
   function updateFault() {
+    if (_isSuperAdmin) {
+      showToast('מנהל Smarta אינו יכול לדווח תקלות — יש להתחבר כאחראית דואר', 'var(--yellow)');
+      return;
+    }
     const selected = document.querySelector('input[name="fault-type"]:checked');
     if (!selected) { showToast('יש לבחור סוג תקלה', 'var(--red)'); return; }
     const cellNum = window._faultCellNum;
