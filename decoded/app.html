@@ -2664,6 +2664,15 @@ fetchAndCacheLockerConfig(function() {
   }
 });
 
+// ─── REFRESH ON TAB REVISIT (postMessage from shell) ─────
+window.addEventListener('message', function(e) {
+  if (!e.data || e.data.type !== 'smarta-refresh') return;
+  if (jwtToken) {
+    loadResidentsFromAPI();
+    loadPackagesFromAPI();
+  }
+});
+
 </script>
 
 <!-- BARCODE SCANNER MODAL -->

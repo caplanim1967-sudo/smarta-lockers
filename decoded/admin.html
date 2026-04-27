@@ -2230,6 +2230,20 @@ function buildWizardLockerData() {
   };
 }
 
+// ─── REFRESH ON TAB REVISIT (postMessage from shell) ─────
+window.addEventListener('message', function(e) {
+  if (!e.data || e.data.type !== 'smarta-refresh') return;
+  var activePage = document.querySelector('.page.active');
+  if (!activePage) { loadSettlements(); return; }
+  switch (activePage.id) {
+    case 'page-settlements':   loadSettlements(); break;
+    case 'page-lockers':       loadLockers(); break;
+    case 'page-users':         loadUsers(); break;
+    case 'page-monitoring':    loadMonitoring(); break;
+    case 'page-payments':      renderPayments(); break;
+  }
+});
+
 // ─── UTILS ────────────────────────────────────────────────
 function esc(s) {
   if (!s && s !== 0) return '';
