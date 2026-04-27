@@ -1042,7 +1042,7 @@
       return JSON.parse(decodeURIComponent(escape(atob(b64))));
     } catch(e) { return {}; }
   })();
-  var _isSuperAdmin = (_jwtPayload.role === 'smarta_admin');
+  var _isSuperAdmin = !_jwtPayload.community_id; // אמת גם למנהל-על ללא הקשר ישוב
 
   // ===== API =====
   var API_BASE = 'https://smarta-api.smarta-api.workers.dev';
@@ -2012,7 +2012,7 @@ function buildLockerGrid() {
 
   function submitNewFault() {
     if (_isSuperAdmin) {
-      showToast('מנהל Smarta אינו יכול לדווח תקלות — יש להתחבר כאחראית דואר', 'var(--yellow)');
+      showToast('יש לבחור ישוב — לחץ "נהל" ליד הישוב הרצוי ברשימת הישובים', 'var(--yellow)');
       return;
     }
     const cellNum = parseInt(document.getElementById('fault-cell-select').value);
@@ -2052,7 +2052,7 @@ function buildLockerGrid() {
 
   function updateFault() {
     if (_isSuperAdmin) {
-      showToast('מנהל Smarta אינו יכול לדווח תקלות — יש להתחבר כאחראית דואר', 'var(--yellow)');
+      showToast('יש לבחור ישוב — לחץ "נהל" ליד הישוב הרצוי ברשימת הישובים', 'var(--yellow)');
       return;
     }
     const selected = document.querySelector('input[name="fault-type"]:checked');

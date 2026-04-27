@@ -959,7 +959,6 @@ function deleteSettlement(id, name) {
 // ─── IMPERSONATION ────────────────────────────────────────
 
 function manageSettlement(id, name) {
-  // מנהל סמרטה נכנס לניהול ישוב ספציפי עם הרשאות מלאות
   showToast('מתחבר ל' + name + '…');
   apiPost('/api/admin/impersonate', { community_id: id })
     .then(function(res) {
@@ -967,27 +966,11 @@ function manageSettlement(id, name) {
         alert('שגיאה: ' + (res && res.error ? res.error : 'לא ניתן להתחבר לישוב'));
         return;
       }
-      // Store impersonated token as manager_token (shell reads this for manager iframe)
-      var userObj = {
-        name:           res.community_name ? 'מנהל סמרטה — ' + res.community_name : name,
-        role:           'community_manager',
-        community_id:   res.community_id,
-        community_name: res.community_name || name,
-        impersonated_by: 'smarta_admin'
-      };
-      sessionStorage.setItem('manager_token', res.token);
-      sessionStorage.setItem('manager_user',  JSON.stringify(userObj));
-      // Navigate the shell to the manager iframe — force reload so new token is picked up
-      if (window.parent && window.parent.showTab) {
-        // Reset the shell's loaded cache for manager so it re-renders with new token
-        if (window.parent.loaded) {
-          window.parent.loaded['manager'] = false;
-        } else {
-          // Fallback: reset iframe src directly
-          var mgrFrame = window.parent.document.getElementById('iframe-manager');
-          if (mgrFrame) mgrFrame.src = '';
-        }
-        window.parent.showTab('manager');
+      var commName = res.community_name || name;
+      if (window.parent && window.parent.activateCommunity) {
+        // הפעל הקשר ישוב לכל הטאבים
+        window.parent.activateCommunity(res.community_id, commName, res.token);
+        showToast('כל הטאבים פעילים עבור ' + commName);
       } else {
         alert('אין גישה ל-shell. פתח מתוך smarta-all-v2.html');
       }
