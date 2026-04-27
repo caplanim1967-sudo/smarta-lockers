@@ -1519,15 +1519,32 @@ function loadMonitoring() {
     if (!faults.length) {
       fb.innerHTML = '<div style="color:var(--green);text-align:center;padding:16px">✓ אין תקלות פתוחות</div>';
     } else {
-      fb.innerHTML = '<table><thead><tr><th>ישוב</th><th>תא</th><th>סטטוס</th><th>תיאור</th><th>דווח ב</th><th></th></tr></thead><tbody>' +
+      fb.innerHTML = '<table>' +
+        '<colgroup>' +
+          '<col style="width:22%">' +
+          '<col style="width:8%;white-space:nowrap">' +
+          '<col style="width:9%">' +
+          '<col style="width:35%">' +
+          '<col style="width:18%">' +
+          '<col style="width:8%">' +
+        '</colgroup>' +
+        '<thead><tr>' +
+          '<th>ישוב</th>' +
+          '<th style="text-align:center">תא</th>' +
+          '<th style="text-align:center">סטטוס</th>' +
+          '<th>תיאור</th>' +
+          '<th style="text-align:center">דווח ב</th>' +
+          '<th></th>' +
+        '</tr></thead><tbody>' +
         faults.map(function(c) {
+          var ts = c.created_at ? (function(t){var d=new Date(t*1000);return d.toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});})(c.created_at) : '—';
           return '<tr>' +
             '<td style="font-size:12px">' + esc(c.community_name || c.community_id) + '</td>' +
-            '<td><strong>תא ' + c.cell_number + '</strong></td>' +
-            '<td><span class="badge badge-red">תקלה</span></td>' +
+            '<td style="text-align:center;white-space:nowrap"><strong>תא ' + c.cell_number + '</strong></td>' +
+            '<td style="text-align:center"><span class="badge badge-red">תקלה</span></td>' +
             '<td style="font-size:12px;color:var(--muted)">' + esc(c.fault_note || '—') + '</td>' +
-            '<td style="font-size:12px;color:var(--muted);direction:ltr;text-align:right;unicode-bidi:plaintext">' + (c.created_at ? (function(ts){var d=new Date(ts*1000);return d.toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});})(c.created_at) : '—') + '</td>' +
-            '<td><button class="btn btn-danger btn-sm" style="font-size:11px;padding:3px 8px" onclick="adminClearFault(' + JSON.stringify(c.id) + ')">הסר</button></td>' +
+            '<td style="text-align:center;white-space:nowrap;font-size:12px;color:var(--muted);direction:ltr;unicode-bidi:plaintext">' + ts + '</td>' +
+            '<td style="text-align:center"><button class="btn btn-danger btn-sm" style="font-size:11px;padding:3px 8px" onclick="adminClearFault(' + JSON.stringify(c.id) + ')">הסר</button></td>' +
           '</tr>';
         }).join('') + '</tbody></table>';
     }
