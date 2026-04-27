@@ -694,6 +694,7 @@
       <!-- buttons -->
       <div style="display:flex;gap:5px;flex-shrink:0;">
         <button class="primary-btn" style="padding:5px 10px;font-size:11px;white-space:nowrap;background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3)" onclick="openAllCells()">🔓 פתח הכל</button>
+        <button class="primary-btn" style="padding:5px 10px;font-size:11px;white-space:nowrap;background:rgba(16,185,129,0.15);color:var(--green);border:1px solid rgba(16,185,129,0.35)" onclick="clearAllOccupied()">🧹 פנה תפוסים</button>
         <button class="primary-btn" style="padding:5px 10px;font-size:11px;white-space:nowrap;background:rgba(107,114,128,0.15);color:#9ca3af;border:1px solid #6b7280" onclick="openReportFaultModal()">⚠️ תקלה</button>
         <button class="primary-btn" style="padding:5px 10px;font-size:11px;white-space:nowrap;" onclick="openSendAllModal()">📣 שלח לכולם</button>
         <button class="primary-btn" style="padding:5px 10px;font-size:11px;white-space:nowrap;background:rgba(107,114,128,0.15);color:#9ca3af;border:1px solid #6b7280" onclick="printDashboard()">🖨️ הדפס</button>
@@ -2141,6 +2142,34 @@ function buildLockerGrid() {
 
   function openAllCells() {
     showToast('כל התאים נפתחו ✓', 'var(--red)');
+  }
+
+  function clearAllOccupied() {
+    var occupied = Object.keys(packageData).filter(function(k) {
+      return packageData[k] && packageData[k].status === 'occupied';
+    });
+    if (!occupied.length) {
+      showToast('אין תאים תפוסים לפינוי', 'var(--muted)');
+      return;
+    }
+    if (!confirm('לפנות ' + occupied.length + ' תאים תפוסים?\n(תאים עם תקלה לא יושפעו)')) return;
+    var count = occupied.length;
+    occupied.forEach(function(num) {
+      var cell = packageData[num] || {};
+      var ids = cell._ids || [];
+      delete packageData[num];
+      delete cellSelection[num];
+      if (ids.length) {
+        ids.forEach(function(id) {
+          apiPost('/api/packages/' + id + '/collect', {}).catch(function() {});
+        });
+      } else {
+        apiPost('/api/packages/collect-cell', { cell_id: String(num) }).catch(function() {});
+      }
+    });
+    savePackageData();
+    buildLockerGrid();
+    showToast('פונו ' + count + ' תאים ✓', 'var(--green)');
   }
 
   let _currentCellNum = null;
