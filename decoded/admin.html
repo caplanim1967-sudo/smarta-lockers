@@ -790,7 +790,8 @@ function showPage(name, el) {
   if (name === 'settlements') loadSettlements();
   if (name === 'lockers')     loadLockers();
   if (name === 'users')       { populateUsersFilter(); loadUsers(); }
-  if (name === 'monitoring')  { populateMonFilter(); loadMonitoring(); }
+  if (name === 'monitoring')  { populateMonFilter(); loadMonitoring(); startMonitoringAutoRefresh(); }
+  else { stopMonitoringAutoRefresh(); }
   if (name === 'payments')   { renderPayments(); }
   if (name === 'locker-builder') { populateBuilderComm(); loadBuilderFromStorage(); buildColConfig(); buildLocker(); }
 }
@@ -1575,6 +1576,19 @@ function loadMonitoring() {
         }).join('') + '</tbody></table>';
     }
   });
+}
+
+// ─── MONITORING AUTO-REFRESH ──────────────────────────────
+var _monRefreshTimer = null;
+function startMonitoringAutoRefresh() {
+  stopMonitoringAutoRefresh();
+  _monRefreshTimer = setInterval(function() {
+    var monPage = document.getElementById('page-monitoring');
+    if (monPage && monPage.classList.contains('active')) loadMonitoring();
+  }, 30000); // רענון כל 30 שניות
+}
+function stopMonitoringAutoRefresh() {
+  if (_monRefreshTimer) { clearInterval(_monRefreshTimer); _monRefreshTimer = null; }
 }
 
 // ─── PAYMENTS ─────────────────────────────────────────────
