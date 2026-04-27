@@ -2108,11 +2108,22 @@ function buildLockerGrid() {
   }
 
   function clearFault() {
-    delete packageData[window._faultCellNum];
-    delete cellSelection[window._faultCellNum];
+    var cellNum = window._faultCellNum;
+    delete packageData[cellNum];
+    delete cellSelection[cellNum];
     closeModal('fault-modal');
-    showToast('תא ' + window._faultCellNum + ' סומן כתקין ✓', 'var(--green)');
     buildLockerGrid();
+    apiPost('/api/cells/clear-fault', { cell_id: cellNum })
+      .then(function(res) {
+        if (res && res.error) {
+          showToast('שגיאה בהסרת תקלה: ' + res.error, 'var(--red)');
+        } else {
+          showToast('תא ' + cellNum + ' סומן כתקין ✓', 'var(--green)');
+        }
+      })
+      .catch(function() {
+        showToast('שגיאת תקשורת — הסרת התקלה לא נשמרה', 'var(--red)');
+      });
   }
 
   function toggleNotify(num) {
