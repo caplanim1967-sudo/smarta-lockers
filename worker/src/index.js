@@ -402,6 +402,25 @@ async function handleAdmin(path, method, request, env, user, url) {
     return ok({ sent: true, note: 'Twilio integration pending' });
   }
 
+  // ── מחיקת תקלה בודדת (לפי cell.id) ─────────────────────
+  if (path === '/api/admin/faults' && method === 'DELETE') {
+    const b = await request.json().catch(() => ({}));
+    if (!b.id) return err('id חובה');
+    await db.prepare('DELETE FROM cells WHERE id = ?').bind(b.id).run();
+    return ok({ ok: true });
+  }
+
+  // ── ניקוי כל התקלות (כל הישובים או ישוב מסוים) ──────────
+  if (path === '/api/admin/faults/clear-all' && method === 'POST') {
+    const b = await request.json().catch(() => ({}));
+    if (b.community_id) {
+      await db.prepare(`DELETE FROM cells WHERE community_id = ? AND status != 'empty'`).bind(b.community_id).run();
+    } else {
+      await db.prepare(`DELETE FROM cells WHERE status != 'empty'`).run();
+    }
+    return ok({ ok: true });
+  }
+
   // ── Cell faults — all communities ────────────────────────
   if (path === '/api/admin/faults' && method === 'GET') {
     const commId = url.searchParams.get('community_id');

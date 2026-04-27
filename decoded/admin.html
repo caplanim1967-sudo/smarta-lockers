@@ -380,7 +380,10 @@ textarea{resize:vertical;min-height:80px;}
         <div class="status-card"><div class="label">תקלות תאים</div><div class="val val-red" id="mon-faults">—</div><div class="sub">פתוחות</div></div>
       </div>
       <div class="card" id="mon-faults-card">
-        <div class="card-title">⚠️ תקלות תאים פתוחות</div>
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+          <span>⚠️ תקלות תאים פתוחות</span>
+          <button class="btn btn-danger btn-sm" onclick="adminClearAllFaults()" style="font-size:11px">🗑️ נקה הכל</button>
+        </div>
         <div id="mon-faults-body" style="color:var(--muted);font-size:13px;text-align:center;padding:24px">טוען...</div>
       </div>
       <div class="card">
@@ -1517,7 +1520,7 @@ function loadMonitoring() {
     if (!faults.length) {
       fb.innerHTML = '<div style="color:var(--green);text-align:center;padding:16px">✓ אין תקלות פתוחות</div>';
     } else {
-      fb.innerHTML = '<table><thead><tr><th>ישוב</th><th>תא</th><th>סטטוס</th><th>תיאור</th><th>דווח ב</th></tr></thead><tbody>' +
+      fb.innerHTML = '<table><thead><tr><th>ישוב</th><th>תא</th><th>סטטוס</th><th>תיאור</th><th>דווח ב</th><th></th></tr></thead><tbody>' +
         faults.map(function(c) {
           return '<tr>' +
             '<td style="font-size:12px">' + esc(c.community_name || c.community_id) + '</td>' +
@@ -1525,6 +1528,7 @@ function loadMonitoring() {
             '<td><span class="badge badge-red">תקלה</span></td>' +
             '<td style="font-size:12px;color:var(--muted)">' + esc(c.fault_note || '—') + '</td>' +
             '<td style="font-size:12px;color:var(--muted);direction:ltr;text-align:right;unicode-bidi:plaintext">' + (c.created_at ? (function(ts){var d=new Date(ts*1000);return d.toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});})(c.created_at) : '—') + '</td>' +
+            '<td><button class="btn btn-danger btn-sm" style="font-size:11px;padding:3px 8px" onclick="adminClearFault(' + JSON.stringify(c.id) + ')">הסר</button></td>' +
           '</tr>';
         }).join('') + '</tbody></table>';
     }
@@ -1577,6 +1581,37 @@ function stopMonitoringAutoRefresh() {
 }
 
 // ─── PAYMENTS ─────────────────────────────────────────────
+// ─── מחיקת תקלות מהניטור (Admin) ────────────────────────────────────────────
+function adminClearFault(cellId) {
+  if (!confirm('להסיר תקלה זו מה-DB?')) return;
+  fetch(API_BASE + '/api/admin/faults', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + adminToken },
+    body: JSON.stringify({ id: cellId })
+  }).then(function(r) { return r.json(); }).then(function(res) {
+    if (res && res.error) { showToast('שגיאה: ' + res.error, 'var(--red)'); return; }
+    showToast('התקלה הוסרה ✓');
+    loadMonitoring();
+  }).catch(function() { showToast('שגיאת תקשורת', 'var(--red)'); });
+}
+
+function adminClearAllFaults() {
+  var filterComm = (document.getElementById('mon-comm-filter') || {}).value || '';
+  var msg = filterComm
+    ? 'למחוק את כל התקלות בישוב זה?'
+    : 'למחוק את כל התקלות בכל הישובים?';
+  if (!confirm(msg)) return;
+  fetch(API_BASE + '/api/admin/faults/clear-all', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + adminToken },
+    body: JSON.stringify(filterComm ? { community_id: filterComm } : {})
+  }).then(function(r) { return r.json(); }).then(function(res) {
+    if (res && res.error) { showToast('שגיאה: ' + res.error, 'var(--red)'); return; }
+    showToast('כל התקלות נוקו ✓');
+    loadMonitoring();
+  }).catch(function() { showToast('שגיאת תקשורת', 'var(--red)'); });
+}
+
 // ─── DEBUG: הצג כל רשומות cells ב-DB ────────────────────────────────────────
 function debugCells() {
   apiGet('/api/admin/faults').then(function(rows) {
