@@ -370,6 +370,7 @@ textarea{resize:vertical;min-height:80px;}
             <option value="">כל הישובים</option>
           </select>
           <button class="btn btn-secondary btn-sm" onclick="loadMonitoring()">🔄 רענן</button>
+          <button class="btn btn-secondary btn-sm" onclick="debugCells()" title="הצג את כל רשומות cells ב-DB">🔍 בדוק DB</button>
         </div>
       </div>
       <div class="status-grid" id="monitoring-stats">
@@ -1576,6 +1577,25 @@ function stopMonitoringAutoRefresh() {
 }
 
 // ─── PAYMENTS ─────────────────────────────────────────────
+// ─── DEBUG: הצג כל רשומות cells ב-DB ────────────────────────────────────────
+function debugCells() {
+  apiGet('/api/admin/faults').then(function(rows) {
+    rows = Array.isArray(rows) ? rows : [];
+    if (!rows.length) {
+      alert('טבלת cells ריקה — אין רשומות עם status != empty');
+      return;
+    }
+    var lines = rows.map(function(r) {
+      return 'id=' + r.id + ' | community=' + (r.community_name || r.community_id) +
+             ' | תא=' + r.cell_number + ' | status=' + r.status +
+             ' | note=' + (r.fault_note || '—');
+    });
+    alert('תקלות ב-DB (' + rows.length + '):\n\n' + lines.join('\n'));
+  }).catch(function(e) {
+    alert('שגיאה: ' + e);
+  });
+}
+
 function renderPayments() {
   var tbody = document.getElementById('payments-tbody');
   var PRICES = { basic: 299, premium: 599 };

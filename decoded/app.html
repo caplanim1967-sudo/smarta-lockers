@@ -1754,7 +1754,9 @@ function buildLockerGrid() {
     const container = document.getElementById('locker-grid-container');
     container.innerHTML = '';
 
-    var commName = (typeof currentUser !== 'undefined' && currentUser && currentUser.community_name) ? currentUser.community_name : 'לוח בקרה';
+    var commName = (_jwtPayload && _jwtPayload.community_name) ? _jwtPayload.community_name
+                 : (typeof currentUser !== 'undefined' && currentUser && currentUser.community_name) ? currentUser.community_name
+                 : 'לוח בקרה';
 
     if (!config.layout || config.layout.length === 0) {
       document.getElementById('locker-title').textContent = commName;
@@ -2031,7 +2033,8 @@ function buildLockerGrid() {
         if (res && res.error) {
           showToast('שגיאה בשמירת תקלה: ' + res.error, 'var(--red)');
         } else {
-          showToast('תקלה דווחה ל-Smarta ✓ תא ' + cellNum + ' — ' + note, '#f59e0b');
+          var _cn = _jwtPayload.community_name || _jwtPayload.community_id || '';
+          showToast('תקלה דווחה ל-Smarta ✓ תא ' + cellNum + ' — ' + note + (_cn ? ' | ' + _cn : ''), '#f59e0b');
         }
       })
       .catch(function() {
