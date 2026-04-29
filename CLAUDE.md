@@ -1,6 +1,6 @@
 # CLAUDE.md — Smarta Lockers
 > קובץ זה נקרא אוטומטית בכל פתיחת שיחה. מעדכן אותו בסוף כל שיחה.
-> עדכון אחרון: 2026-04-27
+> עדכון אחרון: 2026-04-29
 
 ---
 
@@ -83,8 +83,10 @@ lockCode = randPart + cellPart   →   4 ספרות סה"כ
 מנהל ישוב סוגר הסכם עם חברת שילוח → לחברה יש ממשק להוסיף שליחים → שליח פותח רק תאים **פנויים** בתוך המגבלות שמנהל הישוב קבע.
 
 ### SMS / WhatsApp
-ספק: **Twilio** (מאושר). עדיין לא מחובר — כרגע UI בלבד.
+ספק: **InforUMobile** (ישראלי — נבחר על Twilio בגלל מספרים ישראליים).
+עדיין לא מחובר — `sendMessage()` = mock (console.log בלבד).
 **ערוץ:** SMS או WhatsApp — לפי בחירת הדייר, מוגדר ע"י מנהל הישוב.
+**הצעד הבא:** פתיחת חשבון InforUMobile → החלפת mock ב-API אמיתי.
 
 ### זרימת SMS אישור איסוף (רעיון חדש — טרם מומש)
 ```
@@ -317,13 +319,15 @@ wrangler d1 execute smarta-db --remote --command="UPDATE users SET password_hash
 ## בעיות פתוחות
 
 ### קריטי
+- [ ] **Feature flags** — הוספת שדה `features` לD1 + הרחבת JWT + UI בadmin להפעלה/כיבוי פר ישוב
 - [ ] תזכורות ב-manager.html לא נשמרות (צריך endpoint + D1 + UI מחובר)
-- [x] ~~תאי לוקר ב-manager.html לא עובדים~~ — תוקן: /api/cells עובד, תצוגה קריאה בלבד
-- [x] ~~saveLocker לא שמר ל-D1~~ — תוקן: תמיד POST עם INSERT OR REPLACE
-- [x] ~~לוקר לא מוצג ב-app.html~~ — תוקן: builderConfigToLayout ממיר פורמט admin לפורמט app
+- [ ] courier.html — שכתוב מאפס (ראה החלטות אפיון courier בהיסטוריה)
+- [x] ~~תאי לוקר ב-manager.html לא עובדים~~ — תוקן
+- [x] ~~saveLocker לא שמר ל-D1~~ — תוקן
+- [x] ~~לוקר לא מוצג ב-app.html~~ — תוקן
 
 ### בינוני
-- [ ] SMS/WhatsApp לא מחובר (Twilio — עדיין UI בלבד) ← פאזה 2
+- [ ] SMS/WhatsApp לא מחובר — ממתין לחשבון InforUMobile (sendMessage() = mock) ← פאזה 2
 - [ ] כרטיסי תחזוקה לא מומשו
 - [ ] smarta_admin — password_changed_at לא נשמר בD1 (אין עמודה, צריך ALTER TABLE)
 - [ ] ב-admin.html: password reminder SMS — עדיין mock ("Twilio pending")
@@ -373,6 +377,33 @@ wrangler d1 execute smarta-db --remote --command="UPDATE users SET password_hash
 - PROJECT_STATUS.md נוצר
 - CLAUDE.md נוצר (הקובץ הזה)
 - גילוי עסקי: שני מסלולים, מתודיקת קוד, זרימת שליח
+
+### אפריל 29 — session (Claude Code)
+
+**app.html — תיקון "שלח לכולם":**
+- הפונקציות `recipientList`, `msgSection`, `fillCell` הוגדרו בתוך `openSendAllModal` — בסביבת blob URL לא הצליחו לגשת ל-`esc()`
+- פתרון: הוצאו לרמת מודול בשמות `_recipientList`, `_msgSection`, `_fillCell`
+- `esc()` נוספה כ-utility ברמת מודול (HTML escape)
+- `_fillCell` מקבל `isBasic` כפרמטר
+- GitHub Pages: תמיד צריך commit + push, לא רק reencode
+
+**worker — תיקון POST /api/messages/send:**
+- שגיאה 1101 (Cloudflare) = exception שלא נתפס
+- סיבה: `return handleCommunity(...)` ללא `await` → try-catch לא תפס async exceptions
+- תיקון: `return await handleCommunity(...)` ו-`return await handleAdmin(...)`
+- שגיאה אמיתית: `msg_settings_json` ב-D1 נשמר כ-JS object literal (ללא מרכאות על מפתחות) → `JSON.parse` קרס
+- תיקון: try-catch מקומי + fallback ל-`{}`
+- תיקון D1: עדכון `msg_settings_json` ל-JSON תקני ב-NIR-01
+- ספק SMS: InforUMobile (ישראלי) — נבחר במקום Twilio (בעיית מספרים ישראליים)
+- `sendMessage()` כרגע mock — מחכה לחשבון InforUMobile
+
+**מה עובד עכשיו:**
+- לחיצה על "שלח לכולם" → מודל נפתח עם תצוגה מקדימה ✅
+- לחיצה על "שלח הודעות" → API מגיב `{sent: N, failed: 0}` ✅
+- toast "N הודעות נשלחו" מוצג ✅
+
+**סיסמה נוכחית nir_doa:** `Smarta2026!`
+**סיסמה mgr_nir:** לא ידועה (hash ב-D1, לא אופס)
 
 ### אפריל 27 — session (Claude Code)
 
