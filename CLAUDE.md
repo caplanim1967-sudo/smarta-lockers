@@ -164,10 +164,50 @@ wrangler d1 execute smarta-db --remote --file=schema.sql
 | רכיב | פרטים |
 |------|--------|
 | בקר | ESP32 (WiFi מובנה + SIM backup) |
-| מנעול | סולנואיד NC 12V — נפתח כשמקבל מתח, נסגר ללא חשמל (fail-secure) |
-| לוח ממסרים | I2C relay board (AliExpress) — בקר אחד לכל עמודות הארון |
+| מנעול | סולנואיד NC 12V — נפתח כשמקבל מתח, נסגר ללא חשמל (fail-secure) — [AliExpress 1005002667577244](https://he.aliexpress.com/item/1005002667577244.html) |
+| לוח בקרה | **RS485 serial lock control board** — לוח אחד לכל הלוקר (לא לכל עמודה!) — 8/12/18/24/36/50 ערוצים — [AliExpress 1005003506214612](https://he.aliexpress.com/item/1005003506214612.html) |
+| ממיר RS485 | MAX485 chip (~$0.50) — ממיר TTL→RS485 בין ESP32 ללוח |
 | גיבוי חשמל | LiFePO4 — חיוני! בלי חשמל = לא ניתן לפתוח |
 | ניטור דלת | **ללא** חיישן reed — החלטה מכוונת (maintenance overhead) |
+
+### פרוטוקול RS485 — לוח הבקרה
+```
+Baud: 9600, 8N1, הפקודות ב-Hex
+עד 31 לוחות על אותו RS485 bus (כתובת נקבעת ב-DIP switch)
+מתח עבודה: DC 12-24V
+```
+
+| פעולה | פקודה (hex) | הערה |
+|-------|-------------|------|
+| פתח תא יחיד | `8A [board] [ch] 11 [BCC]` | ch=01..N |
+| פתח הכל | `8A [board] 00 11 [BCC]` | |
+| שאל תא יחיד | `80 [board] [ch] 33 [BCC]` | תגובה אחרי 200ms |
+| שאל הכל | `80 [board] 00 33 [BCC]` | |
+| פתח מרובים | `90 [board] [CH1-8] [CH9-16] [CH17-24] [BCC]` | ביטמאפ |
+
+**BCC:** XOR על כל בתים חוץ מהאחרון.
+
+**דוגמה:** פתח תא 1 בלוח 1: `8A 01 01 11 9B`
+
+**Feedback (NC lock):** `8A 01 01 00 8A` = הצלחה | `8A 01 01 11 9B` = כישלון
+
+### ESP32 Firmware — סקיצה
+```cpp
+#define RS485_TX  17
+#define RS485_RX  16
+#define RS485_DE  4   // Direction Enable
+
+HardwareSerial RS485Serial(1);
+
+void openCell(uint8_t board, uint8_t channel) {
+  uint8_t cmd[5] = {0x8A, board, channel, 0x11, 0};
+  cmd[4] = cmd[0]^cmd[1]^cmd[2]^cmd[3]; // BCC
+  digitalWrite(RS485_DE, HIGH);
+  RS485Serial.write(cmd, 5);
+  RS485Serial.flush();
+  digitalWrite(RS485_DE, LOW);
+}
+```
 
 ### פתיחת תא פרמיום
 ```
