@@ -92,6 +92,15 @@ async function sha256hex(str) {
 function newId()  { return crypto.randomUUID(); }
 function nowSec() { return Math.floor(Date.now() / 1000); }
 
+// ── Message sender — Phase 2: replace with InforUMobile API ──────────────────
+async function sendMessage(to, body, channel /*, env */) {
+  // TODO: InforUMobile SMS/WhatsApp API
+  // SMS:      POST https://api.inforumobile.com/...  { to, from, body }
+  // WhatsApp: POST https://api.inforumobile.com/...  { to, from, body }
+  console.log(`[MSG:${(channel||'sms').toUpperCase()}] → ${to} | ${body.substring(0,80)}`);
+  return true; // mock — תמיד מצליח
+}
+
 // ─── AUTH MIDDLEWARE ──────────────────────────────────────────────────────────
 
 async function getUser(request, env) {
@@ -128,6 +137,31 @@ export default {
         return ok({ message: 'אם המשתמש קיים — תישלח הודעת SMS' });
       }
 
+      // ── שינוי סיסמה (כניסה ראשונה) ────────────────────────
+      if (path === '/api/auth/change-password' && method === 'POST') {
+        const authUser = await getUser(request, env);
+        if (!authUser) return unauthorized();
+        const b = await request.json().catch(() => ({}));
+        if (!b.password || b.password.length < 8) return err('סיסמה חייבת להכיל לפחות 8 תווים');
+        const hash = await sha256hex(b.password);
+        await env.smarta_db.prepare(
+          'UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?'
+        ).bind(hash, nowSec(), authUser.sub).run();
+        return ok({ changed: true });
+      }
+
+      // ── ESP32 polling — public, no JWT ─────────────────────
+      if (path === '/api/esp/commands' && method === 'GET') {
+        const espId = url.searchParams.get('esp_id');
+        if (!espId) return err('esp_id חובה');
+        const cmd = await env.smarta_db.prepare(
+          'SELECT * FROM esp_commands WHERE esp_id = ? ORDER BY created_at ASC LIMIT 1'
+        ).bind(espId).first();
+        if (!cmd) return ok({ no_command: true });
+        await env.smarta_db.prepare('DELETE FROM esp_commands WHERE id = ?').bind(cmd.id).run();
+        return ok({ cell_number: cmd.cell_number, community_id: cmd.community_id });
+      }
+
       // First-run setup (only if zero users exist)
       if (path === '/api/setup' && method === 'POST') {
         return handleSetup(request, env);
@@ -140,11 +174,11 @@ export default {
       // Admin routes
       if (path.startsWith('/api/admin/')) {
         if (user.role !== 'smarta_admin') return forbidden();
-        return handleAdmin(path, method, request, env, user, url);
+        return await handleAdmin(path, method, request, env, user, url);
       }
 
       // Community routes (all other roles)
-      return handleCommunity(path, method, request, env, user, url);
+      return await handleCommunity(path, method, request, env, user, url);
 
     } catch (e) {
       console.error('Unhandled error:', e.message, e.stack);
@@ -196,21 +230,27 @@ async function handleLogin(request, env) {
   if (hash !== user.password_hash) return json({ error: 'שם משתמש או סיסמה שגויים' }, 401);
 
   let communityName = '';
+  let features = {};
   if (user.community_id) {
     const s = await env.smarta_db
-      .prepare('SELECT name FROM settlements WHERE id = ?')
+      .prepare('SELECT name, features_json FROM settlements WHERE id = ?')
       .bind(user.community_id)
       .first();
     communityName = s?.name || '';
+    try { features = JSON.parse(s?.features_json || '{}'); } catch(e) { features = {}; }
   }
 
+  const mustChangePassword = user.password_changed_at === null;
+
   const payload = {
-    sub:            user.id,
-    role:           user.role,
-    community_id:   user.community_id || null,
-    name:           `${user.first_name} ${user.last_name}`,
-    community_name: communityName,
-    exp:            nowSec() + 60 * 60 * 24 * 30,  // 30 days
+    sub:                  user.id,
+    role:                 user.role,
+    community_id:         user.community_id || null,
+    name:                 `${user.first_name} ${user.last_name}`,
+    community_name:       communityName,
+    features,
+    must_change_password: mustChangePassword,
+    exp:                  nowSec() + 60 * 60 * 24 * 30,  // 30 days
   };
 
   const token = await jwtSign(payload, env.JWT_SECRET);
@@ -218,10 +258,11 @@ async function handleLogin(request, env) {
   // Login returns flat (no "data" wrapper) — login.html checks data.token directly
   return json({
     token,
-    role:           user.role,
-    name:           payload.name,
-    community_name: communityName,
-    community_id:   user.community_id || null,
+    role:                 user.role,
+    name:                 payload.name,
+    community_name:       communityName,
+    community_id:         user.community_id || null,
+    must_change_password: mustChangePassword,
   });
 }
 
@@ -249,6 +290,17 @@ async function handleAdmin(path, method, request, env, user, url) {
         b.status || 'active', b.contact || '', b.phone || '', nowSec()).run();
       return ok({ id });
     }
+  }
+
+  // ── Settlement feature flags (/api/admin/settlements/:id/features) ──
+  const featuresMatch = path.match(/^\/api\/admin\/settlements\/([^/]+)\/features$/);
+  if (featuresMatch && method === 'PATCH') {
+    const id = featuresMatch[1];
+    const b = await request.json();
+    if (!b.features || typeof b.features !== 'object') return err('features חובה');
+    await db.prepare('UPDATE settlements SET features_json = ? WHERE id = ?')
+      .bind(JSON.stringify(b.features), id).run();
+    return ok({ id });
   }
 
   const settlementMatch = path.match(/^\/api\/admin\/settlements\/([^/]+)$/);
@@ -518,6 +570,35 @@ async function handleOnboarding(request, env, db) {
   return ok({ id: settId, settlement_id: settId });
 }
 
+// ─── DEPOSIT HELPERS ──────────────────────────────────────────────────────────
+
+// Build flat list of cells with volumes from locker columns_json
+function buildCellList(columns) {
+  const list = [];
+  let num = 0;
+  for (const col of columns) {
+    const heights = col.cellHeights || [];
+    for (let j = 0; j < (col.cells || 0); j++) {
+      num++;
+      const h = heights[j] || 1;
+      list.push({ cellNumber: num, volume: (col.width || 40) * (col.depth || 30) * h });
+    }
+  }
+  return list;
+}
+
+// Get set of occupied + faulty cell numbers for a community
+async function getUnavailableNums(db, communityId) {
+  const [{ results: pkgs }, { results: faults }] = await Promise.all([
+    db.prepare(`SELECT cell_id FROM packages WHERE community_id = ? AND status != 'collected'`).bind(communityId).all(),
+    db.prepare(`SELECT cell_number FROM cells WHERE community_id = ? AND status != 'empty'`).bind(communityId).all(),
+  ]);
+  const s = new Set();
+  pkgs.forEach(p => s.add(parseInt(p.cell_id)));
+  faults.forEach(c => s.add(c.cell_number));
+  return s;
+}
+
 // ─── COMMUNITY ROUTES (/api/residents, /api/packages, etc.) ──────────────────
 
 async function handleCommunity(path, method, request, env, user, url) {
@@ -552,6 +633,21 @@ async function handleCommunity(path, method, request, env, user, url) {
     }
   }
 
+  // ── Residents search — חייב להיות לפני residentMatch כדי ש-"search" לא ייתפס כ-id ──
+  if (path === '/api/residents/search' && method === 'GET') {
+    const q = (url.searchParams.get('q') || '').trim();
+    if (q.length < 2) return ok([]);
+    const pattern = '%' + q + '%';
+    const { results } = await db.prepare(`
+      SELECT id, first_name, last_name, phone
+      FROM residents
+      WHERE community_id = ? AND active = 1
+        AND (phone LIKE ? OR first_name LIKE ? OR last_name LIKE ?)
+      ORDER BY last_name, first_name LIMIT 10
+    `).bind(communityId, pattern, pattern, pattern).all();
+    return ok(results);
+  }
+
   const residentMatch = path.match(/^\/api\/residents\/([^/]+)$/);
   if (residentMatch) {
     const id = residentMatch[1];
@@ -582,6 +678,89 @@ async function handleCommunity(path, method, request, env, user, url) {
         : await db.prepare('SELECT * FROM residents WHERE id=?').bind(id).first();
       return row ? ok(row) : notFound();
     }
+  }
+
+  // ── Couriers (managed by courier company / admin / community_manager) ──
+  const allowedCourierRoles = ['courier', 'courier_manager', 'smarta_admin', 'community_manager'];
+  if (path === '/api/couriers') {
+    if (!allowedCourierRoles.includes(user.role)) return forbidden();
+    // courier role מוגבל לשליחים של החברה שלו בלבד
+    // smarta_admin / community_manager רואים את כל השליחים בישוב
+    const companyId = (user.role === 'courier' || user.role === 'courier_manager') ? user.sub : null;
+    if (method === 'GET') {
+      const { results } = companyId
+        ? await db.prepare('SELECT * FROM couriers WHERE company_id = ? ORDER BY last_name, first_name').bind(companyId).all()
+        : await db.prepare('SELECT * FROM couriers ORDER BY last_name, first_name').all();
+      return ok(results);
+    }
+    if (method === 'POST') {
+      const b = await request.json();
+      if (!b.first_name)   return err('שם פרטי חובה');
+      if (!b.last_name)    return err('שם משפחה חובה');
+      if (!b.phone)        return err('טלפון חובה');
+      if (!b.employee_id)  return err('מספר עובד/ת"ז חובה');
+      // בדיקת ייחודיות טלפון
+      const phoneExists = await db.prepare('SELECT id FROM couriers WHERE phone = ?').bind(b.phone).first();
+      if (phoneExists) return err('מספר הטלפון כבר רשום לשליח אחר');
+      // company_id: courier = עצמו, אחרים = חייבים לציין
+      const cmpId = companyId || b.company_id || user.sub;
+      const id = newId();
+      await db.prepare(
+        'INSERT INTO couriers (id, first_name, last_name, phone, employee_id, delivery_zones, company_id, active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)'
+      ).bind(id, b.first_name, b.last_name, b.phone, b.employee_id, b.delivery_zones || '', cmpId, nowSec()).run();
+      return ok({ id });
+    }
+  }
+
+  const courierMatch = path.match(/^\/api\/couriers\/([^/]+)$/);
+  if (courierMatch) {
+    if (!allowedCourierRoles.includes(user.role)) return forbidden();
+    const companyId = (user.role === 'courier' || user.role === 'courier_manager') ? user.sub : null;
+    const cid = courierMatch[1];
+    if (method === 'PUT') {
+      const b = await request.json();
+      // בדיקת ייחודיות טלפון בעדכון (מתעלם מהשורה הנוכחית)
+      const phoneExistsUpd = await db.prepare('SELECT id FROM couriers WHERE phone = ? AND id != ?').bind(b.phone, cid).first();
+      if (phoneExistsUpd) return err('מספר הטלפון כבר רשום לשליח אחר');
+      const q = companyId
+        ? 'UPDATE couriers SET first_name=?, last_name=?, phone=?, employee_id=?, delivery_zones=?, active=? WHERE id=? AND company_id=?'
+        : 'UPDATE couriers SET first_name=?, last_name=?, phone=?, employee_id=?, delivery_zones=?, active=? WHERE id=?';
+      const params = companyId
+        ? [b.first_name || '', b.last_name || '', b.phone, b.employee_id || '', b.delivery_zones || '', b.active !== false ? 1 : 0, cid, companyId]
+        : [b.first_name || '', b.last_name || '', b.phone, b.employee_id || '', b.delivery_zones || '', b.active !== false ? 1 : 0, cid];
+      await db.prepare(q).bind(...params).run();
+      return ok({ id: cid });
+    }
+    if (method === 'DELETE') {
+      const q = companyId
+        ? 'DELETE FROM couriers WHERE id=? AND company_id=?'
+        : 'DELETE FROM couriers WHERE id=?';
+      const params = companyId ? [cid, companyId] : [cid];
+      await db.prepare(q).bind(...params).run();
+      return ok({ deleted: cid });
+    }
+  }
+
+  // ── יצירת חשבון משתמש לשליח ─────────────────────────────
+  const createAccountMatch = path.match(/^\/api\/couriers\/([^/]+)\/create-account$/);
+  if (createAccountMatch && method === 'POST') {
+    if (!['courier_manager', 'smarta_admin', 'community_manager'].includes(user.role)) return forbidden();
+    const cid = createAccountMatch[1];
+    const courier = await db.prepare('SELECT * FROM couriers WHERE id = ?').bind(cid).first();
+    if (!courier) return notFound();
+    // בדיקה אם כבר קיים חשבון לטלפון זה
+    const existing = await db.prepare('SELECT id FROM users WHERE username = ?').bind(courier.phone).first();
+    if (existing) return err('כבר קיים חשבון עם שם משתמש זה');
+    // סיסמה ראשונית = ת"ז (employee_id)
+    if (!courier.employee_id) return err('חסרה ת"ז לשליח זה');
+    const hash = await sha256hex(courier.employee_id);
+    const userId = newId();
+    await db.prepare(`
+      INSERT INTO users (id, first_name, last_name, role, community_id, username, phone, password_hash, password_changed_at, active, created_at)
+      VALUES (?, ?, ?, 'courier', ?, ?, ?, ?, NULL, 1, ?)
+    `).bind(userId, courier.first_name, courier.last_name,
+      communityId, courier.phone, courier.phone, hash, nowSec()).run();
+    return ok({ id: userId, username: courier.phone });
   }
 
   // ── Packages ─────────────────────────────────────────────
@@ -654,6 +833,71 @@ async function handleCommunity(path, method, request, env, user, url) {
     await db.prepare(`DELETE FROM packages WHERE id = ? AND community_id = ?`)
       .bind(id, communityId).run();
     return ok({ deleted: id });
+  }
+
+  // ── Send messages ────────────────────────────────────────
+  if (path === '/api/messages/send' && method === 'POST') {
+    try {
+    const b = await request.json();
+    if (!Array.isArray(b.messages) || !b.messages.length) return err('messages חובה');
+
+    // Load settings + tier
+    const [settingsRow, lockerRow] = await Promise.all([
+      db.prepare('SELECT msg_settings_json FROM settlements WHERE id = ?').bind(communityId).first(),
+      db.prepare('SELECT tier FROM locker_configs WHERE community_id = ?').bind(communityId).first(),
+    ]);
+    const msgDefaults = {
+      msg_arrival:   'היי {שם}! 📦 הגיעה לך חבילה מ-{חברה}{תא}. לאחר משיכת החבילה/ות נא לאשר בהקלדת הספרה 1 בלבד. תודה!',
+      msg_reminder1: 'היי {שם} 👋 תזכורת — יש לך חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם. לאחר משיכת החבילה/ות נא לאשר בהקלדת הספרה 1 בלבד. תודה!',
+      msg_reminder2: 'היי {שם} ⚠️ תזכורת שנייה — חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם. לאחר משיכת החבילה/ות נא לאשר בהקלדת הספרה 1 בלבד. תודה!',
+      msg_reminder3: 'היי {שם} 🚨 תזכורת שלישית — חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם. לאחר משיכת החבילה/ות נא לאשר בהקלדת הספרה 1 בלבד. תודה!',
+      msg_reminder4: 'היי {שם} ⛔ תזכורת אחרונה — חבילה כבר {ימים} ימים{תא}. ללא איסוף תחויב בקנס. לאחר משיכת החבילה/ות נא לאשר בהקלדת הספרה 1 בלבד. תודה!',
+    };
+    let savedSettings = {};
+    try { savedSettings = JSON.parse(settingsRow?.msg_settings_json || '{}'); } catch(_) {}
+    const s = { ...msgDefaults, ...savedSettings };
+    const isBasic = (lockerRow?.tier || 'basic') === 'basic';
+
+    let sent = 0, failed = 0;
+
+    for (const msg of b.messages) {
+      const cellId = String(msg.cell_id);
+      const type   = msg.type; // 'arrival' | 'reminder1' … 'reminder4'
+
+      // Lookup active package + resident for this cell
+      const pkg = await db.prepare(`
+        SELECT p.id, p.cell_id, p.courier, p.assigned_at,
+               r.first_name, r.phone, r.notify_method
+        FROM packages p LEFT JOIN residents r ON p.resident_id = r.id
+        WHERE p.community_id = ? AND p.cell_id = ?
+          AND p.status NOT IN ('collected','confirmed')
+        ORDER BY p.assigned_at DESC LIMIT 1
+      `).bind(communityId, cellId).first();
+
+      if (!pkg?.phone) { failed++; continue; }
+
+      // Build message text
+      const templateKey = type === 'arrival' ? 'msg_arrival' : `msg_${type}`;
+      const template    = s[templateKey] || '';
+      const cellSuffix  = isBasic ? ` בתא ${cellId}` : '';
+      const days        = Math.floor((Date.now()/1000 - (pkg.assigned_at || 0)) / 86400);
+      const text = template
+        .replace(/\{שם\}/g,   pkg.first_name || '')
+        .replace(/\{חברה\}/g, pkg.courier    || '')
+        .replace(/\{תא\}/g,   cellSuffix)
+        .replace(/\{ימים\}/g, String(days))
+        .replace(/ {2,}/g, ' ').trim();
+
+      const ok2 = await sendMessage(pkg.phone, text, pkg.notify_method || 'sms');
+      if (ok2) sent++;
+      else     failed++;
+    }
+
+    return ok({ sent, failed });
+    } catch(e) {
+      console.error('[messages/send] error:', e.message, e.stack);
+      return err('שגיאה בשליחה: ' + e.message, 500);
+    }
   }
 
   // ── Community staff users ────────────────────────────────
@@ -795,6 +1039,154 @@ async function handleCommunity(path, method, request, env, user, url) {
       DELETE FROM cells WHERE community_id = ? AND cell_number = ?
     `).bind(communityId, cellNum).run();
     return ok({ ok: true });
+  }
+
+  // ── Message / reminder settings ──────────────────────────
+  if (path === '/api/settings/messages') {
+    if (method === 'GET') {
+      const row = await db.prepare(
+        'SELECT msg_settings_json FROM settlements WHERE id = ?'
+      ).bind(communityId).first();
+      let settings = {};
+      try { settings = JSON.parse(row?.msg_settings_json || '{}'); } catch(e) {}
+      // Fill defaults for any missing keys
+      const defaults = {
+        reminder1_days: 1,
+        reminder2_days: 3,
+        reminder3_days: 5,
+        reminder4_days: 7,
+        fine_days:      10,
+        fine_amount:    20,
+        msg_arrival:   'היי {שם}! 📦 הגיעה לך חבילה מ-{חברה}{תא}. לאחר משיכת החבילה/ות נא לאשר את משיכת החבילה בהקלדת הספרה 1 בלבד. תודה!',
+        msg_reminder1: 'היי {שם} 👋 תזכורת — יש לך חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם. לאחר משיכת החבילה/ות נא לאשר בהקלדת הספרה 1 בלבד. תודה!',
+        msg_reminder2: 'היי {שם} ⚠️ תזכורת שנייה — חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם. לאחר משיכת החבילה/ות נא לאשר בהקלדת הספרה 1 בלבד. תודה!',
+        msg_reminder3: 'היי {שם} 🚨 תזכורת שלישית — חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם. לאחר משיכת החבילה/ות נא לאשר בהקלדת הספרה 1 בלבד. תודה!',
+        msg_reminder4: 'היי {שם} ⛔ תזכורת אחרונה — חבילה כבר {ימים} ימים{תא}. ללא איסוף תחויב בקנס. לאחר משיכת החבילה/ות נא לאשר בהקלדת הספרה 1 בלבד. תודה!',
+      };
+      return ok({ ...defaults, ...settings });
+    }
+    if (method === 'PUT') {
+      // Only community_manager can save settings (mail_manager is read-only for settings)
+      if (user.role !== 'community_manager' && user.role !== 'smarta_admin') return forbidden();
+      const b = await request.json();
+      // Whitelist allowed keys to prevent injection
+      const allowed = ['reminder1_days','reminder2_days','reminder3_days','reminder4_days','fine_days','fine_amount',
+                       'msg_arrival','msg_reminder1','msg_reminder2','msg_reminder3','msg_reminder4'];
+      const clean = {};
+      allowed.forEach(k => { if (b[k] !== undefined) clean[k] = b[k]; });
+      await db.prepare('UPDATE settlements SET msg_settings_json = ? WHERE id = ?')
+        .bind(JSON.stringify(clean), communityId).run();
+      return ok({ saved: true });
+    }
+  }
+
+  // ─── Deposit flow ──────────────────────────────────────────────────────────
+  const depositRoles = ['courier', 'courier_manager', 'community_manager', 'smarta_admin'];
+
+  // ── שלב 1: מציאת תא + פתיחת דלת ─────────────────────────
+  if (path === '/api/deposit/start' && method === 'POST') {
+    if (!depositRoles.includes(user.role)) return forbidden();
+    const b = await request.json();
+    if (!b.locker_id)   return err('locker_id חובה');
+    if (!b.resident_id) return err('resident_id חובה');
+
+    const locker = await db.prepare(
+      'SELECT * FROM locker_configs WHERE id = ? AND community_id = ?'
+    ).bind(b.locker_id, communityId).first();
+    if (!locker)             return notFound();
+    if (locker.tier !== 'premium') return err('הפקדת חבילה זמינה רק ללוקר פרמיום');
+    if (!locker.esp_id)      return err('הלוקר אינו מוגדר עם ESP');
+
+    const columns   = JSON.parse(locker.columns_json || '[]');
+    const cellList  = buildCellList(columns);
+    const occupied  = await getUnavailableNums(db, communityId);
+    const available = cellList.filter(c => !occupied.has(c.cellNumber));
+    if (!available.length) return ok({ no_cells: true });
+
+    available.sort((a, b2) => a.volume - b2.volume);
+    const chosen = available[0];
+
+    await db.prepare(
+      'INSERT INTO esp_commands (id, esp_id, community_id, cell_number, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).bind(newId(), locker.esp_id, communityId, chosen.cellNumber, nowSec()).run();
+
+    return ok({ cell_number: chosen.cellNumber, volume: chosen.volume, no_cells: false });
+  }
+
+  // ── שלב 1ב: תא קטן — מצא תא גדול יותר ──────────────────
+  if (path === '/api/deposit/too-small' && method === 'POST') {
+    if (!depositRoles.includes(user.role)) return forbidden();
+    const b = await request.json();
+    if (!b.locker_id) return err('locker_id חובה');
+
+    const locker = await db.prepare(
+      'SELECT * FROM locker_configs WHERE id = ? AND community_id = ?'
+    ).bind(b.locker_id, communityId).first();
+    if (!locker)        return notFound();
+    if (!locker.esp_id) return err('הלוקר אינו מוגדר עם ESP');
+
+    const columns  = JSON.parse(locker.columns_json || '[]');
+    const cellList = buildCellList(columns);
+    const occupied = await getUnavailableNums(db, communityId);
+    // שחרר את התא הנוכחי (לא נתפוס אותו שוב)
+    occupied.delete(parseInt(b.current_cell_number || 0));
+
+    const available = cellList.filter(
+      c => !occupied.has(c.cellNumber) && c.volume > (b.current_volume || 0)
+    );
+    if (!available.length) return ok({ no_cells: true });
+
+    available.sort((a, b2) => a.volume - b2.volume);
+    const chosen = available[0];
+
+    await db.prepare(
+      'INSERT INTO esp_commands (id, esp_id, community_id, cell_number, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).bind(newId(), locker.esp_id, communityId, chosen.cellNumber, nowSec()).run();
+
+    return ok({ cell_number: chosen.cellNumber, volume: chosen.volume, no_cells: false });
+  }
+
+  // ── שלב 2: אישור נעילה + שמירת חבילה + SMS ───────────────
+  if (path === '/api/deposit/confirm' && method === 'POST') {
+    if (!depositRoles.includes(user.role)) return forbidden();
+    const b = await request.json();
+    if (!b.cell_number) return err('cell_number חובה');
+    if (!b.barcode)     return err('ברקוד חבילה חובה');
+
+    const resident = b.resident_id
+      ? await db.prepare('SELECT * FROM residents WHERE id = ? AND community_id = ?')
+          .bind(b.resident_id, communityId).first()
+      : null;
+
+    const pkgId      = newId();
+    const cellIdStr  = String(b.cell_number);
+    const courierName = user.name || '';
+
+    await db.prepare(`
+      INSERT INTO packages (id, community_id, resident_id, cell_id, barcode, courier, status, assigned_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'waiting', ?)
+    `).bind(pkgId, communityId, b.resident_id || null,
+      cellIdStr, b.barcode, courierName, nowSec()).run();
+
+    // שלח SMS לדייר
+    if (resident?.phone) {
+      const settRow = await db.prepare(
+        'SELECT msg_settings_json FROM settlements WHERE id = ?'
+      ).bind(communityId).first();
+      let settings = {};
+      try { settings = JSON.parse(settRow?.msg_settings_json || '{}'); } catch(_) {}
+      const template = settings.msg_arrival ||
+        'היי {שם}! 📦 הגיעה לך חבילה מ-{חברה}. לאחר משיכת החבילה נא לאשר בהקלדת הספרה 1 בלבד. תודה!';
+      const text = template
+        .replace(/\{שם\}/g,   resident.first_name || '')
+        .replace(/\{חברה\}/g, courierName)
+        .replace(/\{תא\}/g,   '')
+        .replace(/\{ימים\}/g, '0')
+        .replace(/ {2,}/g, ' ').trim();
+      await sendMessage(resident.phone, text, resident.notify_method || 'sms');
+    }
+
+    return ok({ package_id: pkgId });
   }
 
   // ── Locker config (read for community) ───────────────────

@@ -947,39 +947,9 @@
 
 <!-- SEND ALL MODAL -->
 <div class="modal-overlay" id="send-all-modal">
-  <div class="modal" style="width:460px">
-    <div class="modal-title">📣 שלח הודעות לכולם</div>
-    <div class="modal-sub">בחר אילו הודעות לשלוח עכשיו</div>
-
-    <div style="background:var(--surface2);border-radius:12px;padding:14px;margin-bottom:12px;border:1px solid var(--border)">
-      <div style="display:flex;align-items:flex-start;gap:10px">
-        <input type="checkbox" id="chk-new" checked style="width:16px;height:16px;margin-top:2px;flex-shrink:0">
-        <div>
-          <div style="font-size:13px;font-weight:700">הודעת הגעה — חבילות שהגיעו היום</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:4px">4 דיירים יקבלו הודעה: יוסי כהן, משה גולן, נועה שפירא, לילה בן דוד</div>
-          <div style="font-size:11px;color:var(--accent);margin-top:6px;background:rgba(79,142,247,0.08);border-radius:6px;padding:6px 10px;line-height:1.6">
-            היי [שם]! 📦 הגיעה לך חבילה מ-[חברה]. לאישור קבלה: הקלד 1
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div style="background:var(--surface2);border-radius:12px;padding:14px;margin-bottom:20px;border:1px solid var(--border)">
-      <div style="display:flex;align-items:flex-start;gap:10px">
-        <input type="checkbox" id="chk-remind" checked style="width:16px;height:16px;margin-top:2px;flex-shrink:0">
-        <div>
-          <div style="font-size:13px;font-weight:700">תזכורת — לא נמשכו מאז ההודעה האחרונה</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:4px" id="send-all-reminder-sub"></div>
-          <div style="font-size:11px;color:var(--yellow);margin-top:6px;background:rgba(245,158,11,0.08);border-radius:6px;padding:6px 10px;line-height:1.6">
-            היי [שם] 👋 תזכורת — יש לך חבילה כבר [N] ימים. אנא אסוף בהקדם. לאישור קבלה: הקלד 1
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="modal-actions">
-      <button class="modal-btn confirm" onclick="sendAllMessages()">שלח הודעות</button>
-      <button class="modal-btn cancel" onclick="closeModal('send-all-modal')">ביטול</button>
+  <div class="modal" style="width:500px;max-height:85vh;overflow-y:auto">
+    <div id="send-all-body">
+      <!-- נבנה דינמית ע"י openSendAllModal() -->
     </div>
   </div>
 </div>
@@ -1048,6 +1018,8 @@
   // ===== API =====
   var API_BASE = 'https://smarta-api.smarta-api.workers.dev';
   var _residentsCache = [];
+  var _msgSettingsCache = null; // נוסחי הודעות ואינטרוולים
+  var _sendModalData = { newCells:[], r1Cells:[], r2Cells:[], r3Cells:[], r4Cells:[] };
 
   async function apiGet(path) {
     var r = await fetch(API_BASE + path, { headers: { Authorization: 'Bearer ' + jwtToken } });
@@ -1083,6 +1055,15 @@
         });
       }
     } catch(e) { console.warn('residents load failed', e); }
+  }
+
+  // ─── טעינת הגדרות הודעות ──────────────────────────────────
+  async function loadMsgSettings() {
+    if (_isSuperAdmin) return; // smarta_admin אין לו ישוב
+    try {
+      var data = await apiGet('/api/settings/messages');
+      if (data && !data.error) _msgSettingsCache = data;
+    } catch(e) { console.warn('loadMsgSettings failed', e); }
   }
 
   // ─── טעינת חבילות מה-API ─────────────────────────────────
@@ -2290,6 +2271,11 @@ function buildLockerGrid() {
     ).join('');
   }
 
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
   var _toastTimer = null;
   function showToast(msg, color) {
     const t = document.getElementById('toast');
@@ -2387,7 +2373,112 @@ function buildLockerGrid() {
     showToast(count + ' תאים נפתחו ✓', 'var(--red)');
   }
 
-  function openSendAllModal() { openModal('send-all-modal'); }
+  // ── עזרים לmodal שלח לכולם (ברמת מודול כדי לגשת ל-esc) ──
+  function _fillCell(template, cellNum, isBasic) {
+    var cellVal = isBasic ? (' בתא ' + cellNum) : '';
+    return template.replace(/\{תא\}/g, cellVal).replace(/ {2,}/g, ' ').trim();
+  }
+  function _recipientList(cells) {
+    if (!cells.length) return '<span style="color:var(--muted)">אין נמענים</span>';
+    return cells.map(function(c) {
+      return '<span style="background:var(--surface3);border-radius:4px;padding:1px 6px;font-size:11px">' + esc(c.resident) + '</span>';
+    }).join(' ');
+  }
+  function _msgSection(chkId, icon, title, color, bgColor, cells, template, daysLabel, isBasic) {
+    var disabled = !cells.length ? 'disabled' : '';
+    var opacity  = !cells.length ? 'opacity:0.45;' : '';
+    var previewCell = cells.length ? cells[0].num : '—';
+    var preview = _fillCell(template, previewCell, isBasic)
+      .replace(/\{שם\}/g,'[שם]').replace(/\{חברה\}/g,'[חברה]').replace(/\{ימים\}/g,'[ימים]');
+    return '<div style="' + opacity + 'background:var(--surface2);border-radius:12px;padding:14px;margin-bottom:10px;border:1px solid var(--border)">' +
+      '<div style="display:flex;align-items:flex-start;gap:10px">' +
+        '<input type="checkbox" id="' + chkId + '" ' + (cells.length ? 'checked' : '') + ' ' + disabled + ' style="width:16px;height:16px;margin-top:2px;flex-shrink:0">' +
+        '<div style="flex:1">' +
+          '<div style="font-size:13px;font-weight:700">' + icon + ' ' + title + '</div>' +
+          (daysLabel ? '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + daysLabel + '</div>' : '') +
+          '<div style="margin-top:6px;line-height:1.7">' + _recipientList(cells) + '</div>' +
+          '<div style="font-size:11px;color:' + color + ';margin-top:8px;background:' + bgColor + ';border-radius:6px;padding:7px 10px;line-height:1.6;direction:rtl">' +
+            esc(preview) +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function openSendAllModal() {
+    var s = _msgSettingsCache || {};
+    var isBasic = (typeof lockerConfig !== 'undefined' && lockerConfig && lockerConfig.tier === 'basic') ||
+                  (_jwtPayload && _jwtPayload.plan === 'basic');
+    var r1d = s.reminder1_days || 1;
+    var r2d = s.reminder2_days || 3;
+    var r3d = s.reminder3_days || 5;
+    var r4d = s.reminder4_days || 7;
+
+    // ── סיווג תאים (מדלגים על confirmed) ────────────────────
+    var newCells = [];   // loading → הגעה
+    var r1Cells  = [];   // occupied, days ∈ [r1d, r2d)
+    var r2Cells  = [];   // occupied, days ∈ [r2d, r3d)
+    var r3Cells  = [];   // occupied, days ∈ [r3d, r4d)
+    var r4Cells  = [];   // occupied, days >= r4d
+
+    Object.entries(packageData).forEach(function(entry) {
+      var num = entry[0], d = entry[1];
+      if (!d || d.status === 'confirmed') return;
+      var days = parseInt(d.days || '0');
+      if (d.status === 'loading') {
+        newCells.push({ num: num, resident: d.resident || '?', courier: d.courier || '' });
+      } else if (d.status === 'occupied') {
+        if      (days >= r4d) r4Cells.push({ num: num, resident: d.resident || '?', days: days });
+        else if (days >= r3d) r3Cells.push({ num: num, resident: d.resident || '?', days: days });
+        else if (days >= r2d) r2Cells.push({ num: num, resident: d.resident || '?', days: days });
+        else if (days >= r1d) r1Cells.push({ num: num, resident: d.resident || '?', days: days });
+      }
+    });
+
+    // שמור לשימוש sendAllMessages
+    _sendModalData = { newCells: newCells, r1Cells: r1Cells, r2Cells: r2Cells, r3Cells: r3Cells, r4Cells: r4Cells };
+
+    var arrTpl = s.msg_arrival   || 'היי {שם}! 📦 הגיעה לך חבילה מ-{חברה}{תא}. לאישור קבלה: הקלד 1';
+    var r1Tpl  = s.msg_reminder1 || 'היי {שם} 👋 תזכורת — יש לך חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם';
+    var r2Tpl  = s.msg_reminder2 || 'היי {שם} ⚠️ תזכורת שנייה — חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם';
+    var r3Tpl  = s.msg_reminder3 || 'היי {שם} 🚨 תזכורת שלישית — חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם';
+    var r4Tpl  = s.msg_reminder4 || 'היי {שם} ⛔ תזכורת אחרונה — חבילה כבר {ימים} ימים{תא}. ללא איסוף תחויב בקנס';
+
+    var html = '<div class="modal-title">📣 שלח הודעות לכולם</div>' +
+      '<div class="modal-sub" style="margin-bottom:16px">בחר אילו הודעות לשלוח</div>';
+
+    html += _msgSection('chk-new', '📦', 'הודעת הגעה', 'var(--accent)', 'rgba(79,142,247,0.08)',
+      newCells, arrTpl, null, isBasic);
+
+    var hasReminders = r1Cells.length || r2Cells.length || r3Cells.length || r4Cells.length;
+    if (hasReminders) {
+      html += _msgSection('chk-r1', '👋', 'תזכורת ראשונה',  'var(--yellow)', 'rgba(245,158,11,0.08)',
+        r1Cells, r1Tpl, 'לדיירים שלא אספו ' + r1d + '–' + (r2d-1) + ' ימים', isBasic);
+      html += _msgSection('chk-r2', '⚠️', 'תזכורת שנייה',   'var(--yellow)', 'rgba(245,158,11,0.08)',
+        r2Cells, r2Tpl, 'לדיירים שלא אספו ' + r2d + '–' + (r3d-1) + ' ימים', isBasic);
+      html += _msgSection('chk-r3', '🚨', 'תזכורת שלישית',  'var(--red)',    'rgba(239,68,68,0.08)',
+        r3Cells, r3Tpl, 'לדיירים שלא אספו ' + r3d + '–' + (r4d-1) + ' ימים', isBasic);
+      html += _msgSection('chk-r4', '⛔', 'תזכורת רביעית — לפני קנס', 'var(--red)', 'rgba(239,68,68,0.12)',
+        r4Cells, r4Tpl, 'לדיירים שלא אספו מעל ' + r4d + ' ימים', isBasic);
+    } else {
+      html += '<div style="background:var(--surface2);border-radius:12px;padding:14px;margin-bottom:10px;border:1px solid var(--border);opacity:0.5">' +
+        '<div style="font-size:13px;font-weight:700">🔔 תזכורות</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:6px">אין דיירים שעברו את האינטרוול המוגדר</div>' +
+        '</div>';
+    }
+
+    if (!_msgSettingsCache) {
+      html += '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;padding:8px 10px;background:var(--surface2);border-radius:8px">💡 הגדרות הנוסחים מוגדרות ע"י מנהל הישוב</div>';
+    }
+
+    html += '<div class="modal-actions">' +
+      '<button class="modal-btn confirm" onclick="sendAllMessages()">שלח הודעות</button>' +
+      '<button class="modal-btn cancel" onclick="closeModal(\'send-all-modal\')">ביטול</button>' +
+      '</div>';
+
+    document.getElementById('send-all-body').innerHTML = html;
+    openModal('send-all-modal');
+  }
 
   function printDashboard() {
     const dateEl = document.getElementById('print-date');
@@ -2396,24 +2487,55 @@ function buildLockerGrid() {
   }
 
   function sendAllMessages() {
-    const newMsg = document.getElementById('chk-new').checked;
-    const remind = document.getElementById('chk-remind').checked;
-    if (!newMsg && !remind) { closeModal('send-all-modal'); showToast('לא נבחרו הודעות'); return; }
-    // Only send to cells where notify is not explicitly turned off
-    const notifyCount = Object.entries(cellSelection).filter(([num, v]) => v.notify !== false && packageData[num]).length;
+    var chkNew = document.getElementById('chk-new');
+    var chkR1  = document.getElementById('chk-r1');
+    var chkR2  = document.getElementById('chk-r2');
+    var chkR3  = document.getElementById('chk-r3');
+    var chkR4  = document.getElementById('chk-r4');
+    var sendNew = chkNew && chkNew.checked && !chkNew.disabled;
+    var sendR1  = chkR1  && chkR1.checked  && !chkR1.disabled;
+    var sendR2  = chkR2  && chkR2.checked  && !chkR2.disabled;
+    var sendR3  = chkR3  && chkR3.checked  && !chkR3.disabled;
+    var sendR4  = chkR4  && chkR4.checked  && !chkR4.disabled;
 
-    // Change all "loading" cells to "occupied" after sending
-    Object.keys(packageData).forEach(function(cellNum) {
-      if (packageData[cellNum] && packageData[cellNum].status === 'loading') {
-        packageData[cellNum].status = 'occupied';
+    if (!sendNew && !sendR1 && !sendR2 && !sendR3 && !sendR4) {
+      closeModal('send-all-modal');
+      showToast('לא נבחרו הודעות');
+      return;
+    }
+
+    // בניית רשימת הודעות לשליחה
+    var messages = [];
+    if (sendNew) _sendModalData.newCells.forEach(function(c) { messages.push({ cell_id: c.num, type: 'arrival'   }); });
+    if (sendR1)  _sendModalData.r1Cells.forEach(function(c)  { messages.push({ cell_id: c.num, type: 'reminder1' }); });
+    if (sendR2)  _sendModalData.r2Cells.forEach(function(c)  { messages.push({ cell_id: c.num, type: 'reminder2' }); });
+    if (sendR3)  _sendModalData.r3Cells.forEach(function(c)  { messages.push({ cell_id: c.num, type: 'reminder3' }); });
+    if (sendR4)  _sendModalData.r4Cells.forEach(function(c)  { messages.push({ cell_id: c.num, type: 'reminder4' }); });
+
+    // כפתור מצב טעינה
+    var btn = document.querySelector('#send-all-modal .modal-btn.confirm');
+    if (btn) { btn.disabled = true; btn.textContent = 'שולח...'; }
+
+    apiPost('/api/messages/send', { messages: messages }).then(function(res) {
+      // עדכון מצב מקומי: loading → occupied
+      if (sendNew) {
+        _sendModalData.newCells.forEach(function(c) {
+          if (packageData[c.num] && packageData[c.num].status === 'loading') {
+            packageData[c.num].status = 'occupied';
+          }
+        });
       }
+      savePackageData();
+      buildLockerGrid();
+      closeModal('send-all-modal');
+      var sentCount = (res && res.sent != null) ? res.sent : messages.length;
+      var failCount = (res && res.failed) ? res.failed : 0;
+      showToast(sentCount + ' הודעות נשלחו ✓');
+      if (failCount > 0) setTimeout(function() { showToast(failCount + ' הודעות נכשלו', 'error'); }, 800);
+    }).catch(function() {
+      if (btn) { btn.disabled = false; btn.textContent = 'שלח הודעות'; }
+      showToast('שגיאה בשליחת הודעות', 'error');
     });
-    savePackageData();
-    buildLockerGrid();
-
-    closeModal('send-all-modal');
-    let msg = notifyCount + ' הודעות נשלחו ✓';
-    showToast(msg);
   }
 
   function searchResident(q) {
@@ -2661,6 +2783,7 @@ fetchAndCacheLockerConfig(function() {
   if (jwtToken) {
     loadResidentsFromAPI();
     loadPackagesFromAPI(); // מרענן מ-D1 — עדכן ממכשירים אחרים
+    loadMsgSettings();     // נוסחי הודעות ואינטרוולים
   }
 });
 

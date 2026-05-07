@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "courier",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "C:\\Users\\bitah\\smarta-lockers\\decoded", "-p", "3333", "--no-clipboard"],
+      "port": 3333
+    }
+  ]
+}

@@ -1,0 +1,1313 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smarta — מנהל ישוב</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+/* RTL table — numeric cells (phone, ID, dates) must be ltr + right-aligned */
+.num-cell { direction: ltr; text-align: right; font-family: monospace; unicode-bidi: plaintext; }
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #22263a;
+  --surface3: #2a2f47;
+  --border: #2e3348;
+  --accent: #4f8ef7;
+  --accent2: #7c3aed;
+  --green: #22c55e;
+  --yellow: #f59e0b;
+  --red: #ef4444;
+  --cyan: #06b6d4;
+  --text: #f0f2ff;
+  --muted: #7b82a0;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Heebo',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; direction:rtl; }
+
+/* NAV */
+nav {
+  background:var(--surface); border-bottom:1px solid var(--border);
+  padding:0 28px; height:58px;
+  display:flex; align-items:center; justify-content:space-between;
+  position:sticky; top:0; z-index:100;
+}
+.logo { font-size:18px; font-weight:900; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.nav-center { font-size:13px; color:var(--muted); }
+.nav-center strong { color:var(--text); }
+.nav-right { display:flex; align-items:center; gap:12px; }
+.avatar { width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff; cursor:pointer; }
+.btn-logout { background:none; border:1px solid var(--border); color:var(--muted); font-size:12px; font-family:'Heebo',sans-serif; border-radius:7px; padding:5px 12px; cursor:pointer; }
+.btn-logout:hover { border-color:var(--red); color:var(--red); }
+
+/* SIDEBAR */
+.layout { display:flex; min-height:calc(100vh - 58px); }
+aside {
+  width:210px; background:var(--surface); border-left:1px solid var(--border);
+  padding:16px 10px; flex-shrink:0;
+  position:sticky; top:58px; height:calc(100vh - 58px); overflow-y:auto;
+}
+.sidebar-section { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:1px; padding:0 10px; margin:14px 0 5px; }
+.sidebar-item {
+  display:flex; align-items:center; gap:9px;
+  padding:8px 10px; border-radius:8px; font-size:13px; font-weight:500; color:var(--muted);
+  cursor:pointer; transition:all 0.15s; margin-bottom:1px;
+  border:none; background:transparent; width:100%; text-align:right; font-family:'Heebo',sans-serif;
+}
+.sidebar-item:hover { background:var(--surface2); color:var(--text); }
+.sidebar-item.active { background:rgba(79,142,247,0.1); color:var(--accent); }
+.sidebar-item .icon { font-size:15px; width:18px; text-align:center; }
+.sidebar-item .badge { margin-right:auto; background:var(--surface2); color:var(--muted); font-size:11px; font-weight:600; padding:1px 7px; border-radius:10px; min-width:22px; text-align:center; }
+.sidebar-item.active .badge { background:rgba(79,142,247,0.2); color:var(--accent); }
+
+/* MAIN */
+main { flex:1; padding:24px 28px; }
+.page { display:none; }
+.page.active { display:block; }
+
+.page-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:20px; }
+.page-title { font-size:20px; font-weight:800; }
+.page-sub { font-size:12px; color:var(--muted); margin-top:3px; }
+
+/* BUTTONS */
+.btn { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; border:none; font-family:'Heebo',sans-serif; transition:all 0.15s; }
+.btn-primary { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; }
+.btn-primary:hover { opacity:0.88; }
+.btn-secondary { background:var(--surface2); color:var(--text); border:1px solid var(--border); }
+.btn-secondary:hover { border-color:var(--accent); color:var(--accent); }
+.btn-danger { background:rgba(239,68,68,0.1); color:var(--red); border:1px solid rgba(239,68,68,0.2); }
+.btn-danger:hover { background:rgba(239,68,68,0.18); }
+.btn-sm { padding:5px 11px; font-size:12px; }
+.btn-group { display:flex; gap:8px; flex-wrap:wrap; }
+
+/* CARDS */
+.card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px; margin-bottom:16px; }
+.card-title { font-size:13px; font-weight:700; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+.card-title .sub { font-weight:400; color:var(--muted); font-size:12px; }
+
+/* STAT GRID */
+.stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:18px; }
+.stat-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px; }
+.stat-card .label { font-size:11px; color:var(--muted); font-weight:600; margin-bottom:6px; }
+.stat-card .val { font-size:28px; font-weight:800; line-height:1; }
+.stat-card .sub { font-size:11px; color:var(--muted); margin-top:4px; }
+.val-blue { color:var(--accent); }
+.val-green { color:var(--green); }
+.val-yellow { color:var(--yellow); }
+.val-red { color:var(--red); }
+
+/* TABLE */
+.table-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { text-align:right; padding:8px 12px; color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid var(--border); white-space:nowrap; }
+td { padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:rgba(255,255,255,0.015); }
+.td-actions { display:flex; gap:6px; justify-content:flex-end; }
+
+/* BADGES */
+.badge { display:inline-block; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; }
+.badge-green { background:rgba(34,197,94,0.12); color:var(--green); border:1px solid rgba(34,197,94,0.25); }
+.badge-yellow { background:rgba(245,158,11,0.12); color:var(--yellow); border:1px solid rgba(245,158,11,0.25); }
+.badge-red { background:rgba(239,68,68,0.12); color:var(--red); border:1px solid rgba(239,68,68,0.25); }
+.badge-blue { background:rgba(79,142,247,0.12); color:var(--accent); border:1px solid rgba(79,142,247,0.25); }
+.badge-gray { background:rgba(123,130,160,0.12); color:var(--muted); border:1px solid var(--border); }
+
+/* FORM */
+.form-group { margin-bottom:10px; }
+.form-group label { display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:5px; }
+.form-group input, .form-group select, .form-group textarea {
+  width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+  padding:9px 12px; color:var(--text); font-size:13px; font-family:'Heebo',sans-serif; outline:none;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color:var(--accent); }
+.form-row { display:grid; gap:14px; margin-bottom:0; }
+.form-row.cols-2 { grid-template-columns:1fr 1fr; }
+.form-row.cols-3 { grid-template-columns:1fr 1fr 1fr; }
+.form-row.cols-1 { grid-template-columns:1fr; }
+
+/* SEARCH BAR */
+.search-bar { display:flex; gap:10px; margin-bottom:16px; align-items:center; }
+.search-bar input { flex:1; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:8px 12px; color:var(--text); font-size:13px; font-family:'Heebo',sans-serif; outline:none; }
+.search-bar input:focus { border-color:var(--accent); }
+
+/* MODAL */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none; align-items:flex-start; justify-content:center; z-index:500; padding:16px 0; overflow-y:auto; }
+.modal-overlay.open { display:flex; }
+.modal { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px 24px; width:480px; max-width:95vw; margin:auto; }
+.modal-lg { width:580px; }
+.modal-title { font-size:17px; font-weight:800; margin-bottom:2px; }
+.modal-sub { font-size:12px; color:var(--muted); margin-bottom:14px; }
+.modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:22px; }
+.modal-err { color:var(--red); font-size:12px; margin-top:6px; display:none; }
+.field-err { color:var(--red); font-size:11px; margin-top:4px; display:none; }
+.divider { border:none; border-top:1px solid var(--border); margin:16px 0; }
+.section-label { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:12px; }
+
+/* LOCKER GRID */
+.locker-grid { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.cell-box {
+  width:62px; height:62px; border-radius:8px; border:2px solid var(--border);
+  background:var(--surface2); display:flex; flex-direction:column; align-items:center;
+  justify-content:center; font-size:11px; font-weight:700; cursor:default;
+  transition:all 0.15s; gap:3px;
+}
+.cell-box.available { border-color:rgba(34,197,94,0.3); background:rgba(34,197,94,0.07); color:var(--green); }
+.cell-box.occupied  { border-color:rgba(245,158,11,0.4); background:rgba(245,158,11,0.1); color:var(--yellow); }
+.cell-box.fault     { border-color:rgba(239,68,68,0.4); background:rgba(239,68,68,0.1); color:var(--red); }
+.cell-box .cell-num { font-size:16px; font-weight:800; }
+.cell-box .cell-lbl { font-size:9px; font-weight:600; }
+
+/* EMPTY STATE */
+.empty-state { text-align:center; padding:48px 20px; color:var(--muted); }
+.empty-state .icon { font-size:40px; margin-bottom:12px; }
+.empty-state .title { font-size:16px; font-weight:700; color:var(--text); margin-bottom:6px; }
+
+/* TOAST */
+.toast {
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(60px);
+  background:var(--green); color:#fff; padding:12px 24px; border-radius:10px;
+  font-size:14px; font-weight:600; z-index:9999; transition:all 0.3s; opacity:0;
+}
+.toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
+
+/* SPINNER */
+.spinner { display:inline-block; width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.loading-row td { text-align:center; padding:24px; color:var(--muted); }
+
+/* TABS (packages) */
+.tab-bar { display:flex; gap:4px; background:var(--surface2); border-radius:10px; padding:4px; margin-bottom:16px; width:fit-content; }
+.tab-btn { padding:6px 16px; border-radius:7px; border:none; background:transparent; color:var(--muted); font-size:13px; font-weight:600; font-family:'Heebo',sans-serif; cursor:pointer; transition:all 0.15s; }
+.tab-btn.active { background:var(--surface); color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,0.3); }
+
+@media (max-width:700px) {
+  .stat-grid { grid-template-columns:1fr 1fr; }
+  .form-row.cols-2, .form-row.cols-3 { grid-template-columns:1fr; }
+  main { padding:16px; }
+  aside { display:none; }
+}
+</style>
+</head>
+<body>
+
+<!-- No login overlay — auth handled by login.html -->
+
+<!-- NAV -->
+<nav>
+  <div class="logo">Smarta</div>
+  <div class="nav-center">ישוב: <strong id="nav-settlement">—</strong></div>
+  <div class="nav-right">
+    <button class="btn-logout" onclick="doLogout()">יציאה</button>
+    <div class="avatar" id="nav-avatar">?</div>
+  </div>
+</nav>
+
+<div class="layout">
+<aside>
+  <div class="sidebar-section">ניהול</div>
+  <button class="sidebar-item active" id="sb-dashboard" onclick="showPage('dashboard',this)">
+    <span class="icon">📊</span> דשבורד
+  </button>
+  <button class="sidebar-item" id="sb-residents" onclick="showPage('residents',this)">
+    <span class="icon">👥</span> דיירים
+    <span class="badge" id="badge-residents">—</span>
+  </button>
+  <div class="sidebar-section">הגדרות</div>
+  <button class="sidebar-item" id="sb-staff" onclick="showPage('staff',this)">
+    <span class="icon">🪪</span> בעלי תפקידים
+  </button>
+  <button class="sidebar-item" id="sb-reminders" onclick="showPage('reminders',this)">
+    <span class="icon">⏰</span> תזכורות
+  </button>
+</aside>
+
+<main>
+
+  <!-- DASHBOARD -->
+  <div class="page active" id="page-dashboard">
+    <div class="page-header">
+      <div><div class="page-title">דשבורד</div><div class="page-sub" id="dash-sub">טוען נתונים...</div></div>
+      <button class="btn btn-secondary btn-sm" onclick="refreshDashboard()">↻ רענן</button>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="label">דיירים רשומים</div><div class="val val-blue" id="stat-residents">—</div><div class="sub">פעילים</div></div>
+      <div class="stat-card"><div class="label">תאים פנויים</div><div class="val val-green" id="stat-free">—</div><div class="sub">מוכנים לשימוש</div></div>
+      <div class="stat-card"><div class="label">תאים תפוסים</div><div class="val val-yellow" id="stat-occ">—</div><div class="sub">עם חבילה</div></div>
+      <div class="stat-card"><div class="label">תאים תקולים</div><div class="val val-red" id="stat-fault">—</div><div class="sub">דורשים טיפול</div></div>
+    </div>
+  </div>
+
+  <!-- RESIDENTS -->
+  <div class="page" id="page-residents">
+    <div class="page-header">
+      <div><div class="page-title">דיירים</div><div class="page-sub" id="residents-sub">טוען...</div></div>
+      <div class="btn-group">
+        <button class="btn btn-secondary btn-sm" onclick="downloadResidentTemplate()">📄 הורד תבנית</button>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('import-excel-input').click()">📥 ייבוא מאקסל</button>
+        <input type="file" id="import-excel-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="importFromExcel(this)">
+        <button class="btn btn-primary" onclick="openModal('resident-modal'); editingResidentId=null; document.getElementById('resident-modal-title').textContent='דייר חדש'; clearResidentForm()">＋ דייר חדש</button>
+      </div>
+    </div>
+    <div class="search-bar">
+      <input type="text" placeholder="חיפוש לפי שם או טלפון..." id="resident-search" oninput="filterResidents()">
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <colgroup>
+            <col style="width:22%"><col style="width:9%"><col style="width:11%"><col style="width:13%"><col style="width:11%"><col style="width:20%"><col style="width:14%">
+          </colgroup>
+          <thead><tr><th>שם</th><th>מס' בית</th><th>ת"ז</th><th>נייד</th><th>התראות</th><th>איש קשר נוסף</th><th></th></tr></thead>
+          <tbody id="residents-tbody"><tr class="loading-row"><td colspan="7">טוען דיירים...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- STAFF -->
+  <div class="page" id="page-staff">
+    <div class="page-header">
+      <div><div class="page-title">בעלי תפקידים</div><div class="page-sub">ניהול משתמשים בישוב</div></div>
+      <button class="btn btn-primary btn-sm" onclick="openAddStaff()">+ הוסף בעל תפקיד</button>
+    </div>
+    <div class="card">
+      <table>
+        <colgroup>
+          <col style="width:20%"><col style="width:12%"><col style="width:16%"><col style="width:14%"><col style="width:14%"><col style="width:10%"><col style="width:14%">
+        </colgroup>
+        <thead><tr><th>שם מלא</th><th>נייד</th><th>תפקיד</th><th>שם משתמש</th><th>מייל</th><th>סיסמה</th><th></th></tr></thead>
+        <tbody id="staff-tbody"><tr class="loading-row"><td colspan="7">טוען...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ADD / EDIT STAFF MODAL -->
+  <div id="add-staff-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;align-items:center;justify-content:center">
+    <div style="background:var(--surface);border-radius:16px;padding:24px;width:400px;max-width:96vw;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <div id="staff-modal-title" style="font-size:16px;font-weight:900">🪪 הוספת בעל תפקיד</div>
+        <button onclick="closeAddStaff()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">✕</button>
+      </div>
+      <div class="form-row cols-2">
+        <div class="form-group">
+          <label>שם פרטי *</label>
+          <input id="staff-first" type="text" placeholder="שם פרטי">
+        </div>
+        <div class="form-group">
+          <label>שם משפחה *</label>
+          <input id="staff-last" type="text" placeholder="שם משפחה">
+        </div>
+      </div>
+      <div class="form-row cols-2">
+        <div class="form-group">
+          <label>נייד <span style="font-weight:400;color:var(--muted)">(10 ספרות, מתחיל ב-05)</span></label>
+          <input id="staff-phone" type="tel" placeholder="0501234567" maxlength="10" inputmode="numeric" dir="ltr" oninput="this.value=this.value.replace(/\D/g,''); var e=document.getElementById('staff-phone-err'); if(e) e.style.display=(this.value&&!/^05\d{8}$/.test(this.value))?'block':'none'">
+          <div class="field-err" id="staff-phone-err">נייד חייב להיות 10 ספרות ולהתחיל ב-05</div>
+        </div>
+        <div class="form-group">
+          <label>תפקיד</label>
+          <select id="staff-role">
+            <option value="">— בחר תפקיד —</option>
+            <option value="mail_manager">אחראי/ת דואר</option>
+            <option value="courier_manager">חברת שילוח</option>
+            <option value="finance">חשבונות</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row cols-1">
+        <div class="form-group">
+          <label>מייל <span style="font-weight:400;color:var(--muted)">(לא חובה)</span></label>
+          <input id="staff-email" type="email" placeholder="example@mail.com" dir="ltr" autocomplete="off">
+          <div class="field-err" id="staff-email-err">כתובת מייל לא תקינה</div>
+        </div>
+      </div>
+      <div class="form-row cols-2">
+        <div class="form-group">
+          <label id="staff-username-label">שם משתמש *</label>
+          <input id="staff-username" type="text" placeholder="nir_doa" dir="ltr" autocomplete="off">
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">אותיות לועזיות, ספרות וקו תחתון בלבד</div>
+        </div>
+        <div class="form-group">
+          <label id="staff-password-label">סיסמה *</label>
+          <input id="staff-password" type="text" placeholder="לדוגמה: Smarta2026!" dir="ltr" autocomplete="off">
+          <div id="staff-password-hint" style="font-size:11px;color:var(--muted);margin-top:4px">נדרש: לפחות 8 תווים, אות גדולה, מספר ותו מיוחד (!@#$%)</div>
+        </div>
+      </div>
+      <div id="staff-err" style="display:none;color:var(--red);font-size:12px;margin-bottom:10px"></div>
+      <button id="staff-save-btn" class="btn btn-primary" style="width:100%" onclick="saveStaff()">שמור בעל תפקיד</button>
+    </div>
+  </div>
+
+  <!-- REMINDERS -->
+  <div class="page" id="page-reminders">
+    <div class="page-header">
+      <div><div class="page-title">תזכורות ונוסחים</div><div class="page-sub">הגדרות הודעות לדיירים — ערוץ שליחה נקבע לפי פרטי כל דייר</div></div>
+      <button class="btn btn-primary btn-sm" id="rem-save-btn" onclick="saveReminders()">שמור הגדרות</button>
+    </div>
+
+    <!-- משתני תבנית -->
+    <div style="background:rgba(79,142,247,0.07);border:1px solid rgba(79,142,247,0.2);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:var(--muted);line-height:1.8">
+      <strong style="color:var(--accent)">משתני תבנית זמינים:</strong>
+      &nbsp;
+      <code style="background:var(--surface2);padding:2px 7px;border-radius:4px;color:var(--text)">{שם}</code>
+      <code style="background:var(--surface2);padding:2px 7px;border-radius:4px;color:var(--text)">{חברה}</code>
+      <code style="background:var(--surface2);padding:2px 7px;border-radius:4px;color:var(--text)">{תא}</code>
+      <code style="background:var(--surface2);padding:2px 7px;border-radius:4px;color:var(--text)">{ימים}</code>
+      &nbsp;|&nbsp;
+      <span>{תא} מוצג בתוכנית <strong>Basic</strong> בלבד</span>
+    </div>
+
+    <!-- אינטרוולים -->
+    <div class="card">
+      <div class="card-title">⏱ אינטרוולים</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label>תזכורת ראשונה — לאחר (ימים)</label>
+          <input type="number" id="rem-r1-days" min="1" max="30" value="1">
+        </div>
+        <div class="form-group">
+          <label>תזכורת שנייה — לאחר (ימים)</label>
+          <input type="number" id="rem-r2-days" min="1" max="60" value="3">
+        </div>
+        <div class="form-group">
+          <label>תזכורת שלישית — לאחר (ימים)</label>
+          <input type="number" id="rem-r3-days" min="1" max="90" value="5">
+        </div>
+        <div class="form-group">
+          <label>תזכורת רביעית — לאחר (ימים)</label>
+          <input type="number" id="rem-r4-days" min="1" max="120" value="7">
+        </div>
+        <div style="display:flex;gap:10px">
+          <div class="form-group" style="flex:1">
+            <label>קנס — לאחר (ימים)</label>
+            <input type="number" id="rem-fine-days" min="1" max="180" value="10">
+          </div>
+          <div class="form-group" style="flex:1">
+            <label>סכום קנס (₪)</label>
+            <input type="number" id="rem-fine-amount" min="0" value="20">
+          </div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:10px">כל האינטרוולים נמדדים מרגע שנשלחה הודעת ההגעה לדייר.</div>
+    </div>
+
+    <!-- נוסח הגעה -->
+    <div class="card">
+      <div class="card-title">📦 הודעת הגעה</div>
+      <div class="form-group">
+        <textarea id="rem-msg-arrival" rows="4" placeholder="היי {שם}! 📦 הגיעה לך חבילה מ-{חברה}{תא}. לאחר משיכת החבילה/ות נא לאשר את משיכת החבילה בהקלדת הספרה 1 בלבד. תודה!"></textarea>
+      </div>
+    </div>
+
+    <!-- נוסחי תזכורות -->
+    <div class="card">
+      <div class="card-title">🔔 נוסחי תזכורות</div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="form-group">
+          <label>תזכורת ראשונה</label>
+          <textarea id="rem-msg-r1" rows="4" placeholder="היי {שם} 👋 תזכורת — יש לך חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם. לאחר משיכת החבילה/ות נא לאשר בהקלדת הספרה 1 בלבד. תודה!"></textarea>
+        </div>
+        <div class="form-group">
+          <label>תזכורת שנייה</label>
+          <textarea id="rem-msg-r2" rows="4" placeholder="היי {שם} ⚠️ תזכורת שנייה — חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם. לאחר משיכת החבילה/ות נא לאשר בהקלדת הספרה 1 בלבד. תודה!"></textarea>
+        </div>
+        <div class="form-group">
+          <label>תזכורת שלישית</label>
+          <textarea id="rem-msg-r3" rows="4" placeholder="היי {שם} 🚨 תזכורת שלישית — חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם. לאחר משיכת החבילה/ות נא לאשר בהקלדת הספרה 1 בלבד. תודה!"></textarea>
+        </div>
+        <div class="form-group">
+          <label>תזכורת רביעית <span style="font-weight:400;text-transform:none;color:var(--yellow)">(לפני קנס)</span></label>
+          <textarea id="rem-msg-r4" rows="4" placeholder="היי {שם} ⛔ תזכורת אחרונה — חבילה כבר {ימים} ימים{תא}. ללא איסוף תחויב בקנס. לאחר משיכת החבילה/ות נא לאשר בהקלדת הספרה 1 בלבד. תודה!"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div id="rem-err" style="display:none;color:var(--red);font-size:12px;margin-bottom:12px"></div>
+  </div>
+
+</main>
+</div>
+
+<!-- MODAL: דייר -->
+<div class="modal-overlay" id="resident-modal">
+  <div class="modal modal-lg">
+    <div class="modal-title" id="resident-modal-title">דייר חדש</div>
+    <div class="modal-sub">פרטי הדייר בישוב</div>
+
+    <div class="form-row cols-2">
+      <div class="form-group"><label>שם פרטי *</label><input type="text" id="r-first" placeholder="שם פרטי"></div>
+      <div class="form-group"><label>שם משפחה *</label><input type="text" id="r-last" placeholder="שם משפחה"></div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group">
+        <label>ת"ז <span style="font-weight:400;color:var(--muted)">(9 ספרות)</span></label>
+        <input type="text" id="r-id" placeholder="000000000" maxlength="9" inputmode="numeric">
+        <div class="field-err" id="r-id-err">ת"ז חייב להכיל בדיוק 9 ספרות (יכול להתחיל ב-0)</div>
+      </div>
+      <div class="form-group">
+        <label>נייד * <span style="font-weight:400;color:var(--muted)">(10 ספרות, מתחיל ב-05)</span></label>
+        <input type="tel" id="r-phone" placeholder="0501234567" maxlength="10" inputmode="numeric">
+        <div class="field-err" id="r-phone-err">נייד חייב להיות 10 ספרות ולהתחיל ב-05</div>
+      </div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group"><label>רחוב</label><input type="text" id="r-street" placeholder="שם הרחוב"></div>
+      <div class="form-group"><label>מספר בית</label><input type="text" id="r-house" placeholder="12א"></div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group">
+        <label>ערוץ הודעות</label>
+        <select id="r-notify">
+          <option value="whatsapp">📱 WhatsApp</option>
+          <option value="sms">💬 SMS</option>
+        </select>
+      </div>
+      <div class="form-group"><label>הערות</label><input type="text" id="r-notes" placeholder="הערות על הדייר"></div>
+    </div>
+
+    <hr class="divider">
+    <div class="section-label">איש קשר נוסף <span style="font-weight:400;text-transform:none;color:var(--muted);font-size:11px">— מקבל את כל ההודעות וההרשאות במקום הדייר</span></div>
+
+    <div class="form-row cols-2">
+      <div class="form-group"><label>שם פרטי</label><input type="text" id="r-alt-first" placeholder="שם פרטי"></div>
+      <div class="form-group"><label>שם משפחה</label><input type="text" id="r-alt-last" placeholder="שם משפחה"></div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group">
+        <label>ת"ז <span style="font-weight:400;color:var(--muted)">(9 ספרות)</span></label>
+        <input type="text" id="r-alt-id" placeholder="000000000" maxlength="9" inputmode="numeric">
+        <div class="field-err" id="r-alt-id-err">ת"ז חייב להכיל בדיוק 9 ספרות (יכול להתחיל ב-0)</div>
+      </div>
+      <div class="form-group">
+        <label>נייד <span style="font-weight:400;color:var(--muted)">(10 ספרות, מתחיל ב-05)</span></label>
+        <input type="tel" id="r-alt-phone" placeholder="0501234567" maxlength="10" inputmode="numeric">
+        <div class="field-err" id="r-alt-phone-err">נייד חייב להיות 10 ספרות ולהתחיל ב-05</div>
+      </div>
+    </div>
+    <div class="form-row cols-1">
+      <div class="form-group">
+        <label>ערוץ הודעות</label>
+        <select id="r-alt-notify">
+          <option value="whatsapp">WhatsApp</option>
+          <option value="sms">SMS</option>
+          <option value="none">ללא</option>
+        </select>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:-4px;margin-bottom:12px">
+      דוגמה: הורה קשיש ללא נייד — הבן/הבת מקבלים הודעה בשמו ויכולים לפתוח את התא.
+    </div>
+
+    <div class="modal-err" id="r-err"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="saveResident()">שמור</button>
+      <button class="btn btn-secondary" onclick="closeModal('resident-modal')">ביטול</button>
+    </div>
+  </div>
+</div>
+
+
+<div class="toast" id="toast"></div>
+
+<script>
+var API_BASE = 'https://smarta-api.smarta-api.workers.dev';
+var jwtToken = sessionStorage.getItem('manager_token') || '';
+var currentUser = JSON.parse(sessionStorage.getItem('manager_user') || 'null');
+var allResidents = [];
+var editingResidentId = null;
+
+// ─── AUTH ───────────────────────────────────────────────
+function doLogout() {
+  sessionStorage.clear();
+  // Redirect parent frame to login page
+  try { window.parent.location.href = './login.html'; } catch(e) { window.location.href = './login.html'; }
+}
+
+// ─── פענוח JWT (ללא אימות חתימה — רק לUI) ───────────────
+var _jwtPayload = (function() {
+  try {
+    var parts = jwtToken.split('.');
+    if (parts.length !== 3) return {};
+    var b64 = parts[1].replace(/-/g,'+').replace(/_/g,'/');
+    var pad = (4 - b64.length % 4) % 4;
+    return JSON.parse(decodeURIComponent(escape(atob(b64 + '='.repeat(pad)))));
+  } catch(e) { return {}; }
+})();
+
+// ─── INIT ────────────────────────────────────────────────
+function initApp() {
+  var name = currentUser && (currentUser.full_name || currentUser.username) || 'מנהל';
+  // community_name: JWT גובר על currentUser (מעודכן בכל impersonation)
+  var communityName = _jwtPayload.community_name
+    || (currentUser && currentUser.community_name)
+    || '';
+  document.getElementById('nav-settlement').textContent = communityName || 'בחר ישוב ← לחץ "נהל"';
+  document.getElementById('nav-avatar').textContent = name.charAt(0);
+  document.title = communityName ? 'Smarta — ' + communityName : 'Smarta — מנהל ישוב';
+  refreshDashboard();
+  loadResidents();
+}
+
+if (jwtToken) {
+  initApp();
+} else {
+  // No token — redirect to login
+  try { window.parent.location.href = './login.html'; } catch(e) { window.location.href = './login.html'; }
+}
+
+// ─── API HELPERS ─────────────────────────────────────────
+function apiGet(path) {
+  return fetch(API_BASE + path, {
+    headers: { 'Authorization': 'Bearer ' + jwtToken }
+  }).then(function(r) {
+    if (r.status === 401) { doLogout(); return null; }
+    return r.json();
+  });
+}
+
+function apiPost(path, body) {
+  return fetch(API_BASE + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwtToken },
+    body: JSON.stringify(body)
+  }).then(function(r) {
+    if (r.status === 401) { doLogout(); return null; }
+    return r.json().catch(function() { return { error: 'שגיאת שרת ' + r.status }; });
+  });
+}
+
+function apiPut(path, body) {
+  return fetch(API_BASE + path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwtToken },
+    body: JSON.stringify(body)
+  }).then(function(r) {
+    if (r.status === 401) { doLogout(); return null; }
+    return r.json().catch(function() { return { error: 'שגיאת שרת ' + r.status }; });
+  });
+}
+
+function apiDelete(path) {
+  return fetch(API_BASE + path, {
+    method: 'DELETE',
+    headers: { 'Authorization': 'Bearer ' + jwtToken }
+  }).then(function(r) {
+    return r.json().catch(function() { return { error: 'שגיאת שרת ' + r.status }; });
+  });
+}
+
+function apiPatch(path, body) {
+  return fetch(API_BASE + path, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwtToken },
+    body: JSON.stringify(body)
+  }).then(function(r) {
+    return r.json().catch(function() { return { error: 'שגיאת שרת ' + r.status }; });
+  });
+}
+
+// ─── ייבוא מאקסל ─────────────────────────────────────────
+// שמות העמודות הקבועים (חייבים להתאים לתבנית)
+var EXCEL_COLS = {
+  first_name:          'שם פרטי',
+  last_name:           'שם משפחה',
+  phone:               'נייד',
+  id_number:           'ת"ז',
+  street:              'רחוב',
+  house_number:        'מספר בית',
+  notify_method:       'ערוץ הודעות',
+  notes:               'הערות',
+  alt_first_name:      'שם פרטי איש קשר',
+  alt_last_name:       'שם משפחה איש קשר',
+  alt_id_number:       'ת"ז איש קשר',
+  alt_phone:           'נייד איש קשר',
+  alt_notify_method:   'ערוץ הודעות איש קשר'
+};
+
+function downloadResidentTemplate() {
+  var headers = Object.values(EXCEL_COLS);
+  var example = [
+    'ישראל', 'ישראלי', '0501234567', '123456789',
+    'הגפן', '5', 'whatsapp', 'דייר לדוגמה',
+    '', '', '', '', ''
+  ];
+  var ws = XLSX.utils.aoa_to_sheet([headers, example]);
+  // רוחב עמודות
+  ws['!cols'] = headers.map(function(h) { return { wch: Math.max(h.length + 2, 14) }; });
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'דיירים');
+  XLSX.writeFile(wb, 'תבנית_ייבוא_דיירים.xlsx');
+}
+
+function importFromExcel(input) {
+  var file = input.files[0];
+  if (!file) return;
+  input.value = '';
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var wb = XLSX.read(e.target.result, { type: 'array' });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      // header:1 מחזיר מערך של מערכים כדי לשלוט בעמודות בדיוק
+      var raw = XLSX.utils.sheet_to_json(ws, { defval: '', header: 1 });
+      if (raw.length < 2) { showToast('הקובץ ריק או חסרה שורת כותרות', 'error'); return; }
+
+      var headerRow = raw[0].map(function(h) { return String(h).trim(); });
+      var dataRows  = raw.slice(1);
+
+      // מיפוי: שם עמודה → אינדקס
+      var colIdx = {};
+      Object.keys(EXCEL_COLS).forEach(function(field) {
+        var colName = EXCEL_COLS[field];
+        var idx = headerRow.indexOf(colName);
+        colIdx[field] = idx; // -1 = לא נמצא
+      });
+
+      // בדיקה שעמודות חובה קיימות
+      var missingCols = ['first_name','last_name','phone'].filter(function(f) { return colIdx[f] === -1; });
+      if (missingCols.length) {
+        showToast('עמודות חובה חסרות: ' + missingCols.map(function(f){ return EXCEL_COLS[f]; }).join(', '), 'error');
+        return;
+      }
+
+      function cellVal(row, field) {
+        var idx = colIdx[field];
+        return idx >= 0 ? String(row[idx] || '').trim() : '';
+      }
+
+      // ניתוח + אימות כל שורה
+      var valid = [], errors = [];
+      dataRows.forEach(function(row, i) {
+        var rowNum = i + 2; // מספר שורה באקסל (1=כותרות)
+        // דלג על שורות ריקות לחלוטין
+        if (row.every(function(c){ return !c || !String(c).trim(); })) return;
+
+        var fn   = cellVal(row, 'first_name');
+        var ln   = cellVal(row, 'last_name');
+        var ph   = cellVal(row, 'phone').replace(/[-\s]/g, '');
+        var id   = cellVal(row, 'id_number').replace(/\D/g, '');
+        var altPh= cellVal(row, 'alt_phone').replace(/[-\s]/g, '');
+        var altId= cellVal(row, 'alt_id_number').replace(/\D/g, '');
+        var ntfy = cellVal(row, 'notify_method').toLowerCase() || 'whatsapp';
+        var altNtfy = cellVal(row, 'alt_notify_method').toLowerCase() || 'whatsapp';
+
+        var rowErrs = [];
+        if (!fn)                          rowErrs.push('שם פרטי חסר');
+        if (!ln)                          rowErrs.push('שם משפחה חסר');
+        if (!ph)                          rowErrs.push('נייד חסר');
+        else if (!/^05\d{8}$/.test(ph))   rowErrs.push('נייד לא תקין (חייב להתחיל ב-05, 10 ספרות)');
+        if (id  && !/^\d{9}$/.test(id))   rowErrs.push('ת"ז לא תקין (9 ספרות)');
+        if (altPh && !/^05\d{8}$/.test(altPh)) rowErrs.push('נייד איש קשר לא תקין');
+        if (altId && !/^\d{9}$/.test(altId))   rowErrs.push('ת"ז איש קשר לא תקין (9 ספרות)');
+        if (!['whatsapp','sms'].includes(ntfy))       ntfy = 'whatsapp';
+        if (!['whatsapp','sms','none'].includes(altNtfy)) altNtfy = 'whatsapp';
+
+        if (rowErrs.length) {
+          errors.push('שורה ' + rowNum + ' (' + (fn || ln || '?') + '): ' + rowErrs.join(', '));
+        } else {
+          valid.push({
+            first_name:        fn,
+            last_name:         ln,
+            phone:             ph,
+            id_number:         id   || '',
+            street:            cellVal(row, 'street'),
+            house_number:      cellVal(row, 'house_number'),
+            notify_method:     ntfy,
+            notes:             cellVal(row, 'notes'),
+            alt_first_name:    cellVal(row, 'alt_first_name'),
+            alt_last_name:     cellVal(row, 'alt_last_name'),
+            alt_id_number:     altId || '',
+            alt_phone:         altPh || '',
+            alt_notify_method: altPh ? altNtfy : ''
+          });
+        }
+      });
+
+      // הצג שגיאות
+      if (errors.length) {
+        var msg = 'נמצאו ' + errors.length + ' שורות עם שגיאות:\n\n' + errors.join('\n');
+        if (valid.length) {
+          msg += '\n\nלייבא את ' + valid.length + ' השורות התקינות בלבד?';
+          if (!confirm(msg)) return;
+        } else {
+          alert(msg + '\n\nאין שורות תקינות לייבוא.');
+          return;
+        }
+      } else {
+        if (!confirm('נמצאו ' + valid.length + ' דיירים תקינים.\nלייבא אותם?')) return;
+      }
+
+      if (!valid.length) { showToast('אין שורות תקינות לייבוא', 'error'); return; }
+
+      // ייבוא רץ
+      var done = 0, failed = 0, total = valid.length;
+      function next(i) {
+        if (i >= total) {
+          showToast('יובאו ' + done + ' דיירים' + (failed ? ' | ' + failed + ' שגיאות שרת' : '') + ' ✓');
+          loadResidents();
+          return;
+        }
+        apiPost('/api/residents', valid[i]).then(function(res) {
+          if (res && res.error) failed++; else done++;
+          next(i + 1);
+        }).catch(function() { failed++; next(i + 1); });
+      }
+      next(0);
+
+    } catch(ex) {
+      showToast('שגיאה בקריאת הקובץ: ' + ex.message, 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  var d;
+  if (typeof iso === 'number') {
+    // Unix timestamp in seconds (from D1 nowSec())
+    d = new Date(iso * 1000);
+  } else {
+    d = new Date(iso.replace(' ', 'T') + (iso.includes('Z') ? '' : 'Z'));
+  }
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('he-IL', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+}
+
+// ─── NAV ─────────────────────────────────────────────────
+function showPage(name, el) {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.sidebar-item').forEach(function(b) { b.classList.remove('active'); });
+  document.getElementById('page-' + name).classList.add('active');
+  el.classList.add('active');
+  if (name === 'residents') renderResidents();
+  if (name === 'staff') loadStaff();
+  if (name === 'reminders') loadReminders();
+}
+
+// ─── MODAL ───────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(function(m) {
+  m.addEventListener('click', function(e) { if (e.target === m) m.classList.remove('open'); });
+});
+
+// ─── TOAST ───────────────────────────────────────────────
+function showToast(msg, isErr) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = isErr ? 'var(--red)' : 'var(--green)';
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 3000);
+}
+
+// ─── DASHBOARD ───────────────────────────────────────────
+function refreshDashboard() {
+  document.getElementById('dash-sub').textContent = 'מתעדכן...';
+  Promise.all([
+    apiGet('/api/residents'),
+    apiGet('/api/cells').catch(function() { return []; })
+  ]).then(function(results) {
+    var residents = results[0] || [];
+    var cells     = Array.isArray(results[1]) ? results[1] : [];
+
+    document.getElementById('stat-residents').textContent = residents.filter(function(r) { return r.active !== 0; }).length;
+    document.getElementById('badge-residents').textContent = residents.length || '0';
+
+    // תאים פנויים / תפוסים / תקולים
+    if (cells.length) {
+      var free  = cells.filter(function(c) { return c.status === 'available'; }).length;
+      var occ   = cells.filter(function(c) { return c.status === 'occupied' || c.status === 'loading'; }).length;
+      var fault = cells.filter(function(c) { return c.status === 'fault'; }).length;
+      document.getElementById('stat-free').textContent  = free;
+      document.getElementById('stat-occ').textContent   = occ;
+      document.getElementById('stat-fault').textContent = fault;
+    }
+
+    document.getElementById('dash-sub').textContent = 'עודכן ' + new Date().toLocaleTimeString('he-IL');
+  }).catch(function() {
+    document.getElementById('dash-sub').textContent = 'שגיאה בטעינת נתונים';
+  });
+}
+
+// ─── RESIDENTS ───────────────────────────────────────────
+function loadResidents() {
+  apiGet('/api/residents').then(function(data) {
+    if (!data) return;
+    allResidents = data;
+    renderResidents();
+    document.getElementById('badge-residents').textContent = data.length;
+    document.getElementById('residents-sub').textContent = data.length + ' דיירים רשומים';
+  });
+}
+
+function renderResidents(list) {
+  var rows = list || allResidents;
+  var tbody = document.getElementById('residents-tbody');
+  if (!rows || !rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">אין דיירים רשומים</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(function(r) {
+    var notifyMap = { whatsapp: '📱 WhatsApp', sms: '💬 SMS' };
+    var notifyIcon = notifyMap[r.notify_method] || '📱 WhatsApp';
+    var houseCell = [r.street, r.house_number].filter(Boolean).join(' ') || '—';
+    var nameCell = '<strong>' + esc(r.first_name || '') + ' ' + esc(r.last_name || '') + '</strong>' +
+      (r.notes ? '<br><span style="font-size:11px;color:var(--cyan)">' + esc(r.notes) + '</span>' : '');
+    var altFullName = [r.alt_first_name, r.alt_last_name].filter(Boolean).join(' ');
+    var altContact = altFullName
+      ? '<span style="font-size:12px;font-weight:600">' + esc(altFullName) + '</span>' +
+        (r.alt_phone ? '<br><span style="font-size:11px;color:var(--muted)" dir="ltr">' + esc(r.alt_phone) + '</span>' : '')
+      : '<span style="color:var(--muted);font-size:12px">—</span>';
+    return '<tr>' +
+      '<td>' + nameCell + '</td>' +
+      '<td style="font-size:12px;color:var(--muted)">' + esc(houseCell) + '</td>' +
+      '<td class="num-cell" style="font-size:12px">' + esc(r.id_number || '—') + '</td>' +
+      '<td class="num-cell" style="font-size:13px">' + esc(r.phone || '—') + '</td>' +
+      '<td style="font-size:12px">' + notifyIcon + '</td>' +
+      '<td>' + altContact + '</td>' +
+      '<td><div class="td-actions">' +
+        '<button class="btn btn-secondary btn-sm" onclick="openEditResident(\'' + r.id + '\')">עריכה</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="deleteResident(\'' + r.id + '\')">מחק</button>' +
+      '</div></td></tr>';
+  }).join('');
+}
+
+function filterResidents() {
+  var q = document.getElementById('resident-search').value.toLowerCase();
+  if (!q) { renderResidents(); return; }
+  renderResidents(allResidents.filter(function(r) {
+    var fullName = ((r.first_name || '') + ' ' + (r.last_name || '')).toLowerCase();
+    return fullName.includes(q) || (r.phone || '').includes(q);
+  }));
+}
+
+function clearResidentForm() {
+  ['r-first','r-last','r-id','r-phone','r-street','r-house','r-notes',
+   'r-alt-first','r-alt-last','r-alt-id','r-alt-phone'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  ['r-id-err','r-phone-err','r-alt-id-err','r-alt-phone-err'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  document.getElementById('r-notify').value = 'whatsapp';
+  document.getElementById('r-alt-notify').value = 'whatsapp';
+  document.getElementById('r-err').style.display = 'none';
+}
+
+function openEditResident(id) {
+  var r = allResidents.find(function(x) { return x.id === id; });
+  if (!r) return;
+  editingResidentId = id;
+  document.getElementById('resident-modal-title').textContent = 'עריכת דייר';
+  document.getElementById('r-first').value    = r.first_name    || '';
+  document.getElementById('r-last').value     = r.last_name     || '';
+  document.getElementById('r-id').value       = r.id_number     || '';
+  document.getElementById('r-phone').value    = r.phone         || '';
+  document.getElementById('r-street').value   = r.street        || '';
+  document.getElementById('r-house').value    = r.house_number  || '';
+  document.getElementById('r-notify').value   = r.notify_method || 'whatsapp';
+  document.getElementById('r-notes').value    = r.notes         || '';
+  document.getElementById('r-alt-first').value= r.alt_first_name|| '';
+  document.getElementById('r-alt-last').value = r.alt_last_name || '';
+  document.getElementById('r-alt-id').value   = r.alt_id_number || '';
+  document.getElementById('r-alt-phone').value= r.alt_phone     || '';
+  document.getElementById('r-alt-notify').value= r.alt_notify_method || 'whatsapp';
+  ['r-id-err','r-phone-err','r-alt-id-err','r-alt-phone-err'].forEach(function(id) {
+    document.getElementById(id).style.display = 'none';
+  });
+  document.getElementById('r-err').style.display = 'none';
+  openModal('resident-modal');
+}
+
+function validatePhone(val) { return !val || /^05\d{8}$/.test(val); }
+function validateId(val)    { return !val || /^\d{9}$/.test(val); }
+
+// Live validation on input
+['r-phone','r-alt-phone'].forEach(function(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('input', function() {
+    var v = this.value.replace(/\D/g,'');
+    this.value = v;
+    var errId = id + '-err';
+    var errEl = document.getElementById(errId);
+    if (errEl) errEl.style.display = (v && !validatePhone(v)) ? 'block' : 'none';
+  });
+});
+['r-id','r-alt-id'].forEach(function(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('input', function() {
+    var v = this.value.replace(/\D/g,'');
+    this.value = v;
+    var errId = id + '-err';
+    var errEl = document.getElementById(errId);
+    if (errEl) errEl.style.display = (v && !validateId(v)) ? 'block' : 'none';
+  });
+});
+
+function saveResident() {
+  var firstName  = document.getElementById('r-first').value.trim();
+  var lastName   = document.getElementById('r-last').value.trim();
+  var phone      = document.getElementById('r-phone').value.replace(/\D/g,'');
+  var idNum      = document.getElementById('r-id').value.replace(/\D/g,'');
+  var altPhone   = document.getElementById('r-alt-phone').value.replace(/\D/g,'');
+  var altIdNum   = document.getElementById('r-alt-id').value.replace(/\D/g,'');
+  var errEl      = document.getElementById('r-err');
+  var valid      = true;
+
+  var errors = [];
+
+  if (!firstName || !lastName) errors.push('יש למלא שם פרטי ושם משפחה');
+  if (!phone)                   errors.push('נייד הוא שדה חובה');
+  if (phone    && !validatePhone(phone))    errors.push('נייד ראשי חייב להיות 10 ספרות ולהתחיל ב-05');
+  if (idNum    && !validateId(idNum))       errors.push('ת"ז חייב להכיל בדיוק 9 ספרות');
+  if (altPhone && !validatePhone(altPhone)) errors.push('נייד איש קשר נוסף חייב להיות 10 ספרות ולהתחיל ב-05');
+  if (altIdNum && !validateId(altIdNum))    errors.push('ת"ז איש קשר נוסף חייב להכיל בדיוק 9 ספרות');
+
+  // Show field-level errors
+  document.getElementById('r-phone-err').style.display    = (phone    && !validatePhone(phone))    ? 'block' : 'none';
+  document.getElementById('r-id-err').style.display       = (idNum    && !validateId(idNum))       ? 'block' : 'none';
+  document.getElementById('r-alt-phone-err').style.display= (altPhone && !validatePhone(altPhone)) ? 'block' : 'none';
+  document.getElementById('r-alt-id-err').style.display   = (altIdNum && !validateId(altIdNum))    ? 'block' : 'none';
+
+  if (errors.length) {
+    errEl.innerHTML = errors.map(function(e) { return '• ' + e; }).join('<br>');
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+
+  var body = {
+    first_name:        firstName,
+    last_name:         lastName,
+    id_number:         idNum     || null,
+    phone:             phone     || null,
+    notify_method:     document.getElementById('r-notify').value,
+    street:            document.getElementById('r-street').value.trim() || null,
+    house_number:      document.getElementById('r-house').value.trim() || null,
+    notes:             document.getElementById('r-notes').value.trim() || null,
+    alt_first_name:    document.getElementById('r-alt-first').value.trim() || null,
+    alt_last_name:     document.getElementById('r-alt-last').value.trim() || null,
+    alt_id_number:     altIdNum  || null,
+    alt_phone:         altPhone  || null,
+    alt_notify_method: document.getElementById('r-alt-notify').value || null,
+  };
+
+  var promise = editingResidentId
+    ? apiPut('/api/residents/' + editingResidentId, body)
+    : apiPost('/api/residents', body);
+
+  promise.then(function(data) {
+    if (!data) return;
+    if (data.error) {
+      errEl.textContent = 'שגיאת שרת: ' + data.error;
+      errEl.style.display = 'block';
+      return;
+    }
+    closeModal('resident-modal');
+    showToast(editingResidentId ? 'דייר עודכן ✓' : 'דייר נוסף ✓');
+    loadResidents();
+  }).catch(function(e) {
+    errEl.textContent = 'שגיאת תקשורת עם השרת' + (e && e.message ? ': ' + e.message : '');
+    errEl.style.display = 'block';
+  });
+}
+
+
+function deleteResident(id) {
+  var r = allResidents.find(function(x) { return x.id === id; });
+  if (!r) return;
+  var displayName = [r.first_name, r.last_name].filter(Boolean).join(' ') || 'הדייר';
+  if (!confirm('למחוק את ' + displayName + '?')) return;
+  apiDelete('/api/residents/' + id).then(function() {
+    showToast('דייר הוסר ✓');
+    loadResidents();
+  });
+}
+
+// ─── STAFF ───────────────────────────────────────────────
+var allStaff = [];
+
+function loadStaff() {
+  var tbody = document.getElementById('staff-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="7">טוען...</td></tr>';
+  apiGet('/api/users').then(function(data) {
+    if (!data) return;
+    allStaff = Array.isArray(data) ? data : (data.users || []);
+    renderStaff();
+  }).catch(function() {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">שגיאה בטעינה</td></tr>';
+  });
+}
+
+var ROLE_LABELS = { mail_manager: 'אחראי/ת דואר', courier: 'שליח בשטח', courier_manager: 'חברת שילוח', finance: 'חשבונות', community_manager: 'מנהל ישוב', smarta_admin: 'מנהל Smarta' };
+
+function renderStaff() {
+  var tbody = document.getElementById('staff-tbody');
+  if (!tbody) return;
+  // smarta_admin ו-community_manager הם מעל ההיררכיה — לא מופיעים ברשימה זו
+  var visibleStaff = allStaff.filter(function(u) {
+    return u.role !== 'smarta_admin' && u.role !== 'community_manager';
+  });
+  if (!visibleStaff.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">אין בעלי תפקידים רשומים</td></tr>';
+    return;
+  }
+  tbody.innerHTML = visibleStaff.map(function(u) {
+    var fullName = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username || '—';
+    var emailCell = u.email
+      ? '<a href="mailto:' + esc(u.email) + '" style="font-size:11px;color:var(--accent);direction:ltr;display:block">' + esc(u.email) + '</a>'
+      : '<span style="color:var(--muted)">—</span>';
+    var roleLabel = ROLE_LABELS[u.role] || u.role || '—';
+    return '<tr>' +
+      '<td><strong>' + esc(fullName) + '</strong></td>' +
+      '<td class="num-cell" style="font-size:13px">' + esc(u.phone || '—') + '</td>' +
+      '<td style="font-size:12px">' + esc(roleLabel) + '</td>' +
+      '<td class="num-cell" style="font-size:12px">' + esc(u.username || '—') + '</td>' +
+      '<td>' + emailCell + '</td>' +
+      '<td><span class="badge badge-gray" style="font-family:monospace;letter-spacing:1px">••••••</span></td>' +
+      '<td><div class="td-actions">' +
+        '<button class="btn btn-secondary btn-sm" onclick="openEditStaff(\'' + u.id + '\')">עריכה</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="deleteStaff(\'' + u.id + '\',\'' + esc(fullName) + '\')">מחק</button>' +
+      '</div></td></tr>';
+  }).join('');
+}
+
+var editingStaffId = null;
+
+function staffClearErrors() {
+  ['staff-phone-err','staff-email-err'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+  document.getElementById('staff-err').style.display = 'none';
+}
+
+function openAddStaff() {
+  editingStaffId = null;
+  ['staff-first','staff-last','staff-phone','staff-email','staff-role','staff-username','staff-password'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.value = '';
+  });
+  staffClearErrors();
+  document.getElementById('staff-modal-title').textContent = '🪪 הוספת בעל תפקיד';
+  document.getElementById('staff-save-btn').textContent = 'שמור בעל תפקיד';
+  document.getElementById('staff-username').disabled = false;
+  document.getElementById('staff-password-label').textContent = 'סיסמה *';
+  document.getElementById('staff-password-hint').textContent = 'נדרש: לפחות 8 תווים, אות גדולה, מספר ותו מיוחד (!@#$%)';
+  document.getElementById('add-staff-modal').style.display = 'flex';
+}
+
+function openEditStaff(id) {
+  var u = allStaff.find(function(x) { return x.id === id; });
+  if (!u) return;
+  editingStaffId = id;
+  document.getElementById('staff-first').value    = u.first_name || '';
+  document.getElementById('staff-last').value     = u.last_name  || '';
+  document.getElementById('staff-phone').value    = u.phone      || '';
+  document.getElementById('staff-email').value    = u.email      || '';
+  document.getElementById('staff-role').value     = u.role       || '';
+  document.getElementById('staff-username').value = u.username   || '';
+  document.getElementById('staff-password').value = '';
+  document.getElementById('staff-username').disabled = true;
+  staffClearErrors();
+  document.getElementById('staff-modal-title').textContent = '✏️ עריכת בעל תפקיד';
+  document.getElementById('staff-save-btn').textContent = 'עדכן בעל תפקיד';
+  document.getElementById('staff-password-label').textContent = 'סיסמה חדשה';
+  document.getElementById('staff-password-hint').textContent = 'השאר ריק כדי לא לשנות | אם משנים: לפחות 8 תווים, אות גדולה, מספר ותו מיוחד';
+  document.getElementById('add-staff-modal').style.display = 'flex';
+}
+
+function closeAddStaff() {
+  document.getElementById('add-staff-modal').style.display = 'none';
+  document.getElementById('staff-username').disabled = false;
+  editingStaffId = null;
+}
+
+function saveStaff() {
+  var errEl = document.getElementById('staff-err');
+  staffClearErrors();
+  var first    = document.getElementById('staff-first').value.trim();
+  var last     = document.getElementById('staff-last').value.trim();
+  var phone    = document.getElementById('staff-phone').value.replace(/\D/g,'');
+  var email    = document.getElementById('staff-email').value.trim();
+  var role     = document.getElementById('staff-role').value.trim();
+  var username = document.getElementById('staff-username').value.trim();
+  var password = document.getElementById('staff-password').value.trim();
+
+  var hasErr = false;
+  if (!first || !last) { errEl.textContent = 'נא להזין שם פרטי ושם משפחה'; errEl.style.display = 'block'; hasErr = true; }
+  if (!role) { errEl.textContent = 'יש לבחור תפקיד'; errEl.style.display = 'block'; hasErr = true; }
+  if (phone && !/^05\d{8}$/.test(phone)) {
+    document.getElementById('staff-phone-err').style.display = 'block'; hasErr = true;
+  }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    document.getElementById('staff-email-err').style.display = 'block'; hasErr = true;
+  }
+  if (hasErr) return;
+
+  function validatePassword(p) {
+    return p.length >= 8 &&
+           /[A-Z]/.test(p) &&
+           /[0-9]/.test(p) &&
+           /[!@#$%^&*\-_=+]/.test(p);
+  }
+  var PWD_ERR = 'סיסמה חייבת: לפחות 8 תווים, אות גדולה, מספר ותו מיוחד (!@#$%)';
+
+  if (editingStaffId) {
+    if (password && !validatePassword(password)) { errEl.textContent = PWD_ERR; errEl.style.display = 'block'; return; }
+    var payload = { first_name: first, last_name: last, phone: phone || null, email: email || '', role: role };
+    if (password) payload.password = password;
+    apiPatch('/api/users/' + editingStaffId, payload)
+      .then(function(res) {
+        if (res && res.error) { errEl.textContent = res.error; errEl.style.display = 'block'; return; }
+        closeAddStaff(); showToast(first + ' ' + last + ' עודכן ✓'); loadStaff();
+      }).catch(function() { errEl.textContent = 'שגיאת תקשורת עם השרת'; errEl.style.display = 'block'; });
+  } else {
+    if (!username)                              { errEl.textContent = 'נא להזין שם משתמש';                              errEl.style.display = 'block'; return; }
+    if (!/^[a-zA-Z0-9_]+$/.test(username))     { errEl.textContent = 'שם משתמש: אותיות לועזיות, ספרות וקו תחתון בלבד'; errEl.style.display = 'block'; return; }
+    if (!password)                              { errEl.textContent = 'נא להזין סיסמה';                                 errEl.style.display = 'block'; return; }
+    if (!validatePassword(password))            { errEl.textContent = PWD_ERR;                                          errEl.style.display = 'block'; return; }
+    apiPost('/api/users', { first_name: first, last_name: last, phone: phone || null, email: email || '', role: role, username: username, password: password })
+      .then(function(res) {
+        if (res && res.error) { errEl.textContent = res.error; errEl.style.display = 'block'; return; }
+        closeAddStaff(); showToast(first + ' ' + last + ' נוסף ✓'); loadStaff();
+      }).catch(function() { errEl.textContent = 'שגיאת תקשורת עם השרת'; errEl.style.display = 'block'; });
+  }
+}
+
+function deleteStaff(id, name) {
+  var target = allStaff.find(function(u) { return u.id === id; });
+  if (target && (target.role === 'smarta_admin' || target.role === 'community_manager')) {
+    alert('לא ניתן למחוק משתמש בדרגה גבוהה יותר.');
+    return;
+  }
+  if (!confirm('למחוק את ' + name + '?\nהמשתמש לא יוכל להתחבר למערכת.')) return;
+  apiDelete('/api/users/' + id).then(function() {
+    showToast(name + ' הוסר ✓');
+    loadStaff();
+  }).catch(function() { showToast('שגיאה במחיקה', 'error'); });
+}
+
+// ─── REMINDERS & MESSAGE SETTINGS ───────────────────────
+var _msgSettings = null; // cache
+
+function loadReminders() {
+  var saveBtn = document.getElementById('rem-save-btn');
+  var errEl   = document.getElementById('rem-err');
+  errEl.style.display = 'none';
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'טוען...';
+  apiGet('/api/settings/messages').then(function(s) {
+    if (!s || s.error) {
+      errEl.textContent = 'שגיאה בטעינת הגדרות';
+      errEl.style.display = 'block';
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'שמור הגדרות';
+      return;
+    }
+    _msgSettings = s;
+    document.getElementById('rem-r1-days').value           = s.reminder1_days   || 1;
+    document.getElementById('rem-r2-days').value           = s.reminder2_days   || 3;
+    document.getElementById('rem-r3-days').value           = s.reminder3_days   || 5;
+    document.getElementById('rem-r4-days').value           = s.reminder4_days   || 7;
+    document.getElementById('rem-fine-days').value         = s.fine_days        || 10;
+    document.getElementById('rem-fine-amount').value       = s.fine_amount      || 20;
+    document.getElementById('rem-msg-arrival').value       = s.msg_arrival      || '';
+    document.getElementById('rem-msg-r1').value            = s.msg_reminder1    || '';
+    document.getElementById('rem-msg-r2').value            = s.msg_reminder2    || '';
+    document.getElementById('rem-msg-r3').value            = s.msg_reminder3    || '';
+    document.getElementById('rem-msg-r4').value            = s.msg_reminder4    || '';
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'שמור הגדרות';
+  }).catch(function() {
+    errEl.textContent = 'שגיאת תקשורת';
+    errEl.style.display = 'block';
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'שמור הגדרות';
+  });
+}
+
+function saveReminders() {
+  var saveBtn = document.getElementById('rem-save-btn');
+  var errEl   = document.getElementById('rem-err');
+  errEl.style.display = 'none';
+
+  var r1 = parseInt(document.getElementById('rem-r1-days').value) || 1;
+  var r2 = parseInt(document.getElementById('rem-r2-days').value) || 3;
+  var r3 = parseInt(document.getElementById('rem-r3-days').value) || 5;
+  var r4 = parseInt(document.getElementById('rem-r4-days').value) || 7;
+  var fd = parseInt(document.getElementById('rem-fine-days').value) || 10;
+  var fa = parseInt(document.getElementById('rem-fine-amount').value) || 0;
+
+  // ולידציה: כל אינטרוול חייב להיות גדול מהקודם
+  if (r2 <= r1) { errEl.textContent = 'תזכורת שנייה חייבת להיות אחרי הראשונה';  errEl.style.display = 'block'; return; }
+  if (r3 <= r2) { errEl.textContent = 'תזכורת שלישית חייבת להיות אחרי השנייה';  errEl.style.display = 'block'; return; }
+  if (r4 <= r3) { errEl.textContent = 'תזכורת רביעית חייבת להיות אחרי השלישית'; errEl.style.display = 'block'; return; }
+  if (fd <= r4) { errEl.textContent = 'הקנס חייב להיות אחרי התזכורת הרביעית';   errEl.style.display = 'block'; return; }
+
+  var body = {
+    reminder1_days:    r1,
+    reminder2_days:    r2,
+    reminder3_days:    r3,
+    reminder4_days:    r4,
+    fine_days:         fd,
+    fine_amount:       fa,
+    msg_arrival:       document.getElementById('rem-msg-arrival').value.trim(),
+    msg_reminder1:     document.getElementById('rem-msg-r1').value.trim(),
+    msg_reminder2:     document.getElementById('rem-msg-r2').value.trim(),
+    msg_reminder3:     document.getElementById('rem-msg-r3').value.trim(),
+    msg_reminder4:     document.getElementById('rem-msg-r4').value.trim(),
+  };
+
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'שומר...';
+
+  apiPut('/api/settings/messages', body).then(function(res) {
+    if (res && res.error) {
+      errEl.textContent = 'שגיאה: ' + res.error;
+      errEl.style.display = 'block';
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'שמור הגדרות';
+      return;
+    }
+    _msgSettings = body;
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'שמור הגדרות';
+    showToast('הגדרות נשמרו ✓');
+  }).catch(function() {
+    errEl.textContent = 'שגיאת תקשורת — ההגדרות לא נשמרו';
+    errEl.style.display = 'block';
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'שמור הגדרות';
+  });
+}
+
+// ─── REFRESH ON TAB REVISIT (postMessage from shell) ─────
+window.addEventListener('message', function(e) {
+  if (!e.data || e.data.type !== 'smarta-refresh') return;
+  var activePage = document.querySelector('.page.active');
+  if (!activePage) { refreshDashboard(); return; }
+  switch (activePage.id) {
+    case 'page-dashboard':  refreshDashboard(); break;
+    case 'page-residents':  loadResidents();    break;
+    case 'page-staff':      loadStaff();        break;
+    case 'page-reminders':  loadReminders();    break;
+  }
+});
+
+// ─── UTILS ───────────────────────────────────────────────
+function esc(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

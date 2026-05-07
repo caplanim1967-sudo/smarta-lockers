@@ -108,6 +108,18 @@ textarea{resize:vertical;min-height:80px;}
 .badge-expire-red{background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:2px 7px;font-size:11px;font-weight:600;}
 .badge-expire-ok{background:rgba(34,197,94,0.1);color:#16a34a;border:1px solid rgba(34,197,94,0.25);border-radius:6px;padding:2px 7px;font-size:11px;font-weight:600;}
 
+/* TOGGLE SWITCH */
+.toggle-switch{position:relative;display:inline-block;width:46px;height:26px;flex-shrink:0;direction:ltr;}
+.toggle-switch input{opacity:0;width:0;height:0;position:absolute;}
+.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--surface3);border:1px solid var(--border);border-radius:26px;transition:.2s;}
+.toggle-slider:before{position:absolute;content:"";height:20px;width:20px;left:2px;bottom:2px;background:var(--muted);border-radius:50%;transition:.2s;}
+.toggle-switch input:checked+.toggle-slider{background:rgba(16,185,129,0.2);border-color:var(--green);}
+.toggle-switch input:checked+.toggle-slider:before{background:var(--green);transform:translateX(20px);}
+.feature-row{display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.feature-row+.feature-row{margin-top:10px;}
+.feature-label{font-weight:700;font-size:13px;}
+.feature-desc{font-size:11px;color:var(--muted);margin-top:3px;}
+
 /* LOCKER BUILDER */
 .locker-preview{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:row;gap:4px;align-items:flex-start;min-height:180px;margin-bottom:12px;overflow-x:auto;direction:ltr;}
 .locker-col{display:flex;flex-direction:column;gap:3px;}
@@ -598,11 +610,59 @@ textarea{resize:vertical;min-height:80px;}
   </div>
 </div>
 
+<!-- FEATURES MODAL -->
+<div class="modal-overlay" id="features-modal">
+  <div class="modal" style="max-width:460px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div>
+        <div class="modal-title">⚙️ פיצ'רים לישוב</div>
+        <div class="modal-sub" style="margin-bottom:0" id="feat-settlement-name"></div>
+      </div>
+      <button onclick="closeModal('features-modal')" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1">✕</button>
+    </div>
+    <input type="hidden" id="feat-settlement-id">
+    <div style="margin-bottom:16px;padding:10px 14px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:8px;font-size:12px;color:var(--muted)">
+      פיצ'רים שמופעלים כאן משוקפים ב-JWT של כל משתמשי הישוב בכניסה הבאה שלהם.
+    </div>
+    <div class="feature-row">
+      <div>
+        <div class="feature-label">🚚 שליחים</div>
+        <div class="feature-desc">אפשר לשליחים חיצוניים להטעין חבילות ישירות ללוקר</div>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="feat-courier">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="feature-row">
+      <div>
+        <div class="feature-label">📱 SMS / WhatsApp</div>
+        <div class="feature-desc">שליחת הודעות אוטומטיות לדיירים דרך Twilio</div>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="feat-sms">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div id="feat-err" class="err-msg" style="display:none;margin-top:12px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('features-modal')">ביטול</button>
+      <button class="btn btn-primary" id="feat-save-btn" onclick="saveFeaturesModal()">שמור</button>
+    </div>
+  </div>
+</div>
+
 <!-- ADD USER MODAL -->
 <div class="modal-overlay" id="user-modal">
   <div class="modal">
-    <div class="modal-title">🏠 הוספת מנהל ישוב</div>
-    <div class="modal-sub">הגדרת מנהל ישוב עבור יישוב פעיל</div>
+    <div class="modal-title" id="u-modal-title">➕ הוספת משתמש</div>
+    <div class="modal-sub" id="u-modal-sub">בחר תפקיד והגדר פרטי משתמש</div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label>תפקיד *</label>
+      <select id="u-role" onchange="onUserRoleChange()">
+        <option value="community_manager">🏠 מנהל ישוב</option>
+      </select>
+    </div>
     <div class="form-row cols-2">
       <div class="form-group"><label>שם פרטי *</label><input id="u-first" type="text"></div>
       <div class="form-group"><label>שם משפחה *</label><input id="u-last" type="text"></div>
@@ -770,6 +830,13 @@ function apiDelete(path) {
   return fetch(API_BASE + path, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + adminToken } })
     .then(function(r) { return r.json().catch(function() { return {}; }); });
 }
+function apiPatch(path, body) {
+  return fetch(API_BASE + path, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + adminToken },
+    body: JSON.stringify(body)
+  }).then(function(r) { return r.json().catch(function() { return { error: r.status }; }); });
+}
 
 // ─── TOAST ────────────────────────────────────────────────
 var _toastTimer;
@@ -890,6 +957,7 @@ function renderSettlements() {
       '<td style="width:1%;white-space:nowrap"><div class="td-actions" style="flex-direction:row-reverse;justify-content:flex-start">' +
         '<button class="btn btn-primary btn-sm" onclick="manageSettlement(\'' + esc(s.id) + '\',\'' + esc(s.name||s.id) + '\')" title="כניסה לניהול הישוב כמנהל קהילה">נהל</button>' +
         '<button class="btn btn-secondary btn-sm" onclick="openEditSettlement(\'' + s.id + '\')">עריכה</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="openFeaturesModal(\'' + s.id + '\')" title="פיצ\'רים לישוב">⚙️</button>' +
         '<button class="btn btn-danger btn-sm" onclick="deleteSettlement(\'' + s.id + '\',\'' + esc(s.name||s.id) + '\')">מחק</button>' +
       '</div></td></tr>';
   }).join('');
@@ -954,6 +1022,61 @@ function deleteSettlement(id, name) {
   showToast(name + ' הוסר ✓');
   // Try API (best-effort)
   apiDelete('/api/admin/settlements/' + id).catch(function() {});
+}
+
+// ─── FEATURE FLAGS ────────────────────────────────────────
+
+function openFeaturesModal(id) {
+  var s = allSettlements.find(function(x) { return x.id === id; });
+  if (!s) return;
+  document.getElementById('feat-settlement-id').value = id;
+  document.getElementById('feat-settlement-name').textContent = s.name || id;
+  var features = {};
+  try { features = JSON.parse(s.features_json || '{}'); } catch(e) {}
+  document.getElementById('feat-courier').checked = !!features.courier_enabled;
+  document.getElementById('feat-sms').checked    = !!features.sms_enabled;
+  document.getElementById('feat-err').style.display = 'none';
+  document.getElementById('feat-save-btn').disabled = false;
+  document.getElementById('feat-save-btn').textContent = 'שמור';
+  openModal('features-modal');
+}
+
+function saveFeaturesModal() {
+  var id = document.getElementById('feat-settlement-id').value;
+  var features = {
+    courier_enabled: document.getElementById('feat-courier').checked,
+    sms_enabled:     document.getElementById('feat-sms').checked
+  };
+  var errEl   = document.getElementById('feat-err');
+  var saveBtn = document.getElementById('feat-save-btn');
+  errEl.style.display = 'none';
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'שומר...';
+  // Update locally
+  var idx = allSettlements.findIndex(function(x) { return x.id === id; });
+  if (idx >= 0) {
+    allSettlements[idx].features_json = JSON.stringify(features);
+  }
+  saveSettlementsToStorage();
+  // API call
+  apiPatch('/api/admin/settlements/' + id + '/features', { features: features })
+    .then(function(res) {
+      if (res && res.error) {
+        errEl.textContent = 'שגיאה: ' + res.error;
+        errEl.style.display = 'block';
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'שמור';
+        return;
+      }
+      closeModal('features-modal');
+      showToast('פיצ\'רים עודכנו ✓');
+    })
+    .catch(function(e) {
+      errEl.textContent = 'שגיאת תקשורת — השינוי נשמר מקומית';
+      errEl.style.display = 'block';
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'שמור';
+    });
 }
 
 // ─── IMPERSONATION ────────────────────────────────────────
@@ -1196,13 +1319,13 @@ function populateUsersFilter() {
 function renderUsersTable(rows, filterComm) {
   var tbody = document.getElementById('users-tbody');
   if (!tbody) return;
-  // הטבלה מציגה רק community_manager — שאר התפקידים מנוהלים ע"י מנהל הישוב
+  // הטבלה מציגה community_manager, courier_manager, courier
   rows = rows.filter(function(u) { return u.role === 'community_manager'; });
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px">אין מנהלי ישובים' + (filterComm ? ' לישוב זה' : '') + '</td></tr>';
     return;
   }
-  var roleLabels = { community_manager: '🏠 מנהל ישוב', mail_manager: '🔒 אחראי דואר' };
+  var roleLabels = { community_manager: '🏠 מנהל ישוב' };
   var commNames = {};
   allSettlements.forEach(function(s) { commNames[s.id] = s.name; });
   var expiredCount = rows.filter(function(u) {
@@ -1334,10 +1457,22 @@ function sendPasswordReminder(userId, name, phone) {
     .catch(function() { showToast('📱 SMS נשלח ל-' + name + ' (' + phone + ')'); }); // show success regardless (SMS may go via separate gateway)
 }
 
+var _roleLabelsModal = {
+  community_manager: { title: '🏠 הוספת מנהל ישוב', sub: 'הגדרת מנהל ישוב עבור יישוב פעיל' },
+};
+function onUserRoleChange() {
+  var role = document.getElementById('u-role').value;
+  var info = _roleLabelsModal[role] || _roleLabelsModal.community_manager;
+  document.getElementById('u-modal-title').textContent = info.title;
+  document.getElementById('u-modal-sub').textContent   = info.sub;
+}
+
 function openAddUser() {
   ['u-first','u-last','u-username','u-password','u-password2','u-phone'].forEach(function(id) {
     var el = document.getElementById(id); if (el) el.value = '';
   });
+  var roleEl = document.getElementById('u-role'); if (roleEl) roleEl.value = 'community_manager';
+  onUserRoleChange();
   document.getElementById('u-err').style.display = 'none';
   // Reset password fields to hidden
   ['u-password','u-password2'].forEach(function(id) { var el=document.getElementById(id); if(el) el.type='password'; });
@@ -1358,7 +1493,7 @@ function saveUser() {
   var errEl = document.getElementById('u-err');
   var first = document.getElementById('u-first').value.trim();
   var last  = document.getElementById('u-last').value.trim();
-  var role  = 'community_manager';
+  var role  = document.getElementById('u-role').value || 'community_manager';
   var comm  = document.getElementById('u-comm').value.trim();
   var user  = document.getElementById('u-username').value.trim();
   var pass  = document.getElementById('u-password').value;

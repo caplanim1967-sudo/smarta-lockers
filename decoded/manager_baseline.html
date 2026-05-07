@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smarta — מנהל ישוב</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #22263a;
+  --surface3: #2a2f47;
+  --border: #2e3348;
+  --accent: #4f8ef7;
+  --accent2: #7c3aed;
+  --green: #22c55e;
+  --yellow: #f59e0b;
+  --red: #ef4444;
+  --cyan: #06b6d4;
+  --text: #f0f2ff;
+  --muted: #7b82a0;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Heebo',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; direction:rtl; }
+
+/* LOGIN OVERLAY */
+.login-overlay {
+  position:fixed; inset:0; background:rgba(10,12,20,0.96);
+  display:flex; align-items:center; justify-content:center; z-index:1000;
+}
+.login-overlay.hidden { display:none; }
+.login-box {
+  background:var(--surface); border:1px solid var(--border); border-radius:16px;
+  padding:36px 40px; width:360px; text-align:center;
+}
+.login-logo { font-size:28px; font-weight:900; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:4px; }
+.login-sub { font-size:13px; color:var(--muted); margin-bottom:28px; }
+.login-box input { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:9px; padding:11px 14px; color:var(--text); font-size:14px; font-family:'Heebo',sans-serif; margin-bottom:10px; outline:none; }
+.login-box input:focus { border-color:var(--accent); }
+.login-btn { width:100%; padding:11px; background:linear-gradient(135deg,var(--accent),var(--accent2)); border:none; border-radius:9px; color:#fff; font-size:15px; font-weight:700; font-family:'Heebo',sans-serif; cursor:pointer; margin-top:4px; }
+.login-btn:hover { opacity:0.88; }
+.login-err { color:var(--red); font-size:12px; margin-top:8px; display:none; }
+
+/* NAV */
+nav {
+  background:var(--surface); border-bottom:1px solid var(--border);
+  padding:0 28px; height:58px;
+  display:flex; align-items:center; justify-content:space-between;
+  position:sticky; top:0; z-index:100;
+}
+.logo { font-size:18px; font-weight:900; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.nav-center { font-size:13px; color:var(--muted); }
+.nav-center strong { color:var(--text); }
+.nav-right { display:flex; align-items:center; gap:12px; }
+.avatar { width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff; cursor:pointer; }
+.btn-logout { background:none; border:1px solid var(--border); color:var(--muted); font-size:12px; font-family:'Heebo',sans-serif; border-radius:7px; padding:5px 12px; cursor:pointer; }
+.btn-logout:hover { border-color:var(--red); color:var(--red); }
+
+/* SIDEBAR */
+.layout { display:flex; min-height:calc(100vh - 58px); }
+aside {
+  width:210px; background:var(--surface); border-left:1px solid var(--border);
+  padding:16px 10px; flex-shrink:0;
+  position:sticky; top:58px; height:calc(100vh - 58px); overflow-y:auto;
+}
+.sidebar-section { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:1px; padding:0 10px; margin:14px 0 5px; }
+.sidebar-item {
+  display:flex; align-items:center; gap:9px;
+  padding:8px 10px; border-radius:8px; font-size:13px; font-weight:500; color:var(--muted);
+  cursor:pointer; transition:all 0.15s; margin-bottom:1px;
+  border:none; background:transparent; width:100%; text-align:right; font-family:'Heebo',sans-serif;
+}
+.sidebar-item:hover { background:var(--surface2); color:var(--text); }
+.sidebar-item.active { background:rgba(79,142,247,0.1); color:var(--accent); }
+.sidebar-item .icon { font-size:15px; width:18px; text-align:center; }
+.sidebar-item .badge { margin-right:auto; background:var(--surface2); color:var(--muted); font-size:11px; font-weight:600; padding:1px 7px; border-radius:10px; min-width:22px; text-align:center; }
+.sidebar-item.active .badge { background:rgba(79,142,247,0.2); color:var(--accent); }
+
+/* MAIN */
+main { flex:1; padding:24px 28px; }
+.page { display:none; }
+.page.active { display:block; }
+
+.page-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:20px; }
+.page-title { font-size:20px; font-weight:800; }
+.page-sub { font-size:12px; color:var(--muted); margin-top:3px; }
+
+/* BUTTONS */
+.btn { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; border:none; font-family:'Heebo',sans-serif; transition:all 0.15s; }
+.btn-primary { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; }
+.btn-primary:hover { opacity:0.88; }
+.btn-secondary { background:var(--surface2); color:var(--text); border:1px solid var(--border); }
+.btn-secondary:hover { border-color:var(--accent); color:var(--accent); }
+.btn-danger { background:rgba(239,68,68,0.1); color:var(--red); border:1px solid rgba(239,68,68,0.2); }
+.btn-danger:hover { background:rgba(239,68,68,0.18); }
+.btn-sm { padding:5px 11px; font-size:12px; }
+.btn-group { display:flex; gap:8px; flex-wrap:wrap; }
+
+/* CARDS */
+.card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px; margin-bottom:16px; }
+.card-title { font-size:13px; font-weight:700; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+.card-title .sub { font-weight:400; color:var(--muted); font-size:12px; }
+
+/* STAT GRID */
+.stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:18px; }
+.stat-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px; }
+.stat-card .label { font-size:11px; color:var(--muted); font-weight:600; margin-bottom:6px; }
+.stat-card .val { font-size:28px; font-weight:800; line-height:1; }
+.stat-card .sub { font-size:11px; color:var(--muted); margin-top:4px; }
+.val-blue { color:var(--accent); }
+.val-green { color:var(--green); }
+.val-yellow { color:var(--yellow); }
+.val-red { color:var(--red); }
+
+/* TABLE */
+.table-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { text-align:right; padding:8px 12px; color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid var(--border); white-space:nowrap; }
+td { padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:rgba(255,255,255,0.015); }
+.td-actions { display:flex; gap:6px; justify-content:flex-end; }
+
+/* BADGES */
+.badge { display:inline-block; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; }
+.badge-green { background:rgba(34,197,94,0.12); color:var(--green); border:1px solid rgba(34,197,94,0.25); }
+.badge-yellow { background:rgba(245,158,11,0.12); color:var(--yellow); border:1px solid rgba(245,158,11,0.25); }
+.badge-red { background:rgba(239,68,68,0.12); color:var(--red); border:1px solid rgba(239,68,68,0.25); }
+.badge-blue { background:rgba(79,142,247,0.12); color:var(--accent); border:1px solid rgba(79,142,247,0.25); }
+.badge-gray { background:rgba(123,130,160,0.12); color:var(--muted); border:1px solid var(--border); }
+
+/* FORM */
+.form-group { margin-bottom:14px; }
+.form-group label { display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:5px; }
+.form-group input, .form-group select, .form-group textarea {
+  width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+  padding:9px 12px; color:var(--text); font-size:13px; font-family:'Heebo',sans-serif; outline:none;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color:var(--accent); }
+.form-row { display:grid; gap:14px; margin-bottom:0; }
+.form-row.cols-2 { grid-template-columns:1fr 1fr; }
+.form-row.cols-3 { grid-template-columns:1fr 1fr 1fr; }
+.form-row.cols-1 { grid-template-columns:1fr; }
+
+/* SEARCH BAR */
+.search-bar { display:flex; gap:10px; margin-bottom:16px; align-items:center; }
+.search-bar input { flex:1; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:8px 12px; color:var(--text); font-size:13px; font-family:'Heebo',sans-serif; outline:none; }
+.search-bar input:focus { border-color:var(--accent); }
+
+/* MODAL */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center; z-index:500; }
+.modal-overlay.open { display:flex; }
+.modal { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:28px; width:480px; max-width:95vw; max-height:90vh; overflow-y:auto; }
+.modal-lg { width:600px; }
+.modal-title { font-size:17px; font-weight:800; margin-bottom:4px; }
+.modal-sub { font-size:12px; color:var(--muted); margin-bottom:22px; }
+.modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:22px; }
+.modal-err { color:var(--red); font-size:12px; margin-top:6px; display:none; }
+.field-err { color:var(--red); font-size:11px; margin-top:4px; display:none; }
+.divider { border:none; border-top:1px solid var(--border); margin:16px 0; }
+.section-label { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:12px; }
+
+/* LOCKER GRID */
+.locker-grid { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.cell-box {
+  width:62px; height:62px; border-radius:8px; border:2px solid var(--border);
+  background:var(--surface2); display:flex; flex-direction:column; align-items:center;
+  justify-content:center; font-size:11px; font-weight:700; cursor:default;
+  transition:all 0.15s; gap:3px;
+}
+.cell-box.available { border-color:rgba(34,197,94,0.3); background:rgba(34,197,94,0.07); color:var(--green); }
+.cell-box.occupied  { border-color:rgba(245,158,11,0.4); background:rgba(245,158,11,0.1); color:var(--yellow); }
+.cell-box.fault     { border-color:rgba(239,68,68,0.4); background:rgba(239,68,68,0.1); color:var(--red); }
+.cell-box .cell-num { font-size:16px; font-weight:800; }
+.cell-box .cell-lbl { font-size:9px; font-weight:600; }
+
+/* EMPTY STATE */
+.empty-state { text-align:center; padding:48px 20px; color:var(--muted); }
+.empty-state .icon { font-size:40px; margin-bottom:12px; }
+.empty-state .title { font-size:16px; font-weight:700; color:var(--text); margin-bottom:6px; }
+
+/* TOAST */
+.toast {
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(60px);
+  background:var(--green); color:#fff; padding:12px 24px; border-radius:10px;
+  font-size:14px; font-weight:600; z-index:9999; transition:all 0.3s; opacity:0;
+}
+.toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
+
+/* SPINNER */
+.spinner { display:inline-block; width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.loading-row td { text-align:center; padding:24px; color:var(--muted); }
+
+/* TABS (packages) */
+.tab-bar { display:flex; gap:4px; background:var(--surface2); border-radius:10px; padding:4px; margin-bottom:16px; width:fit-content; }
+.tab-btn { padding:6px 16px; border-radius:7px; border:none; background:transparent; color:var(--muted); font-size:13px; font-weight:600; font-family:'Heebo',sans-serif; cursor:pointer; transition:all 0.15s; }
+.tab-btn.active { background:var(--surface); color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,0.3); }
+
+@media (max-width:700px) {
+  .stat-grid { grid-template-columns:1fr 1fr; }
+  .form-row.cols-2, .form-row.cols-3 { grid-template-columns:1fr; }
+  main { padding:16px; }
+  aside { display:none; }
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN OVERLAY -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <div class="login-logo">Smarta</div>
+    <div class="login-sub">מנהל ישוב — כניסה למערכת</div>
+    <input type="text" id="login-user" placeholder="שם משתמש" autocomplete="username">
+    <input type="password" id="login-pass" placeholder="סיסמה" autocomplete="current-password">
+    <button class="login-btn" onclick="doLogin()">כניסה</button>
+    <div class="login-err" id="login-err">שם משתמש או סיסמה שגויים</div>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">Smarta</div>
+  <div class="nav-center">ישוב: <strong id="nav-settlement">—</strong></div>
+  <div class="nav-right">
+    <button class="btn-logout" onclick="doLogout()">יציאה</button>
+    <div class="avatar" id="nav-avatar">?</div>
+  </div>
+</nav>
+
+<div class="layout">
+<aside>
+  <div class="sidebar-section">ניהול</div>
+  <button class="sidebar-item active" id="sb-dashboard" onclick="showPage('dashboard',this)">
+    <span class="icon">📊</span> דשבורד
+  </button>
+  <button class="sidebar-item" id="sb-residents" onclick="showPage('residents',this)">
+    <span class="icon">👥</span> דיירים
+    <span class="badge" id="badge-residents">—</span>
+  </button>
+  <button class="sidebar-item" id="sb-packages" onclick="showPage('packages',this)">
+    <span class="icon">📦</span> חבילות
+    <span class="badge" id="badge-packages">—</span>
+  </button>
+  <button class="sidebar-item" id="sb-cells" onclick="showPage('cells',this)">
+    <span class="icon">🗄️</span> תאים
+  </button>
+  <div class="sidebar-section">הגדרות</div>
+  <button class="sidebar-item" id="sb-staff" onclick="showPage('staff',this)">
+    <span class="icon">🪪</span> בעלי תפקידים
+  </button>
+  <button class="sidebar-item" id="sb-reminders" onclick="showPage('reminders',this)">
+    <span class="icon">⏰</span> תזכורות
+  </button>
+</aside>
+
+<main>
+
+  <!-- DASHBOARD -->
+  <div class="page active" id="page-dashboard">
+    <div class="page-header">
+      <div><div class="page-title">דשבורד</div><div class="page-sub" id="dash-sub">טוען נתונים...</div></div>
+      <button class="btn btn-secondary btn-sm" onclick="refreshDashboard()">↻ רענן</button>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="label">דיירים רשומים</div><div class="val val-blue" id="stat-residents">—</div><div class="sub">פעילים</div></div>
+      <div class="stat-card"><div class="label">חבילות ממתינות</div><div class="val val-yellow" id="stat-waiting">—</div><div class="sub">ללא הודעה</div></div>
+      <div class="stat-card"><div class="label">תאים פנויים</div><div class="val val-green" id="stat-free">—</div><div class="sub">מוכנים לשימוש</div></div>
+      <div class="stat-card"><div class="label">תאים תפוסים</div><div class="val val-yellow" id="stat-occ">—</div><div class="sub">עם חבילה</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">📦 חבילות ממתינות <span class="sub">— האחרונות שנכנסו</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>דייר</th><th>תא</th><th>נכנס</th><th>שליח</th></tr></thead>
+          <tbody id="dash-packages-tbody"><tr class="loading-row"><td colspan="4">טוען...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESIDENTS -->
+  <div class="page" id="page-residents">
+    <div class="page-header">
+      <div><div class="page-title">דיירים</div><div class="page-sub" id="residents-sub">טוען...</div></div>
+      <button class="btn btn-primary" onclick="openModal('resident-modal'); editingResidentId=null; document.getElementById('resident-modal-title').textContent='דייר חדש'; clearResidentForm()">＋ דייר חדש</button>
+    </div>
+    <div class="search-bar">
+      <input type="text" placeholder="חיפוש לפי שם או טלפון..." id="resident-search" oninput="filterResidents()">
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <colgroup>
+            <col style="width:28%"><col style="width:11%"><col style="width:13%">
+            <col style="width:13%"><col style="width:20%"><col style="width:8%"><col style="width:7%">
+          </colgroup>
+          <thead><tr><th>שם ופרטים</th><th>ת"ז</th><th>נייד</th><th>התראות</th><th>איש קשר נוסף</th><th>סטטוס</th><th></th></tr></thead>
+          <tbody id="residents-tbody"><tr class="loading-row"><td colspan="7">טוען דיירים...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- PACKAGES -->
+  <div class="page" id="page-packages">
+    <div class="page-header">
+      <div><div class="page-title">חבילות</div><div class="page-sub">מעקב חבילות לפי סטטוס</div></div>
+      <button class="btn btn-secondary btn-sm" onclick="loadPackages()">↻ רענן</button>
+    </div>
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchPackageTab('waiting',this)">ממתינות</button>
+      <button class="tab-btn" onclick="switchPackageTab('history',this)">היסטוריה</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr id="packages-thead">
+              <th>דייר</th><th>תא</th><th>נכנס</th><th>שליח</th><th>ברקוד</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="packages-tbody"><tr class="loading-row"><td colspan="6">טוען חבילות...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- CELLS -->
+  <div class="page" id="page-cells">
+    <div class="page-header">
+      <div><div class="page-title">תאים</div><div class="page-sub">סטטוס תאי הלוקר בזמן אמת</div></div>
+      <button class="btn btn-secondary btn-sm" onclick="loadCells()">↻ רענן</button>
+    </div>
+    <div class="card">
+      <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--green)">● פנוי</span>
+        <span style="font-size:12px;color:var(--yellow)">● תפוס</span>
+        <span style="font-size:12px;color:var(--red)">● תקלה</span>
+        <span style="font-size:12px;color:var(--muted)">● מנוטרל</span>
+      </div>
+      <div class="locker-grid" id="cells-grid">
+        <div style="color:var(--muted);font-size:13px">טוען תאים...</div>
+      </div>
+    </div>
+    <div class="card" id="cell-detail-card" style="display:none">
+      <div class="card-title" id="cell-detail-title">תא —</div>
+      <div id="cell-detail-body"></div>
+    </div>
+  </div>
+
+  <!-- STAFF -->
+  <div class="page" id="page-staff">
+    <div class="page-header">
+      <div><div class="page-title">בעלי תפקידים</div><div class="page-sub">ניהול משתמשים בישוב</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">🔒 אחראי דואר</div>
+      <table>
+        <thead><tr><th>שם</th><th>נייד</th><th>מייל</th><th>שעות עבודה</th><th>סיסמה</th><th></th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>—</strong></td>
+            <td>—</td><td>—</td><td>—</td>
+            <td><span class="badge badge-gray">לא הוגדר</span></td>
+            <td><div class="td-actions"><button class="btn btn-secondary btn-sm" onclick="showToast('פונקציה זו תהיה זמינה בקרוב')">עריכה</button></div></td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="font-size:12px;color:var(--muted);margin-top:14px">ניהול מלא של בעלי תפקידים יתווסף בגרסה הבאה.</div>
+    </div>
+  </div>
+
+  <!-- REMINDERS -->
+  <div class="page" id="page-reminders">
+    <div class="page-header">
+      <div><div class="page-title">תזכורות וקנסות</div><div class="page-sub">הגדרות אוטומציה</div></div>
+      <button class="btn btn-primary btn-sm" onclick="showToast('הגדרות נשמרו ✓')">שמור</button>
+    </div>
+    <div class="card">
+      <div class="card-title">⏰ תזכורת ראשונה</div>
+      <div class="form-row cols-2">
+        <div class="form-group">
+          <label>שלח תזכורת לאחר (שעות)</label>
+          <input type="number" value="24" min="1" max="72">
+        </div>
+        <div class="form-group">
+          <label>ערוץ</label>
+          <select><option>WhatsApp</option><option>SMS</option><option>שניהם</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">🔔 תזכורת שנייה</div>
+      <div class="form-row cols-2">
+        <div class="form-group">
+          <label>שלח תזכורת שנייה לאחר (שעות)</label>
+          <input type="number" value="48" min="1" max="120">
+        </div>
+        <div class="form-group">
+          <label>ערוץ</label>
+          <select><option>WhatsApp</option><option>SMS</option><option>שניהם</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">💰 קנס איחור</div>
+      <div class="form-row cols-2">
+        <div class="form-group">
+          <label>קנס לאחר (ימים)</label>
+          <input type="number" value="3" min="1">
+        </div>
+        <div class="form-group">
+          <label>סכום קנס (₪)</label>
+          <input type="number" value="20" min="0">
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px">הגדרות אלו יחולו על כל הדיירים בישוב.</div>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<!-- MODAL: דייר -->
+<div class="modal-overlay" id="resident-modal">
+  <div class="modal modal-lg">
+    <div class="modal-title" id="resident-modal-title">דייר חדש</div>
+    <div class="modal-sub">פרטי הדייר בישוב</div>
+
+    <div class="form-row cols-2">
+      <div class="form-group"><label>שם פרטי *</label><input type="text" id="r-first" placeholder="שם פרטי"></div>
+      <div class="form-group"><label>שם משפחה *</label><input type="text" id="r-last" placeholder="שם משפחה"></div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group">
+        <label>ת"ז <span style="font-weight:400;color:var(--muted)">(9 ספרות)</span></label>
+        <input type="text" id="r-id" placeholder="000000000" maxlength="9" inputmode="numeric">
+        <div class="field-err" id="r-id-err">ת"ז חייב להכיל בדיוק 9 ספרות</div>
+      </div>
+      <div class="form-group">
+        <label>נייד * <span style="font-weight:400;color:var(--muted)">(10 ספרות)</span></label>
+        <input type="tel" id="r-phone" placeholder="0501234567" maxlength="10" inputmode="numeric">
+        <div class="field-err" id="r-phone-err">נייד חייב להכיל בדיוק 10 ספרות ללא מרווחים</div>
+      </div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group"><label>רחוב</label><input type="text" id="r-street" placeholder="שם הרחוב"></div>
+      <div class="form-group"><label>מספר בית</label><input type="text" id="r-house" placeholder="12א"></div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group">
+        <label>ערוץ הודעות</label>
+        <select id="r-notify">
+          <option value="whatsapp">WhatsApp</option>
+          <option value="sms">SMS</option>
+          <option value="none">ללא הודעות</option>
+        </select>
+      </div>
+      <div class="form-group"><label>הערות</label><input type="text" id="r-notes" placeholder="הערות על הדייר"></div>
+    </div>
+
+    <hr class="divider">
+    <div class="section-label">איש קשר נוסף <span style="font-weight:400;text-transform:none;color:var(--muted);font-size:11px">— מקבל את כל ההודעות וההרשאות במקום הדייר</span></div>
+
+    <div class="form-row cols-2">
+      <div class="form-group"><label>שם פרטי</label><input type="text" id="r-alt-first" placeholder="שם פרטי"></div>
+      <div class="form-group"><label>שם משפחה</label><input type="text" id="r-alt-last" placeholder="שם משפחה"></div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group">
+        <label>ת"ז <span style="font-weight:400;color:var(--muted)">(9 ספרות)</span></label>
+        <input type="text" id="r-alt-id" placeholder="000000000" maxlength="9" inputmode="numeric">
+        <div class="field-err" id="r-alt-id-err">ת"ז חייב להכיל בדיוק 9 ספרות</div>
+      </div>
+      <div class="form-group">
+        <label>נייד <span style="font-weight:400;color:var(--muted)">(10 ספרות)</span></label>
+        <input type="tel" id="r-alt-phone" placeholder="0501234567" maxlength="10" inputmode="numeric">
+        <div class="field-err" id="r-alt-phone-err">נייד חייב להכיל בדיוק 10 ספרות</div>
+      </div>
+    </div>
+    <div class="form-row cols-1">
+      <div class="form-group">
+        <label>ערוץ הודעות</label>
+        <select id="r-alt-notify">
+          <option value="whatsapp">WhatsApp</option>
+          <option value="sms">SMS</option>
+          <option value="none">ללא</option>
+        </select>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:-4px;margin-bottom:12px">
+      דוגמה: הורה קשיש ללא נייד — הבן/הבת מקבלים הודעה בשמו ויכולים לפתוח את התא.
+    </div>
+
+    <div class="modal-err" id="r-err"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="saveResident()">שמור</button>
+      <button class="btn btn-secondary" onclick="closeModal('resident-modal')">ביטול</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: תקלה בתא -->
+<div class="modal-overlay" id="fault-modal">
+  <div class="modal">
+    <div class="modal-title">דיווח תקלה בתא</div>
+    <div class="modal-sub" id="fault-modal-sub">תא —</div>
+    <div class="form-group">
+      <label>תיאור התקלה</label>
+      <textarea id="fault-note" rows="3" placeholder="תאר את הבעיה..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="submitFault()">דווח תקלה</button>
+      <button class="btn btn-secondary" onclick="closeModal('fault-modal')">ביטול</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var API_BASE = 'https://smarta-api.smarta-api.workers.dev';
+var jwtToken = sessionStorage.getItem('manager_token') || '';
+var currentUser = JSON.parse(sessionStorage.getItem('manager_user') || 'null');
+var allResidents = [];
+var currentPackageTab = 'waiting';
+var activeFaultCellId = null;
+var editingResidentId = null;
+
+// ─── AUTH ───────────────────────────────────────────────
+function doLogin() {
+  var user = document.getElementById('login-user').value.trim();
+  var pass = document.getElementById('login-pass').value.trim();
+  var errEl = document.getElementById('login-err');
+  errEl.style.display = 'none';
+  if (!user || !pass) { errEl.style.display = 'block'; errEl.textContent = 'יש למלא שם משתמש וסיסמה'; return; }
+
+  fetch(API_BASE + '/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: user, password: pass })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.token) {
+      jwtToken = data.token;
+      currentUser = {
+        username: user,
+        full_name: data.name || user,
+        role: data.role,
+        community_name: data.community_name || ''
+      };
+      sessionStorage.setItem('manager_token', jwtToken);
+      sessionStorage.setItem('manager_user', JSON.stringify(currentUser));
+      initApp();
+    } else {
+      errEl.style.display = 'block';
+      errEl.textContent = data.error || 'שגיאת התחברות';
+    }
+  })
+  .catch(function() {
+    errEl.style.display = 'block';
+    errEl.textContent = 'שגיאת תקשורת עם השרת';
+  });
+}
+
+function doLogout() {
+  sessionStorage.removeItem('manager_token');
+  sessionStorage.removeItem('manager_user');
+  jwtToken = '';
+  currentUser = null;
+  document.getElementById('login-overlay').classList.remove('hidden');
+}
+
+document.getElementById('login-pass').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doLogin();
+});
+
+// ─── INIT ────────────────────────────────────────────────
+function initApp() {
+  document.getElementById('login-overlay').classList.add('hidden');
+  var name = currentUser && (currentUser.full_name || currentUser.username) || 'מנהל';
+  var communityName = currentUser && currentUser.community_name || '';
+  document.getElementById('nav-settlement').textContent = communityName || '—';
+  document.getElementById('nav-avatar').textContent = name.charAt(0);
+  document.title = communityName ? 'Smarta — ' + communityName : 'Smarta — מנהל ישוב';
+  refreshDashboard();
+  loadResidents();
+}
+
+if (jwtToken) {
+  initApp();
+}
+
+// ─── API HELPERS ─────────────────────────────────────────
+function apiGet(path) {
+  return fetch(API_BASE + path, {
+    headers: { 'Authorization': 'Bearer ' + jwtToken }
+  }).then(function(r) {
+    if (r.status === 401) { doLogout(); return null; }
+    return r.json();
+  });
+}
+
+function apiPost(path, body) {
+  return fetch(API_BASE + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwtToken },
+    body: JSON.stringify(body)
+  }).then(function(r) {
+    if (r.status === 401) { doLogout(); return null; }
+    return r.json().catch(function() { return { error: 'שגיאת שרת ' + r.status }; });
+  });
+}
+
+function apiPut(path, body) {
+  return fetch(API_BASE + path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwtToken },
+    body: JSON.stringify(body)
+  }).then(function(r) {
+    if (r.status === 401) { doLogout(); return null; }
+    return r.json().catch(function() { return { error: 'שגיאת שרת ' + r.status }; });
+  });
+}
+
+function apiDelete(path) {
+  return fetch(API_BASE + path, {
+    method: 'DELETE',
+    headers: { 'Authorization': 'Bearer ' + jwtToken }
+  }).then(function(r) {
+    return r.json().catch(function() { return { error: 'שגיאת שרת ' + r.status }; });
+  });
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  var d = new Date(iso.replace(' ', 'T') + (iso.includes('Z') ? '' : 'Z'));
+  return d.toLocaleDateString('he-IL', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+}
+
+// ─── NAV ─────────────────────────────────────────────────
+function showPage(name, el) {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.sidebar-item').forEach(function(b) { b.classList.remove('active'); });
+  document.getElementById('page-' + name).classList.add('active');
+  el.classList.add('active');
+  if (name === 'packages') loadPackages();
+  if (name === 'cells') loadCells();
+  if (name === 'residents') renderResidents();
+}
+
+// ─── MODAL ───────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(function(m) {
+  m.addEventListener('click', function(e) { if (e.target === m) m.classList.remove('open'); });
+});
+
+// ─── TOAST ───────────────────────────────────────────────
+function showToast(msg, isErr) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = isErr ? 'var(--red)' : 'var(--green)';
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 3000);
+}
+
+// ─── DASHBOARD ───────────────────────────────────────────
+function refreshDashboard() {
+  document.getElementById('dash-sub').textContent = 'מתעדכן...';
+  Promise.all([
+    apiGet('/api/residents'),
+    apiGet('/api/packages?status=waiting')
+  ]).then(function(results) {
+    var residents = results[0] || [];
+    var packages  = results[1] || [];
+
+    document.getElementById('stat-residents').textContent = residents.filter(function(r) { return r.active !== 0; }).length;
+    document.getElementById('stat-waiting').textContent   = packages.length;
+    document.getElementById('badge-packages').textContent = packages.length || '0';
+    document.getElementById('badge-residents').textContent = residents.length || '0';
+
+    var dashTbody = document.getElementById('dash-packages-tbody');
+    if (!packages.length) {
+      dashTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px">אין חבילות ממתינות</td></tr>';
+    } else {
+      dashTbody.innerHTML = packages.slice(0,8).map(function(p) {
+        return '<tr><td><strong>' + esc(p.resident_name || '—') + '</strong></td>' +
+               '<td><span class="badge badge-yellow">תא ' + (p.cell_number || '—') + '</span></td>' +
+               '<td>' + fmtDate(p.placed_at) + '</td>' +
+               '<td>' + esc(p.courier || '—') + '</td></tr>';
+      }).join('');
+    }
+
+    document.getElementById('dash-sub').textContent = 'עודכן ' + new Date().toLocaleTimeString('he-IL');
+  }).catch(function() {
+    document.getElementById('dash-sub').textContent = 'שגיאה בטעינת נתונים';
+  });
+}
+
+// ─── RESIDENTS ───────────────────────────────────────────
+function loadResidents() {
+  apiGet('/api/residents').then(function(data) {
+    if (!data) return;
+    allResidents = data;
+    renderResidents();
+    document.getElementById('badge-residents').textContent = data.length;
+    document.getElementById('residents-sub').textContent = data.length + ' דיירים רשומים';
+  });
+}
+
+function renderResidents(list) {
+  var rows = list || allResidents;
+  var tbody = document.getElementById('residents-tbody');
+  if (!rows || !rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">אין דיירים רשומים</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(function(r) {
+    var active = r.active !== 0 && r.active !== false;
+    var notifyIcon = { whatsapp: '📱 WhatsApp', sms: '💬 SMS', none: '—' }[r.notify_method] || '—';
+    var address = [r.street, r.house_number].filter(Boolean).join(' ');
+    var nameCell = '<strong>' + esc(r.first_name || '') + ' ' + esc(r.last_name || '') + '</strong>' +
+      (address ? '<br><span style="font-size:11px;color:var(--muted)">' + esc(address) + '</span>' : '') +
+      (r.notes ? '<br><span style="font-size:11px;color:var(--cyan)">' + esc(r.notes) + '</span>' : '');
+    var altFullName = [r.alt_first_name, r.alt_last_name].filter(Boolean).join(' ');
+    var altContact = altFullName
+      ? '<span style="font-size:12px;font-weight:600">' + esc(altFullName) + '</span>' +
+        (r.alt_phone ? '<br><span style="font-size:11px;color:var(--muted)" dir="ltr">' + esc(r.alt_phone) + '</span>' : '')
+      : '<span style="color:var(--muted);font-size:12px">—</span>';
+    return '<tr>' +
+      '<td>' + nameCell + '</td>' +
+      '<td style="font-size:12px;direction:ltr;font-family:monospace">' + esc(r.id_number || '—') + '</td>' +
+      '<td dir="ltr" style="font-size:13px">' + esc(r.phone || '—') + '</td>' +
+      '<td style="font-size:12px">' + notifyIcon + '</td>' +
+      '<td>' + altContact + '</td>' +
+      '<td><span class="badge ' + (active ? 'badge-green' : 'badge-gray') + '">' + (active ? 'פעיל' : 'מושהה') + '</span></td>' +
+      '<td><div class="td-actions">' +
+        '<button class="btn btn-secondary btn-sm" onclick="openEditResident(\'' + r.id + '\')">עריכה</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="deleteResident(\'' + r.id + '\')">מחק</button>' +
+      '</div></td></tr>';
+  }).join('');
+}
+
+function filterResidents() {
+  var q = document.getElementById('resident-search').value.toLowerCase();
+  if (!q) { renderResidents(); return; }
+  renderResidents(allResidents.filter(function(r) {
+    var fullName = ((r.first_name || '') + ' ' + (r.last_name || '')).toLowerCase();
+    return fullName.includes(q) || (r.phone || '').includes(q);
+  }));
+}
+
+function clearResidentForm() {
+  ['r-first','r-last','r-id','r-phone','r-street','r-house','r-notes',
+   'r-alt-first','r-alt-last','r-alt-id','r-alt-phone'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  ['r-id-err','r-phone-err','r-alt-id-err','r-alt-phone-err'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  document.getElementById('r-notify').value = 'whatsapp';
+  document.getElementById('r-alt-notify').value = 'whatsapp';
+  document.getElementById('r-err').style.display = 'none';
+}
+
+function openEditResident(id) {
+  var r = allResidents.find(function(x) { return x.id === id; });
+  if (!r) return;
+  editingResidentId = id;
+  document.getElementById('resident-modal-title').textContent = 'עריכת דייר';
+  document.getElementById('r-first').value    = r.first_name    || '';
+  document.getElementById('r-last').value     = r.last_name     || '';
+  document.getElementById('r-id').value       = r.id_number     || '';
+  document.getElementById('r-phone').value    = r.phone         || '';
+  document.getElementById('r-street').value   = r.street        || '';
+  document.getElementById('r-house').value    = r.house_number  || '';
+  document.getElementById('r-notify').value   = r.notify_method || 'whatsapp';
+  document.getElementById('r-notes').value    = r.notes         || '';
+  document.getElementById('r-alt-first').value= r.alt_first_name|| '';
+  document.getElementById('r-alt-last').value = r.alt_last_name || '';
+  document.getElementById('r-alt-id').value   = r.alt_id_number || '';
+  document.getElementById('r-alt-phone').value= r.alt_phone     || '';
+  document.getElementById('r-alt-notify').value= r.alt_notify_method || 'whatsapp';
+  ['r-id-err','r-phone-err','r-alt-id-err','r-alt-phone-err'].forEach(function(id) {
+    document.getElementById(id).style.display = 'none';
+  });
+  document.getElementById('r-err').style.display = 'none';
+  openModal('resident-modal');
+}
+
+function validatePhone(val) { return !val || /^\d{10}$/.test(val); }
+function validateId(val)    { return !val || /^\d{9}$/.test(val); }
+
+// Live validation on input
+['r-phone','r-alt-phone'].forEach(function(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('input', function() {
+    var v = this.value.replace(/\D/g,'');
+    this.value = v;
+    var errId = id + '-err';
+    var errEl = document.getElementById(errId);
+    if (errEl) errEl.style.display = (v && !validatePhone(v)) ? 'block' : 'none';
+  });
+});
+['r-id','r-alt-id'].forEach(function(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('input', function() {
+    var v = this.value.replace(/\D/g,'');
+    this.value = v;
+    var errId = id + '-err';
+    var errEl = document.getElementById(errId);
+    if (errEl) errEl.style.display = (v && !validateId(v)) ? 'block' : 'none';
+  });
+});
+
+function saveResident() {
+  var firstName  = document.getElementById('r-first').value.trim();
+  var lastName   = document.getElementById('r-last').value.trim();
+  var phone      = document.getElementById('r-phone').value.replace(/\D/g,'');
+  var idNum      = document.getElementById('r-id').value.replace(/\D/g,'');
+  var altPhone   = document.getElementById('r-alt-phone').value.replace(/\D/g,'');
+  var altIdNum   = document.getElementById('r-alt-id').value.replace(/\D/g,'');
+  var errEl      = document.getElementById('r-err');
+  var valid      = true;
+
+  var errors = [];
+
+  if (!firstName || !lastName) errors.push('יש למלא שם פרטי ושם משפחה');
+  if (!phone)                   errors.push('נייד הוא שדה חובה');
+  if (phone    && !validatePhone(phone))    errors.push('נייד ראשי חייב להכיל בדיוק 10 ספרות');
+  if (idNum    && !validateId(idNum))       errors.push('ת"ז חייב להכיל בדיוק 9 ספרות');
+  if (altPhone && !validatePhone(altPhone)) errors.push('נייד איש קשר נוסף חייב להכיל בדיוק 10 ספרות');
+  if (altIdNum && !validateId(altIdNum))    errors.push('ת"ז איש קשר נוסף חייב להכיל בדיוק 9 ספרות');
+
+  // Show field-level errors
+  document.getElementById('r-phone-err').style.display    = (phone    && !validatePhone(phone))    ? 'block' : 'none';
+  document.getElementById('r-id-err').style.display       = (idNum    && !validateId(idNum))       ? 'block' : 'none';
+  document.getElementById('r-alt-phone-err').style.display= (altPhone && !validatePhone(altPhone)) ? 'block' : 'none';
+  document.getElementById('r-alt-id-err').style.display   = (altIdNum && !validateId(altIdNum))    ? 'block' : 'none';
+
+  if (errors.length) {
+    errEl.innerHTML = errors.map(function(e) { return '• ' + e; }).join('<br>');
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+
+  var body = {
+    first_name:        firstName,
+    last_name:         lastName,
+    id_number:         idNum     || null,
+    phone:             phone     || null,
+    notify_method:     document.getElementById('r-notify').value,
+    street:            document.getElementById('r-street').value.trim() || null,
+    house_number:      document.getElementById('r-house').value.trim() || null,
+    notes:             document.getElementById('r-notes').value.trim() || null,
+    alt_first_name:    document.getElementById('r-alt-first').value.trim() || null,
+    alt_last_name:     document.getElementById('r-alt-last').value.trim() || null,
+    alt_id_number:     altIdNum  || null,
+    alt_phone:         altPhone  || null,
+    alt_notify_method: document.getElementById('r-alt-notify').value || null,
+  };
+
+  var promise = editingResidentId
+    ? apiPut('/api/residents/' + editingResidentId, body)
+    : apiPost('/api/residents', body);
+
+  promise.then(function(data) {
+    if (!data) return;
+    if (data.error) {
+      errEl.textContent = 'שגיאת שרת: ' + data.error;
+      errEl.style.display = 'block';
+      return;
+    }
+    closeModal('resident-modal');
+    showToast(editingResidentId ? 'דייר עודכן ✓' : 'דייר נוסף ✓');
+    loadResidents();
+  }).catch(function(e) {
+    errEl.textContent = 'שגיאת תקשורת עם השרת' + (e && e.message ? ': ' + e.message : '');
+    errEl.style.display = 'block';
+  });
+}
+
+function deleteResident(id) {
+  var r = allResidents.find(function(x) { return x.id === id; });
+  if (!r) return;
+  var displayName = [r.first_name, r.last_name].filter(Boolean).join(' ') || 'הדייר';
+  if (!confirm('למחוק את ' + displayName + '?')) return;
+  apiDelete('/api/residents/' + id).then(function() {
+    showToast('דייר הוסר ✓');
+    loadResidents();
+  });
+}
+
+// ─── PACKAGES ────────────────────────────────────────────
+function loadPackages() {
+  var tbody = document.getElementById('packages-tbody');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="6">טוען...</td></tr>';
+
+  var path = currentPackageTab === 'history' ? '/api/packages/history' : '/api/packages?status=waiting';
+  apiGet(path).then(function(data) {
+    if (!data) return;
+    if (currentPackageTab === 'waiting') {
+      document.getElementById('badge-packages').textContent = data.length;
+    }
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">אין חבילות</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(function(p) {
+      var collectBtn = currentPackageTab === 'waiting'
+        ? '<button class="btn btn-primary btn-sm" onclick="collectPackage(\'' + p.id + '\')">אסף</button>'
+        : '';
+      return '<tr>' +
+        '<td><strong>' + esc(p.resident_name || '—') + '</strong><br><span style="font-size:11px;color:var(--muted)">' + esc(p.resident_phone || '') + '</span></td>' +
+        '<td><span class="badge badge-yellow">תא ' + (p.cell_number || '—') + '</span></td>' +
+        '<td>' + fmtDate(p.placed_at) + '</td>' +
+        '<td>' + esc(p.courier || '—') + '</td>' +
+        '<td style="font-size:11px;color:var(--muted)">' + esc(p.barcode || '—') + '</td>' +
+        '<td><div class="td-actions">' + collectBtn + '</div></td></tr>';
+    }).join('');
+  });
+}
+
+function switchPackageTab(tab, el) {
+  currentPackageTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+  el.classList.add('active');
+  var thead = document.getElementById('packages-thead');
+  if (tab === 'history') {
+    thead.innerHTML = '<th>דייר</th><th>תא</th><th>נכנס</th><th>נאסף</th><th>ברקוד</th><th></th>';
+  } else {
+    thead.innerHTML = '<th>דייר</th><th>תא</th><th>נכנס</th><th>שליח</th><th>ברקוד</th><th></th>';
+  }
+  loadPackages();
+}
+
+function collectPackage(id) {
+  if (!confirm('לסמן חבילה כנאספה?')) return;
+  apiPost('/api/packages/' + id + '/collect', {}).then(function(data) {
+    if (!data) return;
+    showToast('חבילה נאספה ✓');
+    loadPackages();
+    refreshDashboard();
+  });
+}
+
+// ─── CELLS ───────────────────────────────────────────────
+function loadCells() {
+  // Get locker_id from community settings - for now use first locker from packages
+  apiGet('/api/packages?status=waiting').then(function(pkgs) {
+    if (!pkgs || !pkgs.length) {
+      renderCellsGrid([]);
+      return;
+    }
+    // We don't have locker_id directly — show message
+    document.getElementById('cells-grid').innerHTML = '<div style="color:var(--muted);font-size:13px">כדי לצפות בתאים, יש להגדיר את מזהה הלוקר בהגדרות ישוב.</div>';
+  });
+}
+
+function renderCellsGrid(cells) {
+  var grid = document.getElementById('cells-grid');
+  if (!cells.length) {
+    grid.innerHTML = '<div style="color:var(--muted);font-size:13px">אין נתוני תאים זמינים</div>';
+    return;
+  }
+  var statMap = { available: 'פנוי', occupied: 'תפוס', fault: 'תקלה', disabled: 'מנוטרל' };
+  grid.innerHTML = cells.map(function(c) {
+    var st = c.status || 'available';
+    return '<div class="cell-box ' + st + '" onclick="selectCell(\'' + c.id + '\',' + c.number + ',\'' + st + '\')">' +
+      '<span class="cell-num">' + c.number + '</span>' +
+      '<span class="cell-lbl">' + (statMap[st] || st) + '</span></div>';
+  }).join('');
+}
+
+function selectCell(id, num, status) {
+  var card = document.getElementById('cell-detail-card');
+  var title = document.getElementById('cell-detail-title');
+  var body = document.getElementById('cell-detail-body');
+  title.textContent = 'תא ' + num + ' — ' + status;
+  body.innerHTML = status === 'fault'
+    ? '<button class="btn btn-secondary btn-sm" onclick="clearFault(\'' + id + '\')">נקה תקלה</button>'
+    : '<button class="btn btn-danger btn-sm" onclick="openFaultModal(\'' + id + '\',' + num + ')">דווח תקלה</button>';
+  card.style.display = 'block';
+}
+
+function openFaultModal(cellId, cellNum) {
+  activeFaultCellId = cellId;
+  document.getElementById('fault-modal-sub').textContent = 'תא ' + cellNum;
+  document.getElementById('fault-note').value = '';
+  openModal('fault-modal');
+}
+
+function submitFault() {
+  var note = document.getElementById('fault-note').value.trim();
+  if (!note) { showToast('יש לתאר את התקלה', true); return; }
+  apiPost('/api/cells/fault', { cell_id: activeFaultCellId, note: note }).then(function() {
+    closeModal('fault-modal');
+    showToast('תקלה דווחה ✓');
+    loadCells();
+  });
+}
+
+function clearFault(cellId) {
+  apiPost('/api/cells/clear-fault', { cell_id: cellId }).then(function() {
+    showToast('תקלה נוקתה ✓');
+    document.getElementById('cell-detail-card').style.display = 'none';
+    loadCells();
+  });
+}
+
+// ─── UTILS ───────────────────────────────────────────────
+function esc(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

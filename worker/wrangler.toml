@@ -1,0 +1,9 @@
+name = "smarta-api"
+main = "src/index.js"
+compatibility_date = "2026-04-17"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "smarta_db"
+database_name = "smarta-db"
+database_id = "1e9ab32c-c6fb-4001-aaca-a2c21913dc36"

@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smarta — מסמך בדיקות</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Heebo, sans-serif; background: #f4f6fb; color: #1a1d2e; direction: rtl; }
+
+  header {
+    background: #1a1d2e;
+    color: #fff;
+    padding: 24px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 { font-size: 22px; font-weight: 900; }
+  header p { font-size: 13px; color: #8b93b0; margin-top: 4px; }
+  .header-badge { background: #4f8ef7; color: #fff; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+
+  main { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+
+  .intro {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px 28px;
+    margin-bottom: 28px;
+    border-right: 4px solid #4f8ef7;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .intro h2 { font-size: 16px; font-weight: 800; margin-bottom: 10px; color: #4f8ef7; }
+  .intro p { font-size: 14px; line-height: 1.8; color: #444; }
+  .intro ul { margin: 10px 0 0 0; padding-right: 20px; }
+  .intro ul li { font-size: 13px; line-height: 2; color: #555; }
+
+  .progress-bar {
+    background: #fff;
+    border-radius: 16px;
+    padding: 18px 24px;
+    margin-bottom: 28px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .progress-label { font-size: 13px; font-weight: 700; white-space: nowrap; }
+  .progress-track { flex: 1; background: #e8eaf0; border-radius: 99px; height: 10px; }
+  .progress-fill { height: 10px; border-radius: 99px; background: linear-gradient(90deg, #4f8ef7, #22c55e); transition: width 0.4s; }
+  .progress-count { font-size: 13px; font-weight: 800; color: #4f8ef7; white-space: nowrap; }
+
+  .module {
+    background: #fff;
+    border-radius: 16px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    overflow: hidden;
+  }
+  .module-header {
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  .module-header:hover { background: #f8f9fd; }
+  .module-title { display: flex; align-items: center; gap: 12px; }
+  .module-icon { font-size: 22px; }
+  .module-name { font-size: 16px; font-weight: 800; }
+  .module-sub { font-size: 12px; color: #8b93b0; margin-top: 2px; }
+  .module-stats { display: flex; align-items: center; gap: 12px; }
+  .module-score { font-size: 12px; font-weight: 700; color: #8b93b0; }
+  .module-chevron { font-size: 14px; color: #8b93b0; transition: transform 0.2s; }
+  .module.open .module-chevron { transform: rotate(180deg); }
+
+  .login-info {
+    background: #f0f4ff;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin: 0 24px 16px;
+    font-size: 13px;
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .login-info strong { color: #4f8ef7; }
+  .login-field { display: flex; gap: 6px; align-items: center; }
+  .login-field .lbl { color: #8b93b0; font-size: 12px; }
+  .login-field code { background: #fff; border: 1px solid #d0d8f0; padding: 3px 10px; border-radius: 6px; font-size: 13px; font-family: monospace; }
+
+  .tasks { padding: 0 24px 20px; }
+
+  .task {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid #f0f2f8;
+  }
+  .task:last-child { border-bottom: none; }
+
+  .task-check {
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    border: 2px solid #d0d8f0;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    transition: all 0.15s;
+    margin-top: 2px;
+  }
+  .task-check.checked { background: #22c55e; border-color: #22c55e; color: #fff; }
+  .task-check.issue { background: #ef4444; border-color: #ef4444; color: #fff; }
+
+  .task-body { flex: 1; }
+  .task-title { font-size: 14px; font-weight: 700; line-height: 1.5; }
+  .task-desc { font-size: 12px; color: #6b7280; margin-top: 4px; line-height: 1.6; }
+  .task-expected { font-size: 12px; color: #4f8ef7; margin-top: 6px; background: #f0f4ff; border-radius: 6px; padding: 6px 10px; }
+  .task-expected::before { content: "✓ מצופה: "; font-weight: 700; }
+
+  .task-actions { display: flex; gap: 6px; margin-top: 8px; }
+  .task-btn {
+    padding: 5px 12px; border-radius: 6px; border: none; font-size: 11px;
+    font-weight: 700; cursor: pointer; font-family: Heebo, sans-serif;
+  }
+  .task-btn-ok { background: #dcfce7; color: #166534; }
+  .task-btn-issue { background: #fee2e2; color: #991b1b; }
+
+  .note-area {
+    display: none;
+    margin-top: 8px;
+  }
+  .note-area textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #d0d8f0;
+    border-radius: 8px;
+    font-size: 12px;
+    font-family: Heebo, sans-serif;
+    resize: vertical;
+    min-height: 60px;
+    outline: none;
+  }
+  .note-area textarea:focus { border-color: #4f8ef7; }
+
+  .module-body { display: none; }
+  .module.open .module-body { display: block; }
+
+  .summary-section {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px 28px;
+    margin-top: 28px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .summary-section h2 { font-size: 16px; font-weight: 800; margin-bottom: 16px; }
+  .summary-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 20px; }
+  .sum-box { border-radius: 12px; padding: 16px; text-align: center; }
+  .sum-box .val { font-size: 28px; font-weight: 900; }
+  .sum-box .lbl { font-size: 12px; margin-top: 4px; }
+  .sum-ok { background: #dcfce7; }
+  .sum-ok .val { color: #166534; }
+  .sum-issue { background: #fee2e2; }
+  .sum-issue .val { color: #991b1b; }
+  .sum-pending { background: #f0f4ff; }
+  .sum-pending .val { color: #4f8ef7; }
+
+  .export-btn {
+    width: 100%; padding: 14px; border-radius: 12px; border: none;
+    background: #1a1d2e; color: #fff; font-size: 15px; font-weight: 800;
+    cursor: pointer; font-family: Heebo, sans-serif;
+  }
+  .export-btn:hover { background: #2a2f45; }
+
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; margin-right: 6px; }
+  .tag-critical { background: #fee2e2; color: #991b1b; }
+  .tag-ux { background: #fef9c3; color: #854d0e; }
+  .tag-nice { background: #f0fdf4; color: #166534; }
+
+  @media (max-width: 600px) {
+    main { padding: 16px; }
+    .summary-grid { grid-template-columns: repeat(2,1fr); }
+    header { padding: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🧪 Smarta Lockers — מסמך בדיקות</h1>
+    <p>בדיקת משתמש — כל 5 ממשקים | גרסה 1.0</p>
+  </div>
+  <div class="header-badge" id="total-badge">0 / 0 משימות</div>
+</header>
+
+<main>
+
+  <div class="intro">
+    <h2>👋 הוראות למבדקת</h2>
+    <p>תודה שאת עוזרת לבדוק את המערכת! המטרה היא למצוא בעיות לפני שמשתמשים אמיתיים יגיעו.</p>
+    <ul>
+      <li>עברי על כל משימה — בצעי אותה ולחצי ✓ אם עבד, או ✗ אם הייתה בעיה</li>
+      <li>אם הייתה בעיה — כתבי הערה קצרה מה קרה</li>
+      <li>בסוף לחצי "ייצוא סיכום" ושלחי לבעלך</li>
+    </ul>
+  </div>
+
+  <div class="progress-bar">
+    <span class="progress-label">התקדמות:</span>
+    <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+    <span class="progress-count" id="progress-text">0 / 0</span>
+  </div>
+
+  <!-- MODULE 1: אחראית דואר -->
+  <div class="module open" id="mod-app">
+    <div class="module-header" onclick="toggleModule('app')">
+      <div class="module-title">
+        <span class="module-icon">📦</span>
+        <div>
+          <div class="module-name">ממשק אחראית דואר</div>
+          <div class="module-sub">smarta-app.html</div>
+        </div>
+      </div>
+      <div class="module-stats">
+        <span class="module-score" id="score-app">0/0</span>
+        <span class="module-chevron">▼</span>
+      </div>
+    </div>
+    <div class="module-body">
+      <div class="login-info">
+        <strong>כניסה:</strong>
+        <div class="login-field"><span class="lbl">שם משתמש:</span><code>nir_doa</code></div>
+        <div class="login-field"><span class="lbl">סיסמה:</span><code>1234</code></div>
+      </div>
+      <div class="tasks" id="tasks-app">
+
+        <div class="task" data-module="app" data-id="app1">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-critical">קריטי</span>כניסה למערכת</div>
+            <div class="task-desc">הכניסי את שם המשתמש והסיסמה ולחצי כניסה</div>
+            <div class="task-expected">נכנסת ללוח הבקרה עם שם הישוב בכותרת</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+        <div class="task" data-module="app" data-id="app2">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-critical">קריטי</span>לוח בקרה — צבעי תאים</div>
+            <div class="task-desc">הסתכלי על לוח התאים — בדקי שהצבעים מובנים: תפוס/פנוי/מאחר/לא תקין</div>
+            <div class="task-expected">תאים אדומים = תפוסים, ירוקים = פנויים, אפורים = לא תקינים</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+        <div class="task" data-module="app" data-id="app3">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-critical">קריטי</span>רישום חבילה חדשה</div>
+            <div class="task-desc">לחצי על תא ירוק (פנוי) — אמור לעבור לטאב "חבילה חדשה" עם מספר התא ממולא. חפשי דייר לפי שם ורשמי חבילה.</div>
+            <div class="task-expected">החבילה נרשמה, התא הפך לאדום</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+        <div class="task" data-module="app" data-id="app4">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-ux">UX</span>שליחת הודעה לדייר</div>
+            <div class="task-desc">בלוח הבקרה — בדקי שתא תפוס מסומן עם אייקון הודעה. לחצי "שלח הודעות לכולם".</div>
+            <div class="task-expected">הופיע אישור שההודעות נשלחו</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+        <div class="task" data-module="app" data-id="app5">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-critical">קריטי</span>דיווח תקלה</div>
+            <div class="task-desc">לחצי על כפתור "⚠️ דווח תקלה" — בחרי סוג תקלה ומספר תא ושלחי.</div>
+            <div class="task-expected">התא הפך לאפור עם סימן אזהרה, הופיע באנר בראש הדף</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+        <div class="task" data-module="app" data-id="app6">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-ux">UX</span>חיפוש דייר</div>
+            <div class="task-desc">בטאב "חבילה חדשה" — חפשי דייר לפי 3 ספרות של מספר נייד</div>
+            <div class="task-expected">הופיעו תוצאות חיפוש מסוננות</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- MODULE 2: מנהל ישוב -->
+  <div class="module" id="mod-manager">
+    <div class="module-header" onclick="toggleModule('manager')">
+      <div class="module-title">
+        <span class="module-icon">🏘️</span>
+        <div>
+          <div class="module-name">ממשק מנהל ישוב</div>
+          <div class="module-sub">smarta-manager.html</div>
+        </div>
+      </div>
+      <div class="module-stats">
+        <span class="module-score" id="score-manager">0/0</span>
+        <span class="module-chevron">▼</span>
+      </div>
+    </div>
+    <div class="module-body">
+      <div class="login-info">
+        <strong>כניסה:</strong>
+        <div class="login-field"><span class="lbl">שם משתמש:</span><code>mgr_nir</code></div>
+        <div class="login-field"><span class="lbl">סיסמה:</span><code>1234</code></div>
+      </div>
+      <div class="tasks" id="tasks-manager">
+
+        <div class="task" data-module="manager" data-id="mgr1">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-critical">קריטי</span>כניסה וסקירה</div>
+            <div class="task-desc">הכנסי ותבדקי שרואים נתוני הישוב — מספר תאים, חבילות פעילות, מאחרות</div>
+            <div class="task-expected">לוח בקרה עם נתוני ישוב ניר עוז</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+        <div class="task" data-module="manager" data-id="mgr2">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-critical">קריטי</span>ניהול דיירים</div>
+            <div class="task-desc">עברי לטאב "דיירים" — בדקי שרשימת הדיירים מוצגת עם שם, נייד, ערוץ תקשורת</div>
+            <div class="task-expected">רשימת דיירים עם פרטים מלאים</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+        <div class="task" data-module="manager" data-id="mgr3">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-ux">UX</span>הוספת דייר חדש</div>
+            <div class="task-desc">נסי להוסיף דייר חדש — לחצי על כפתור ההוספה, מלאי פרטים ושמרי</div>
+            <div class="task-expected">הדייר מופיע ברשימה</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+        <div class="task" data-module="manager" data-id="mgr4">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-ux">UX</span>דוחות וסטטיסטיקות</div>
+            <div class="task-desc">עברי לטאב דוחות — בדקי שמוצגים נתונים על שימוש בלוקרים</div>
+            <div class="task-expected">גרפים ונתונים ברורים ומובנים</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- MODULE 3: מנהל Smarta -->
+  <div class="module" id="mod-admin">
+    <div class="module-header" onclick="toggleModule('admin')">
+      <div class="module-title">
+        <span class="module-icon">⚙️</span>
+        <div>
+          <div class="module-name">ממשק מנהל Smarta</div>
+          <div class="module-sub">smarta-admin.html</div>
+        </div>
+      </div>
+      <div class="module-stats">
+        <span class="module-score" id="score-admin">0/0</span>
+        <span class="module-chevron">▼</span>
+      </div>
+    </div>
+    <div class="module-body">
+      <div class="login-info">
+        <strong>כניסה:</strong>
+        <div class="login-field"><span class="lbl">שם משתמש:</span><code>admin</code></div>
+        <div class="login-field"><span class="lbl">סיסמה:</span><code>smarta2026</code></div>
+      </div>
+      <div class="tasks" id="tasks-admin">
+
+        <div class="task" data-module="admin" data-id="adm1">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-critical">קריטי</span>כניסה וצפייה בכל הישובים</div>
+            <div class="task-desc">הכנסי ובדקי שרואים את כל הישובים המחוברים למערכת</div>
+            <div class="task-expected">רשימת ישובים עם סטטוס כל אחד</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+        <div class="task" data-module="admin" data-id="adm2">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-ux">UX</span>הגדרת לוקר חדש</div>
+            <div class="task-desc">נסי להגדיר לוקר חדש — בחרי ישוב, הגדרי עמודות ותאים, בחרי Basic/Premium</div>
+            <div class="task-expected">הלוקר נשמר ומופיע במערכת</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+        <div class="task" data-module="admin" data-id="adm3">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-nice">nice-to-have</span>תצוגת תאים</div>
+            <div class="task-desc">בדקי שתצוגת הלוקר ברורה — מספור תאים, גדלים שונים</div>
+            <div class="task-expected">תצוגה ברורה ומובנת של מבנה הלוקר</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- MODULE 4: חברת שילוח -->
+  <div class="module" id="mod-courier">
+    <div class="module-header" onclick="toggleModule('courier')">
+      <div class="module-title">
+        <span class="module-icon">🚚</span>
+        <div>
+          <div class="module-name">ממשק חברת שילוח</div>
+          <div class="module-sub">smarta-courier.html</div>
+        </div>
+      </div>
+      <div class="module-stats">
+        <span class="module-score" id="score-courier">0/0</span>
+        <span class="module-chevron">▼</span>
+      </div>
+    </div>
+    <div class="module-body">
+      <div class="login-info">
+        <strong>כניסה:</strong>
+        <div class="login-field"><span class="lbl">ח.פ:</span><code>512345678</code></div>
+        <div class="login-field"><span class="lbl">סיסמה:</span><code>1234</code></div>
+      </div>
+      <div class="tasks" id="tasks-courier">
+
+        <div class="task" data-module="courier" data-id="cour1">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-critical">קריטי</span>כניסה וסקירה כללית</div>
+            <div class="task-desc">הכנסי ובדקי שרואים נתוני החברה — חבילות, ישובים, קנסות</div>
+            <div class="task-expected">לוח בקרה עם נתוני דואר ישראל</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+        <div class="task" data-module="courier" data-id="cour2">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-critical">קריטי</span>סינון לפי חודש וישוב</div>
+            <div class="task-desc">שני את החודש בסינון ובדקי שהנתונים מתעדכנים</div>
+            <div class="task-expected">הנתונים מסוננים לפי הבחירה</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+        <div class="task" data-module="courier" data-id="cour3">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-critical">קריטי</span>הדפסת דוח חבילות</div>
+            <div class="task-desc">עברי לטאב "חבילות" ולחצי כפתור הדפסה — בדקי שנפתח חלון הדפסה עם עברית תקינה</div>
+            <div class="task-expected">נפתח חלון הדפסה עם טבלה בעברית, עם כל הנתונים</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+        <div class="task" data-module="courier" data-id="cour4">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-ux">UX</span>טאב קנסות</div>
+            <div class="task-desc">עברי לטאב "קנסות" — בדקי שמוצגות חבילות שלא נאספו עם סכומי קנס</div>
+            <div class="task-expected">רשימת קנסות עם פירוט ברור</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- MODULE 5: מנהלת חשבונות -->
+  <div class="module" id="mod-finance">
+    <div class="module-header" onclick="toggleModule('finance')">
+      <div class="module-title">
+        <span class="module-icon">💰</span>
+        <div>
+          <div class="module-name">ממשק מנהלת חשבונות</div>
+          <div class="module-sub">smarta-finance.html</div>
+        </div>
+      </div>
+      <div class="module-stats">
+        <span class="module-score" id="score-finance">0/0</span>
+        <span class="module-chevron">▼</span>
+      </div>
+    </div>
+    <div class="module-body">
+      <div class="login-info">
+        <strong>כניסה:</strong>
+        <div class="login-field"><span class="lbl">ח.פ ישוב:</span><code>500111111</code></div>
+        <div class="login-field"><span class="lbl">סיסמה:</span><code>1234</code></div>
+      </div>
+      <div class="tasks" id="tasks-finance">
+
+        <div class="task" data-module="finance" data-id="fin1">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-critical">קריטי</span>כניסה וסקירה</div>
+            <div class="task-desc">הכנסי ובדקי שרואים KPIs — הכנסות, חוב פתוח, קנסות, דמי מנוי</div>
+            <div class="task-expected">לוח בקרה עם 4 מספרים ברורים וטבלת 6 חודשים</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+        <div class="task" data-module="finance" data-id="fin2">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-critical">קריטי</span>סימון תשלום מחברת שילוח</div>
+            <div class="task-desc">עברי לטאב "חברות שילוח" — מצאי חברה עם סטטוס "ממתין" ולחצי "✓ סמן שולם". מלאי אסמכתא ותאריך.</div>
+            <div class="task-expected">סטטוס החברה השתנה ל"שולם"</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+        <div class="task" data-module="finance" data-id="fin3">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-critical">קריטי</span>הפקת דוח לחברת שילוח</div>
+            <div class="task-desc">לחצי על כפתור "📄 דוח" ליד חברת שילוח — בדקי שנפתח חלון הדפסה עם פירוט חבילות וסיכום</div>
+            <div class="task-expected">דוח מפורט עם פירוט חבילות, קנסות וסיכום לתשלום</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+        <div class="task" data-module="finance" data-id="fin4">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-ux">UX</span>שליחת דוח במייל</div>
+            <div class="task-desc">לחצי על "📧 מייל" ליד חברת שילוח — בדקי שנפתח חלון מייל עם נוסח מוכן</div>
+            <div class="task-expected">נפתח Gmail/Outlook עם נמען, נושא ופירוט מלא</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+        <div class="task" data-module="finance" data-id="fin5">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-body">
+            <div class="task-title"><span class="tag tag-critical">קריטי</span>סימון גביית קנס מדייר</div>
+            <div class="task-desc">עברי לטאב "קנסות דיירים" — מצאי קנס פתוח ולחצי "✓ סמן גבוי"</div>
+            <div class="task-expected">הקנס עודכן ל"גבוי"</div>
+            <div class="task-actions">
+              <button class="task-btn task-btn-ok" onclick="markTask(this,'ok')">✓ עבד</button>
+              <button class="task-btn task-btn-issue" onclick="markTask(this,'issue')">✗ בעיה</button>
+            </div>
+            <div class="note-area"><textarea placeholder="תארי מה קרה..."></textarea></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- SUMMARY -->
+  <div class="summary-section">
+    <h2>📊 סיכום בדיקות</h2>
+    <div class="summary-grid">
+      <div class="sum-box sum-ok"><div class="val" id="sum-ok">0</div><div class="lbl">עבד תקין</div></div>
+      <div class="sum-box sum-issue"><div class="val" id="sum-issue">0</div><div class="lbl">נמצאה בעיה</div></div>
+      <div class="sum-box sum-pending"><div class="val" id="sum-pending">0</div><div class="lbl">לא נבדק</div></div>
+    </div>
+    <button class="export-btn" onclick="exportSummary()">📋 ייצוא סיכום לשליחה</button>
+  </div>
+
+</main>
+
+<script>
+  var state = {};
+  var notes = {};
+
+  function toggleModule(id) {
+    var mod = document.getElementById('mod-' + id);
+    mod.classList.toggle('open');
+  }
+
+  function toggleTask(el) {
+    var task = el.closest('.task');
+    var id = task.dataset.id;
+    if (!state[id]) {
+      el.classList.add('checked');
+      el.textContent = '✓';
+      state[id] = 'ok';
+    } else if (state[id] === 'ok') {
+      el.classList.remove('checked');
+      el.classList.add('issue');
+      el.textContent = '✗';
+      state[id] = 'issue';
+    } else {
+      el.classList.remove('checked','issue');
+      el.textContent = '';
+      state[id] = null;
+    }
+    updateProgress();
+  }
+
+  function markTask(btn, result) {
+    var task = btn.closest('.task');
+    var id = task.dataset.id;
+    var check = task.querySelector('.task-check');
+    var noteArea = task.querySelector('.note-area');
+
+    check.classList.remove('checked','issue');
+    check.textContent = result === 'ok' ? '✓' : '✗';
+    check.classList.add(result === 'ok' ? 'checked' : 'issue');
+    state[id] = result;
+
+    if (result === 'issue') {
+      noteArea.style.display = 'block';
+      noteArea.querySelector('textarea').focus();
+    } else {
+      noteArea.style.display = 'none';
+    }
+    updateProgress();
+  }
+
+  function updateProgress() {
+    var tasks = document.querySelectorAll('.task');
+    var total = tasks.length;
+    var done = Object.values(state).filter(function(v){ return v; }).length;
+    var ok = Object.values(state).filter(function(v){ return v === 'ok'; }).length;
+    var issues = Object.values(state).filter(function(v){ return v === 'issue'; }).length;
+    var pending = total - done;
+
+    document.getElementById('progress-fill').style.width = (done/total*100) + '%';
+    document.getElementById('progress-text').textContent = done + ' / ' + total;
+    document.getElementById('total-badge').textContent = done + ' / ' + total + ' משימות';
+    document.getElementById('sum-ok').textContent = ok;
+    document.getElementById('sum-issue').textContent = issues;
+    document.getElementById('sum-pending').textContent = pending;
+
+    // Update module scores
+    ['app','manager','admin','courier','finance'].forEach(function(mod) {
+      var modTasks = document.querySelectorAll('[data-module="' + mod + '"]');
+      var modDone = Array.from(modTasks).filter(function(t){ return state[t.dataset.id]; }).length;
+      document.getElementById('score-' + mod).textContent = modDone + '/' + modTasks.length;
+    });
+  }
+
+  function exportSummary() {
+    var lines = ['=== סיכום בדיקות Smarta Lockers ==='];
+    lines.push('תאריך: ' + new Date().toLocaleDateString('he-IL'));
+    lines.push('');
+
+    var modules = [
+      { id: 'app', name: 'אחראית דואר' },
+      { id: 'manager', name: 'מנהל ישוב' },
+      { id: 'admin', name: 'מנהל Smarta' },
+      { id: 'courier', name: 'חברת שילוח' },
+      { id: 'finance', name: 'מנהלת חשבונות' }
+    ];
+
+    modules.forEach(function(mod) {
+      lines.push('--- ' + mod.name + ' ---');
+      var tasks = document.querySelectorAll('[data-module="' + mod.id + '"]');
+      tasks.forEach(function(task) {
+        var id = task.dataset.id;
+        var title = task.querySelector('.task-title').textContent.trim();
+        var s = state[id] || 'לא נבדק';
+        var icon = s === 'ok' ? '✓' : s === 'issue' ? '✗' : '○';
+        var note = task.querySelector('textarea').value;
+        lines.push(icon + ' ' + title);
+        if (note) lines.push('  הערה: ' + note);
+      });
+      lines.push('');
+    });
+
+    var issues = [];
+    document.querySelectorAll('.task').forEach(function(task) {
+      var id = task.dataset.id;
+      if (state[id] === 'issue') {
+        var title = task.querySelector('.task-title').textContent.trim();
+        var note = task.querySelector('textarea').value;
+        issues.push('• ' + title + (note ? ': ' + note : ''));
+      }
+    });
+
+    if (issues.length > 0) {
+      lines.push('=== בעיות שנמצאו ===');
+      issues.forEach(function(i){ lines.push(i); });
+    }
+
+    var text = lines.join('\n');
+    var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'smarta-test-results.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  updateProgress();
+</script>
+</body>
+</html>

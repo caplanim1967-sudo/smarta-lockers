@@ -160,15 +160,65 @@ wrangler d1 execute smarta-db --remote --file=schema.sql
 
 ## חומרה — פרמיום (ESP32)
 
-### רכיבים מאושרים
-| רכיב | פרטים |
-|------|--------|
-| בקר | ESP32 (WiFi מובנה + SIM backup) |
-| מנעול | סולנואיד NC 12V — נפתח כשמקבל מתח, נסגר ללא חשמל (fail-secure) — [AliExpress 1005002667577244](https://he.aliexpress.com/item/1005002667577244.html) |
-| לוח בקרה | **RS485 serial lock control board** — לוח אחד לכל הלוקר (לא לכל עמודה!) — 8/12/18/24/36/50 ערוצים — [AliExpress 1005003506214612](https://he.aliexpress.com/item/1005003506214612.html) |
-| ממיר RS485 | MAX485 chip (~$0.50) — ממיר TTL→RS485 בין ESP32 ללוח |
-| גיבוי חשמל | LiFePO4 — חיוני! בלי חשמל = לא ניתן לפתוח |
-| ניטור דלת | **ללא** חיישן reed — החלטה מכוונת (maintenance overhead) |
+### עקרונות תכנון
+- פיילוט = ייצור סדרתי — אין טלאים
+- Never Go On Site — כל תקלה נפתרת מרחוק
+- SIM גיבוי לWiFi — תמיד
+
+### רכיבים — סטטוס מספרי קטלוג
+
+#### ✅ מאושר סופי
+
+| רכיב | פריט | מחיר | הערות |
+|------|------|-------|-------|
+| **LilyGo T-SIM7600G-H** ESP32 + 4G SIM | `1005001705250713` | ~$40 | דגם: SIM7600G 16M + Premium (עם אנטנות) |
+| **לוח RS485 — 50 ערוצים** | `4000764853220` | ~$71 | עד 31 לוחות על אותו bus |
+| **MAX485 module** TTL→RS485 | `1005005737922222` | ~$1 | module עם bornier ירוק (A/B) + 8 header pins |
+| **מנעול סולנואיד NC 12V** | `1005003375834293` | ~$3.50/יח' | בשימוש ומאושר, 4 חוטים לכל מנעול |
+| **MEANWELL LRS-100-12** 12V/8.5A/100W | `1005005907007589` | ~$18 | ספק כוח ראשי |
+| **Buck 12V→5V + USB-C מובנה** | `1005008928142771` | ₪12.11 | בחר: Type-C 15W / Input 12V24V / Output 5V 3A |
+
+#### 🟡 ממתין לאישור (חסר מספר קטלוג)
+
+| רכיב | מה לחפש | הערות |
+|------|----------|-------|
+| **סוללת 18650** | `Samsung 25R 18650` או `NCR18650B` | חובה ל-LilyGo — מחליקה לבית מובנה בגב הלוח |
+| **כבל שטוח 26 חוטים** | `flat ribbon cable 26 pin AWG26 1.27mm pitch` | 6 מנעולים × 4 חוטים = 24, +2 רזרב |
+| **Dupont F-F 20cm** | `dupont jumper wire female to female 20cm 40pcs` | LilyGo GPIO → MAX485 header pins (5 חוטים) |
+| **SIM ישראלי 4G** | פרטנר / HOT Mobile | data + שיחות נכנסות, ₪35/חודש |
+
+#### ⏸ ממתין להחלטה — גיבוי חשמל
+
+| רכיב | פריט | מחיר | הערות |
+|------|------|-------|-------|
+| **LiFePO4 12V 7Ah** + BMS | LIPULS Amazon | ~$35 | רק אם מחליטים על רציפות תפקודית ב-220V נפילה |
+| **דיודת שוטקי 1N5822** | חפש `1N5822 diode` | ~$1/20יח' | OR-diode בין MEANWELL לסוללה |
+
+### מבנה לוקר פיילוט
+- לוח RS485: 50 ערוצים (מוכן להרחבה)
+- מנעולים מותקנים: עד 10 בפיילוט
+- תא בקרה: תא אחד מתוך הלוקר (מרכז, שורה 2 מלמטה)
+- חיווט לעמודה: 24 חוטים (6 מנעולים × 4) — כבל שטוח 26
+
+### חיבור חשמל
+```
+220V → MEANWELL LRS-100-12 (12V)
+  ├── לוח RS485 (12V ישיר)
+  ├── סולנואידים (12V דרך לוח RS485)
+  ├── Buck 12V→5V → LilyGo (USB)
+  └── דיודה 1N5822 → LiFePO4 (גיבוי אוטומטי)
+```
+
+### פתיחת תא — זרימה מלאה
+```
+דייר מחייג ל-SIM של הלוקר
+→ LilyGo מזהה RING + Caller ID (AT+CLIP) + מנתק מיד
+→ ESP32 קורא ל-API: caller=05XX, locker=NIR-01
+→ API מחזיר: cell=5
+→ ESP32 מפרסם MQTT: open cell 5
+→ ESP32 שולח RS485: 8A 01 05 11 [BCC]
+→ סולנואיד נפתח 3 שניות
+```
 
 ### פרוטוקול RS485 — לוח הבקרה
 ```
@@ -319,15 +369,26 @@ ESP32 מפעיל ממסר תא 5 → סולנואיד נפתח
 - חבילות ✅ מול API (ממתינות + היסטוריה)
 - תאים / לוקר ✅ קריאה בלבד — מנהל ישוב רואה סטטוס, לא יכול לדווח/לנקות תקלה
 - בעלי תפקידים ✅ CRUD מול API
-- תזכורות — UI בלבד (לא נשמר ל-API)
+- תזכורות ✅ — מחובר ל-API ונשמר ל-D1
 
 ### כללי shell (smarta-all-v2.html) ✅
 - postMessage refresh: חזרה לטאב שנטען → שולח `smarta-refresh` → הדף מרענן נתונים בלבד, ללא reload iframe
 - activateCommunity: smarta_admin מתחזה לישוב — כל 4 טאבים מקבלים token חדש
 - community banner: מציג ישוב פעיל + כפתור "חזור לניהול Smarta"
 
-### courier.html / finance.html
-- לא נבדקו/עודכנו בסשנים האחרונים
+### courier.html ⚠️ חלקי — בפיתוח פעיל
+- תפקיד `courier_manager` (חברת שילוח) — רואה את כל הטאבים + הפקדה
+- תפקיד `courier` (שליח בשטח) — רואה רק טאב הפקדה
+- **טאבים:** סקירה / חבילות / דוח חודשי / קנסות / שליחים / הפקדת חבילה
+- **שליחים:** CRUD + כפתור "צור חשבון" — יוצר user עם role=courier, username=טלפון, סיסמה=ת"ז, must_change_password=true
+- **שינוי סיסמה בכניסה ראשונה:** מסך מיוחד (change-pass-screen), API `POST /api/auth/change-password`
+- **סריקת QR:** ✅ ממומשת עם ספריית `jsQR` — מצלמת גב, זיהוי אוטומטי, fallback הזנה ידנית
+- **זרימת הפקדה (7 שלבים):** QR לוקר → חיפוש דייר → הקצאת תא (קטן ביותר) + פתיחת דלת → ברקוד → אישור נעילה → הצלחה / אין תאים
+- **Backend deposit:** `POST /api/deposit/start`, `POST /api/deposit/too-small`, `POST /api/deposit/confirm`
+- **ESP32:** polling `GET /api/esp/commands?esp_id=X` (ללא JWT), מחיקה אטומית אחרי שליפה
+
+### finance.html
+- לא נבדק/עודכן בסשנים האחרונים
 
 ---
 
@@ -338,6 +399,7 @@ ESP32 מפעיל ממסר תא 5 → סולנואיד נפתח
 | smarta_admin | Smarta2026! | smarta_admin | API — D1 |
 | mgr_nir | Manager123! | community_manager | NIR-01 — קיבוץ נירעד |
 | nir_doa | NirDoa2026! | mail_manager | NIR-01 — אחראי דואר |
+| nir_courier | (ידוע למשתמש) | courier_manager | NIR-01 — שלמה סיקס, חברת שילוח — עודכן מ-courier ל-courier_manager |
 
 **חשוב:** שנה סיסמת smarta_admin ו-mgr_nir אחרי הפרסום לייצור!
 
@@ -361,10 +423,12 @@ wrangler d1 execute smarta-db --remote --command="UPDATE users SET password_hash
 ### קריטי
 - [ ] **Feature flags** — הוספת שדה `features` לD1 + הרחבת JWT + UI בadmin להפעלה/כיבוי פר ישוב
 - [ ] תזכורות ב-manager.html לא נשמרות (צריך endpoint + D1 + UI מחובר)
-- [ ] courier.html — שכתוב מאפס (ראה החלטות אפיון courier בהיסטוריה)
+- [ ] **courier.html — בדיקת זרימה מלאה:** יש להיכנס ישירות כ-`nir_courier` (לא דרך shell של smarta_admin) — הסיבה: shell מייצר טוקן עם role=courier ו-sub=smarta_admin_001, מה שגורם לסינון שגוי של שליחים
+- [ ] **שליחים לא מופיעים ברשימה** — כשנכנסים דרך shell של smarta_admin, הסינון `company_id=smarta_admin_001` לא מחזיר תוצאות. הפתרון: כניסה ישירה כ-nir_courier
 - [x] ~~תאי לוקר ב-manager.html לא עובדים~~ — תוקן
 - [x] ~~saveLocker לא שמר ל-D1~~ — תוקן
 - [x] ~~לוקר לא מוצג ב-app.html~~ — תוקן
+- [x] ~~courier.html — שכתוב מאפס~~ — בוצע (זרימת הפקדה מלאה, QR scanner, role-based UI, שינוי סיסמה)
 
 ### בינוני
 - [ ] SMS/WhatsApp לא מחובר — ממתין לחשבון InforUMobile (sendMessage() = mock) ← פאזה 2
@@ -389,6 +453,13 @@ wrangler d1 execute smarta-db --remote --command="UPDATE users SET password_hash
 ---
 
 ## היסטוריה של הפרויקט
+
+### סשן 7 מאי 2026
+- תיקון `applyRoleUI` ב-courier.html: `display = ''` לא עובד כשיש CSS class עם `display:none` — תוקן ל-`display = 'block'`
+- `courier_manager` מקבל כעת את כל הטאבים כולל הפקדה
+- ממוש סריקת QR אמיתית עם `jsQR` (CDN) — מצלמת גב, זיהוי אוטומטי, עצירה אוטומטית
+- עדכון role של `nir_courier` מ-`courier` ל-`courier_manager` בבסיס הנתונים (דרך עריכה ב-manager.html)
+- גילוי: כניסה דרך shell של smarta_admin לטאב "חברת שילוח" מייצרת טוקן עם role=courier ו-sub=smarta_admin_001 — גורם לבאג בסינון שליחים. יש להיכנס ישירות כ-nir_courier לבדיקה נכונה
 
 ### Claude Chat (לפני אפריל 2026)
 - בנה את הגרסה הראשונה של smarta-all-v2.html (באנדל מיניפייד 5MB)
