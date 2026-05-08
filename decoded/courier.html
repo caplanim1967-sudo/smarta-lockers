@@ -1462,6 +1462,8 @@
         _dep.cellNumber = data.cell_number;
         _dep.cellVolume = data.volume;
         document.getElementById('dep-cell-num').textContent = data.cell_number;
+        var q = document.getElementById('dep-cell-question');
+        if (q) q.innerHTML = 'תא <span style="color:var(--accent)">' + data.cell_number + '</span> מתאים לגודל החבילה?';
         depStep('cell');
       });
   }
