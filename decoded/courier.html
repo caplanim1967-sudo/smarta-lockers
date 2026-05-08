@@ -561,9 +561,9 @@
     </div>
     <div style="font-size:11px;color:var(--muted);margin-bottom:14px">ת"ז: 9 ספרות (יכולה להתחיל ב-0) · טלפון: 10 ספרות, מתחיל ב-05</div>
     <div style="margin-bottom:14px">
-      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">אזורי חלוקה</label>
-      <input id="c-zones" type="text" placeholder="לדוגמה: תל אביב, רמת גן, גבעתיים" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);font-family:Heebo,sans-serif;outline:none">
-      <div style="font-size:11px;color:var(--muted);margin-top:5px">מופרדים בפסיק</div>
+      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">לוקרים מורשים</label>
+      <input id="c-zones" type="text" placeholder="לדוגמה: NIR-01, KS-02, TA-03" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);font-family:Heebo,sans-serif;outline:none;direction:ltr;text-align:right">
+      <div style="font-size:11px;color:var(--muted);margin-top:5px">מזהי לוקר מופרדים בפסיק — לדוגמה: NIR-01, KS-02</div>
     </div>
     <div id="c-active-row" style="display:none;margin-bottom:20px;padding:12px;background:var(--surface2);border-radius:8px;align-items:center;justify-content:space-between">
       <span style="font-size:13px;font-weight:600">סטטוס שליח</span>
@@ -584,29 +584,38 @@
 
     <!-- שלב 1: סריקת QR לוקר -->
     <div id="dep-step-locker">
-      <div style="text-align:center;margin-bottom:28px">
-        <div style="font-size:48px;margin-bottom:12px">📷</div>
-        <div style="font-size:18px;font-weight:700;margin-bottom:6px">סרוק QR של הלוקר</div>
-        <div style="font-size:13px;color:var(--muted)">כוון את המצלמה לקוד ה-QR המודבק על הלוקר</div>
+      <div style="text-align:center;margin-bottom:24px">
+        <div style="font-size:48px;margin-bottom:12px">🗄️</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:6px">בחר לוקר</div>
+        <div style="font-size:13px;color:var(--muted)">בחר מהרשימה או סרוק QR על הלוקר</div>
       </div>
-      <div id="dep-qr-reader" style="width:100%;border-radius:12px;overflow:hidden;background:var(--surface2);min-height:220px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;position:relative">
-        <div id="dep-qr-placeholder" style="text-align:center;color:var(--muted)">
-          <div style="font-size:32px;margin-bottom:8px">📸</div>
-          <div style="font-size:12px">לחץ להפעלת מצלמה</div>
+      <!-- רשימת לוקרים -->
+      <div id="dep-locker-loading" style="text-align:center;color:var(--muted);font-size:13px;padding:12px">טוען רשימת לוקרים...</div>
+      <select id="dep-locker-select" onchange="depSelectLockerFromDropdown(this.value)"
+        style="display:none;width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 12px;color:var(--text);font-size:15px;font-family:Heebo,sans-serif;outline:none;margin-bottom:16px;cursor:pointer">
+        <option value="">— בחר לוקר —</option>
+      </select>
+      <div id="dep-locker-empty" style="display:none;text-align:center;padding:20px 0">
+        <div style="font-size:32px;margin-bottom:8px">⚠️</div>
+        <div style="font-size:14px;font-weight:600;margin-bottom:4px">לא הוגדרו לוקרים</div>
+        <div style="font-size:12px;color:var(--muted)">פנה למנהל להגדרת לוקרים מורשים</div>
+      </div>
+      <!-- סריקת QR -->
+      <div id="dep-qr-section" style="display:none">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;text-align:center">או סרוק QR על הלוקר</div>
+        <div id="dep-qr-reader" style="width:100%;border-radius:12px;overflow:hidden;background:var(--surface2);min-height:180px;display:flex;align-items:center;justify-content:center;margin-bottom:10px;position:relative">
+          <div id="dep-qr-placeholder" style="text-align:center;color:var(--muted)">
+            <div style="font-size:28px;margin-bottom:6px">📸</div>
+            <div style="font-size:12px">לחץ להפעלת מצלמה</div>
+          </div>
+          <video id="dep-qr-video" style="width:100%;display:none;border-radius:12px" autoplay playsinline muted></video>
+          <canvas id="dep-qr-canvas" style="display:none"></canvas>
         </div>
-        <video id="dep-qr-video" style="width:100%;display:none;border-radius:12px" autoplay playsinline muted></video>
-        <canvas id="dep-qr-canvas" style="display:none"></canvas>
+        <button id="dep-qr-btn" onclick="depStartQr()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:Heebo,sans-serif;color:var(--text)">
+          📷 סרוק QR
+        </button>
       </div>
-      <button id="dep-qr-btn" onclick="depStartQr()" style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif">
-        📷 פתח מצלמה
-      </button>
-      <div id="dep-locker-manual" style="margin-top:16px">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;text-align:center">או הזן מזהה לוקר ידנית</div>
-        <div style="display:flex;gap:8px">
-          <input id="dep-locker-id" type="text" placeholder="מזהה לוקר..." style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:14px;font-family:Heebo,sans-serif;outline:none">
-          <button onclick="depConfirmLocker(document.getElementById('dep-locker-id').value)" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);cursor:pointer;font-family:Heebo,sans-serif;font-size:14px">אשר</button>
-        </div>
-      </div>
+      <div id="dep-locker-badge" style="font-size:12px;color:var(--muted);margin-top:8px;text-align:center"></div>
     </div>
 
     <!-- שלב 2: חיפוש דייר -->
@@ -1309,6 +1318,8 @@
     if (_user && _user.role) {
       applyRoleUI(_user.role);
     }
+    // טעינת רשימת לוקרים מורשים (רק אם יש session)
+    if (_user) depLoadLockers();
   })();
 
   // ─── DEPOSIT FLOW ─────────────────────────────────────────
@@ -1410,7 +1421,7 @@
 
     if (code && code.data) {
       depStopQr();
-      depConfirmLocker(code.data);
+      depConfirmLockerFromQr(code.data);
       return;
     }
     _qrAnimFrame = requestAnimationFrame(_depScanFrame);
@@ -1427,15 +1438,56 @@
     if (btn) { btn.textContent = '📷 פתח מצלמה'; btn.onclick = depStartQr; }
   }
 
-  function depConfirmLocker(id) {
-    id = (id || '').trim();
-    if (!id) { showToast('יש להזין מזהה לוקר', 'var(--red)'); return; }
-    _apiGet('/api/locker/validate?locker_id=' + encodeURIComponent(id)).then(function(data) {
-      if (!data || !data.valid) { showToast('לוקר לא נמצא — בדוק את המזהה', 'var(--red)'); return; }
-      _dep.lockerId = id;
-      document.getElementById('dep-locker-badge').textContent = 'לוקר: ' + id;
-      depStep('resident');
+  // טעינת רשימת לוקרים מורשים
+  var _depLockers = [];
+  function depLoadLockers() {
+    _apiGet('/api/courier/lockers').then(function(data) {
+      var loadEl  = document.getElementById('dep-locker-loading');
+      var selEl   = document.getElementById('dep-locker-select');
+      var emptyEl = document.getElementById('dep-locker-empty');
+      var qrEl    = document.getElementById('dep-qr-section');
+      if (loadEl) loadEl.style.display = 'none';
+      if (!data || !data.length) {
+        if (emptyEl) emptyEl.style.display = 'block';
+        return;
+      }
+      _depLockers = data;
+      if (selEl) {
+        selEl.innerHTML = '<option value="">— בחר לוקר —</option>';
+        data.forEach(function(l) {
+          var opt = document.createElement('option');
+          opt.value = l.id;
+          opt.textContent = l.id + ' — ' + (l.community_name || l.id);
+          selEl.appendChild(opt);
+        });
+        selEl.style.display = '';
+      }
+      if (qrEl) qrEl.style.display = '';
     });
+  }
+
+  function depSelectLockerFromDropdown(id) {
+    if (!id) return;
+    var locker = _depLockers.find(function(l) { return l.id === id; });
+    if (!locker) { showToast('לוקר לא מורשה', 'var(--red)'); return; }
+    _dep.lockerId = id;
+    var badge = document.getElementById('dep-locker-badge');
+    if (badge) badge.textContent = id + ' — ' + (locker.community_name || id);
+    depStep('resident');
+  }
+
+  // QR scan result → validate against authorized list
+  function depConfirmLockerFromQr(id) {
+    id = (id || '').trim();
+    if (!id) return;
+    var locker = _depLockers.find(function(l) { return l.id === id; });
+    if (!locker) { showToast('לוקר ' + id + ' אינו ברשימת הלוקרים המורשים שלך', 'var(--red)'); return; }
+    _dep.lockerId = id;
+    var selEl = document.getElementById('dep-locker-select');
+    if (selEl) selEl.value = id;
+    var badge = document.getElementById('dep-locker-badge');
+    if (badge) badge.textContent = id + ' — ' + (locker.community_name || id);
+    depStep('resident');
   }
 
   // שלב 2: חיפוש דייר

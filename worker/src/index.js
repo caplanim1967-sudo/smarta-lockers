@@ -1189,13 +1189,35 @@ async function handleCommunity(path, method, request, env, user, url) {
     return ok({ package_id: pkgId });
   }
 
-  // ── Locker validate (courier: check locker_id exists) ────
+  // ── Courier: list authorized lockers ─────────────────────
+  if (path === '/api/courier/lockers' && method === 'GET') {
+    if (!['courier','courier_manager','smarta_admin'].includes(user.role)) return forbidden();
+    // find courier record via users.username = couriers.phone
+    const courierRow = await db.prepare(
+      'SELECT c.delivery_zones FROM couriers c JOIN users u ON c.phone = u.username WHERE u.id = ?'
+    ).bind(user.sub).first();
+    if (!courierRow || !courierRow.delivery_zones) return ok([]);
+    const lockerIds = courierRow.delivery_zones.split(',').map(s => s.trim()).filter(Boolean);
+    if (!lockerIds.length) return ok([]);
+    const placeholders = lockerIds.map(() => '?').join(',');
+    const { results } = await db.prepare(
+      `SELECT lc.id, s.name as community_name
+       FROM locker_configs lc
+       LEFT JOIN settlements s ON s.id = lc.community_id
+       WHERE lc.id IN (${placeholders})`
+    ).bind(...lockerIds).all();
+    return ok(results);
+  }
+
+  // ── Locker validate (fallback: check single locker_id exists) ──
   if (path === '/api/locker/validate' && method === 'GET') {
     const lockerId = url.searchParams.get('locker_id');
     if (!lockerId) return err('locker_id חסר');
-    const row = await db.prepare('SELECT id, name FROM locker_configs WHERE id = ?').bind(lockerId).first();
+    const row = await db.prepare(
+      'SELECT lc.id, s.name as community_name FROM locker_configs lc LEFT JOIN settlements s ON s.id = lc.community_id WHERE lc.id = ?'
+    ).bind(lockerId).first();
     if (!row) return err('לוקר לא נמצא');
-    return ok({ valid: true, name: row.name });
+    return ok({ valid: true, community_name: row.community_name });
   }
 
   // ── Locker config (read for community) ───────────────────
