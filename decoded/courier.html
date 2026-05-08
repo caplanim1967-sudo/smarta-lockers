@@ -695,7 +695,7 @@
           <button onclick="depAnotherSameResident()" style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:14px 36px;font-size:15px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif">
             📦 חבילה נוספת לאותו דייר
           </button>
-          <button onclick="depReset()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:14px 36px;font-size:15px;font-weight:600;cursor:pointer;font-family:Heebo,sans-serif">
+          <button onclick="depNewResident()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:14px 36px;font-size:15px;font-weight:600;cursor:pointer;font-family:Heebo,sans-serif">
             🔄 הפקד לדייר אחר
           </button>
         </div>
@@ -1308,6 +1308,18 @@
       var el = document.getElementById('dep-step-' + s);
       if (el) el.style.display = s === name ? '' : 'none';
     });
+  }
+
+  function depNewResident() {
+    // שומר את הלוקר, מאפס דייר/תא/ברקוד וחוזר לבחירת דייר
+    var savedLockerId = _dep.lockerId;
+    _dep = { lockerId: savedLockerId, residentId: null, residentPhone: null, cellNumber: null, cellVolume: null };
+    document.getElementById('dep-phone-input').value = '';
+    document.getElementById('dep-resident-results').style.display = 'none';
+    document.getElementById('dep-barcode-input').value = '';
+    var badge = document.getElementById('dep-locker-badge');
+    if (badge) badge.textContent = 'לוקר ' + savedLockerId;
+    depStep('resident');
   }
 
   function depAnotherSameResident() {
