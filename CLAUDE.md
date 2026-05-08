@@ -1,6 +1,6 @@
 # CLAUDE.md — Smarta Lockers
 > קובץ זה נקרא אוטומטית בכל פתיחת שיחה. מעדכן אותו בסוף כל שיחה.
-> עדכון אחרון: 2026-04-29
+> עדכון אחרון: 2026-05-08
 
 ---
 
@@ -376,15 +376,23 @@ ESP32 מפעיל ממסר תא 5 → סולנואיד נפתח
 - activateCommunity: smarta_admin מתחזה לישוב — כל 4 טאבים מקבלים token חדש
 - community banner: מציג ישוב פעיל + כפתור "חזור לניהול Smarta"
 
-### courier.html ⚠️ חלקי — בפיתוח פעיל
+### courier.html ✅ זרימה בסיסית עובדת
 - תפקיד `courier_manager` (חברת שילוח) — רואה את כל הטאבים + הפקדה
 - תפקיד `courier` (שליח בשטח) — רואה רק טאב הפקדה
 - **טאבים:** סקירה / חבילות / דוח חודשי / קנסות / שליחים / הפקדת חבילה
 - **שליחים:** CRUD + כפתור "צור חשבון" — יוצר user עם role=courier, username=טלפון, סיסמה=ת"ז, must_change_password=true
 - **שינוי סיסמה בכניסה ראשונה:** מסך מיוחד (change-pass-screen), API `POST /api/auth/change-password`
-- **סריקת QR:** ✅ ממומשת עם ספריית `jsQR` — מצלמת גב, זיהוי אוטומטי, fallback הזנה ידנית
-- **זרימת הפקדה (7 שלבים):** QR לוקר → חיפוש דייר → הקצאת תא (קטן ביותר) + פתיחת דלת → ברקוד → אישור נעילה → הצלחה / אין תאים
+- **זרימת הפקדה (7 שלבים):**
+  1. dropdown לוקרים מורשים (+ QR משני)
+  2. חיפוש דייר — מסונן לקהילת הלוקר הנבחר
+  3. הקצאת תא (קטן ביותר) + פתיחת דלת (← כפתור חזרה לדייר)
+  4. סריקת ברקוד + הזנה ידנית (← כפתור חזרה לתא)
+  5. "האם יש חבילה נוספת?" — לולאת ברקודים, מונה חבילות
+  6. נעילה + SMS אחד לכל הברקודים (← כפתור חזרה ל-5)
+  7. הצלחה / אין תאים
+- **חבילות מרובות לאותו תא:** `_dep.barcodes[]` — array, SMS אחד בסוף
 - **Backend deposit:** `POST /api/deposit/start`, `POST /api/deposit/too-small`, `POST /api/deposit/confirm`
+- **דוח חבילות:** `loadPackagesReport()` — מביא waiting + collected, מציג סטטוס צבעוני
 - **ESP32:** polling `GET /api/esp/commands?esp_id=X` (ללא JWT), מחיקה אטומית אחרי שליפה
 
 ### finance.html
@@ -453,6 +461,64 @@ wrangler d1 execute smarta-db --remote --command="UPDATE users SET password_hash
 ---
 
 ## היסטוריה של הפרויקט
+
+### סשן 8 מאי 2026 — זרימת שליח מלאה
+
+**מה עבדנו עליו:** שיפור מלא של זרימת הפקדת חבילה ב-courier.html (שלבים 1–7).
+
+**שינויים עיקריים:**
+
+**שלב 1 — בחירת לוקר:**
+- הוחלף שדה טקסט ב-dropdown נפתח של לוקרים מורשים
+- `depLoadLockers()` קורא `GET /api/courier/lockers` וממלא את הרשימה
+- QR scan נשאר כאפשרות משנית
+- מעבר אוטומטי לשלב 2 אחרי בחירה
+- תיקון: `depReset()` קרס כי ניסה לאפס `dep-locker-id` שלא קיים — הוחלף ל-`dep-locker-select`
+
+**שלב 2 — חיפוש דייר:**
+- חיפוש מסונן לפי `locker_id` → Worker מביא דיירים מהקהילה של הלוקר הנבחר (לא של השליח)
+- `GET /api/residents/search?q=...&locker_id=NIR-01`
+
+**שלב 5 — "האם יש חבילה נוספת לאותו נמען?":**
+- צומצם ל-2 כפתורים: כן (סרוק ברקוד נוסף) / לא (נעל ושלח הודעה)
+- `_dep.barcodes[]` — array צובר כל הברקודים; לא מאפס בין ברקוד לברקוד
+- תצוגת מונה: "חבילה אחת נסרקה" / "N חבילות נסרקו"
+- `depConfirmBarcode()` בודק כפילויות, דוחה ברקוד שכבר נסרק
+
+**שלב נעילה — `POST /api/deposit/confirm`:**
+- שולח `barcodes[]` (לא `barcode` בודד)
+- Worker שומר רשומה נפרדת לכל ברקוד
+- SMS אחד בלבד — טמפלט נפרד לחבילה/כמה חבילות (`{כמות}`)
+- תאימות אחורה: `barcode` בודד עדיין נתמך
+
+**תיקוני באגים:**
+
+| באג | פתרון |
+|-----|--------|
+| "לא הוגדרו לוקרים" לכל משתמש | Worker לא הכיר `community_manager` כ-role מורשה ב-`/api/courier/lockers` |
+| `/api/courier/lockers` תלוי (pending) | D1 LEFT JOIN ממוש לשאילתות סדרתיות |
+| `community_id=null` בחבילות של שליח אמיתי | `deposit/confirm` כעת שולף `community_id` מ-`locker_configs` לפי `locker_id` |
+| כפתור "חזרה להתחלה" (מ-nocells) לא עבד | `depReset()` ניסה לאפס אלמנט שלא קיים |
+| חבילות לא הופיעו בדוחות | `community_id=null` גרם לחבילות ללא ישוב |
+| היסטוריה ב-אחראית דואר ריקה | `renderHistory()` הסתמכה על `packageData` (waiting בלבד) — הוחלפה ב-`loadHistoryFromAPI()` |
+| דוח חבילות בחברת שילוח ריק | `showScreen('packages')` לא קרא API — הוסף `loadPackagesReport()` |
+
+**כפתורי חזרה שנוספו:**
+- שלב 4 (ברקוד): `← חזור לתא`
+- שלב נעילה: `← חזור`
+
+**Worker — endpoints שעודכנו:**
+- `GET /api/courier/lockers` — הוסף `community_manager` לרשימה מורשה
+- `POST /api/deposit/confirm` — `barcodes[]`, `community_id` מלוקר, SMS מותאם לכמות
+- `GET /api/packages` — JOIN settlements → מחזיר `community_name`
+- `GET /api/packages/history` — JOIN settlements → מחזיר `community_name`
+
+**login.html:**
+- תוקן: `courier_manager` לא קיבל `courier_token` — הוסף לתנאי
+
+**git commit:** `febd2af`, `c75427c`, `3a0dd53`, `f934e9f`
+
+---
 
 ### סשן 7 מאי 2026
 - תיקון `applyRoleUI` ב-courier.html: `display = ''` לא עובד כשיש CSS class עם `display:none` — תוקן ל-`display = 'block'`
