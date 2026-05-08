@@ -669,16 +669,18 @@
       </div>
     </div>
 
-    <!-- שלב 5: אישור נעילה -->
     <!-- שלב 5b: עוד חבילה לאותו נמען? -->
     <div id="dep-step-more" style="display:none">
       <div style="text-align:center;padding:24px 0">
         <div style="font-size:48px;margin-bottom:16px">📦</div>
         <div style="font-size:18px;font-weight:700;margin-bottom:8px">יש חבילה נוספת לאותו נמען?</div>
-        <div style="font-size:13px;color:var(--muted);margin-bottom:32px">אם כן — תוקצה תא נוסף לחבילה הבאה</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:32px">בחר את האפשרות המתאימה</div>
         <div style="display:flex;flex-direction:column;gap:12px;align-items:center">
-          <button onclick="depMoreForSameResident()" style="background:var(--accent);color:#fff;border:none;border-radius:12px;padding:14px 40px;font-size:15px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif;width:70%">
-            ✅ כן, יש חבילה נוספת
+          <button onclick="depMoreSameCell()" style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:14px 40px;font-size:15px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif;width:70%">
+            ✅ כן — נכנסת לאותו תא
+          </button>
+          <button onclick="depNewResident()" style="background:var(--accent);color:#fff;border:none;border-radius:12px;padding:14px 40px;font-size:15px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif;width:70%">
+            🔄 כן — תא נפרד לאותו דייר
           </button>
           <button onclick="depStep('lock')" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:14px 40px;font-size:15px;font-weight:600;cursor:pointer;font-family:Heebo,sans-serif;width:70%">
             🔒 לא — הכנס וסגור
@@ -1578,12 +1580,11 @@
     depStep('more');
   }
 
-  function depMoreForSameResident() {
-    _dep.cellNumber = null;
-    _dep.cellVolume = null;
+  function depMoreSameCell() {
+    // עוד חבילה לאותו תא — רק מאפס ברקוד וחוזר לסריקה
+    _dep.barcode = null;
     document.getElementById('dep-barcode-input').value = '';
-    depStep('cell');
-    depAssignCell();
+    depStep('barcode');
   }
 
   // שלב 5: אישור נעילה
