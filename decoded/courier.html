@@ -628,14 +628,13 @@
         <button onclick="depGoBack('resident')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;font-family:Heebo,sans-serif;padding:0;display:flex;align-items:center;gap:4px">← חזור</button>
       </div>
       <div style="text-align:center;padding:24px 0">
-        <div style="font-size:48px;margin-bottom:12px">🗄️</div>
-        <div style="font-size:16px;font-weight:700;margin-bottom:6px">תא <span id="dep-cell-num" style="color:var(--accent)"></span> נפתח</div>
-        <div style="font-size:13px;color:var(--muted);margin-bottom:32px">תא <span id="dep-cell-num2" style="color:var(--accent)"></span> מתאים לגודל החבילה?</div>
-        <div style="display:flex;flex-direction:column;gap:12px">
-          <button onclick="depCellFits()" style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:16px;font-size:15px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif">
+        <div style="font-size:48px;margin-bottom:16px">🗄️</div>
+        <div id="dep-cell-question" style="font-size:18px;font-weight:700;margin-bottom:32px">תא <span id="dep-cell-num" style="color:var(--accent)"></span> מתאים לגודל החבילה?</div>
+        <div style="display:flex;flex-direction:column;gap:12px;align-items:center">
+          <button onclick="depCellFits()" style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:14px 40px;font-size:15px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif;width:70%">
             ✅ התא מתאים
           </button>
-          <button onclick="depCellTooSmall()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:16px;font-size:15px;font-weight:600;cursor:pointer;font-family:Heebo,sans-serif">
+          <button onclick="depCellTooSmall()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:14px 40px;font-size:15px;font-weight:600;cursor:pointer;font-family:Heebo,sans-serif;width:70%">
             🔄 נדרש תא גדול יותר
           </button>
         </div>
@@ -1451,13 +1450,14 @@
         _dep.cellNumber = data.cell_number;
         _dep.cellVolume = data.volume;
         document.getElementById('dep-cell-num').textContent = data.cell_number;
-        document.getElementById('dep-cell-num2').textContent = data.cell_number;
         depStep('cell');
       });
   }
 
   function depCellFits() {
-    depStep('barcode');
+    var q = document.getElementById('dep-cell-question');
+    if (q) q.textContent = 'פותח את התא שנבחר...';
+    setTimeout(function() { depStep('barcode'); }, 600);
   }
 
   function depCellTooSmall() {
@@ -1473,7 +1473,6 @@
       _dep.cellNumber = data.cell_number;
       _dep.cellVolume = data.volume;
       document.getElementById('dep-cell-num').textContent = data.cell_number;
-        document.getElementById('dep-cell-num2').textContent = data.cell_number;
       depStep('cell');
     });
   }
