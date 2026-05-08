@@ -652,7 +652,10 @@
 
     <!-- שלב 4: סריקת ברקוד חבילה -->
     <div id="dep-step-barcode" style="display:none">
-      <div style="text-align:center;padding:16px 0 24px">
+      <div style="margin-bottom:12px">
+        <button onclick="depStep('cell')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;font-family:Heebo,sans-serif;padding:0;display:flex;align-items:center;gap:4px">← חזור לתא</button>
+      </div>
+      <div style="text-align:center;padding:4px 0 24px">
         <div style="font-size:48px;margin-bottom:12px">📦</div>
         <div style="font-size:16px;font-weight:700;margin-bottom:6px">סרוק ברקוד חבילה</div>
         <div style="font-size:13px;color:var(--muted);margin-bottom:24px">סרוק את ברקוד החבילה לפני הכנסתה לתא</div>
@@ -688,7 +691,10 @@
     </div>
 
     <div id="dep-step-lock" style="display:none">
-      <div style="text-align:center;padding:24px 0">
+      <div style="margin-bottom:12px">
+        <button onclick="depStep('more')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;font-family:Heebo,sans-serif;padding:0;display:flex;align-items:center;gap:4px">← חזור</button>
+      </div>
+      <div style="text-align:center;padding:4px 0 24px">
         <div style="font-size:48px;margin-bottom:12px">🔒</div>
         <div style="font-size:16px;font-weight:700;margin-bottom:8px">הכנס את החבילה ונעל</div>
         <div style="font-size:13px;color:var(--muted);margin-bottom:32px">הכנס את החבילה לתא, סגור את הדלת ובדוק שנעולה היטב</div>
@@ -1277,11 +1283,57 @@
     });
   }
 
+  // ─── PACKAGES REPORT ──────────────────────────────────────
+  function loadPackagesReport() {
+    var tbody = document.getElementById('pkg-table');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">טוען...</td></tr>';
+    Promise.all([
+      _apiGet('/api/packages/history'),
+      _apiGet('/api/packages?status=waiting')
+    ]).then(function(results) {
+      var collected = Array.isArray(results[0]) ? results[0] : [];
+      var waiting   = Array.isArray(results[1]) ? results[1] : [];
+      var rows = [];
+      waiting.forEach(function(p) {
+        rows.push({ p: p, status: 'ממתינה', statusColor: 'var(--accent)',
+          date: p.placed_at ? new Date(p.placed_at * 1000).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—',
+          days: p.placed_at ? String(Math.max(0, Math.floor((Date.now()/1000 - p.placed_at)/86400))) : '0'
+        });
+      });
+      collected.forEach(function(p) {
+        rows.push({ p: p, status: 'נאספה ✓', statusColor: 'var(--green)',
+          date: p.placed_at ? new Date(p.placed_at * 1000).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—',
+          days: (p.placed_at && p.collected_at) ? String(Math.max(0, Math.floor((p.collected_at - p.placed_at)/86400))) : '0'
+        });
+      });
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px">אין חבילות</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(function(r) {
+        var p = r.p;
+        return '<tr>' +
+          '<td>' + r.date + '</td>' +
+          '<td>' + (p.community_name || p.community_id || '—') + '</td>' +
+          '<td>' + (p.resident_name || '—') + '</td>' +
+          '<td style="font-weight:800;color:var(--accent);text-align:center">' + (p.cell_id || '—') + '</td>' +
+          '<td style="font-family:monospace;font-size:11px;color:var(--accent)">' + (p.barcode || '—') + '</td>' +
+          '<td style="color:' + r.statusColor + ';font-weight:700">' + r.status + '</td>' +
+          '<td style="text-align:center">' + r.days + '</td>' +
+          '</tr>';
+      }).join('');
+    }).catch(function() {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:24px">שגיאה בטעינת הנתונים</td></tr>';
+    });
+  }
+
   // טעינה בכניסה לטאב
   var _origShowScreen = showScreen;
   showScreen = function(name, el) {
     _origShowScreen(name, el);
     if (name === 'couriers') loadCouriers();
+    if (name === 'packages') loadPackagesReport();
     if (name === 'deposit')  depReset();
   };
 

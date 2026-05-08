@@ -1164,6 +1164,59 @@
   }
 
 
+  // ===== HISTORY — טעינה מה-API =====
+  function loadHistoryFromAPI() {
+    var tbody = document.getElementById('history-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">טוען...</td></tr>';
+
+    Promise.all([
+      apiGet('/api/packages/history'),
+      apiGet('/api/packages?status=waiting')
+    ]).then(function(results) {
+      var collected = Array.isArray(results[0]) ? results[0] : [];
+      var waiting   = Array.isArray(results[1]) ? results[1] : [];
+      var all = waiting.map(function(p) {
+        return {
+          date: p.placed_at ? new Date(p.placed_at * 1000).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—',
+          resident: p.resident_name || '—', phone: p.resident_phone || '',
+          cell: p.cell_id || '—', barcode: p.barcode || '—',
+          courier: p.courier || '—', status: 'ממתינה',
+          _ts: p.placed_at || 0
+        };
+      }).concat(collected.map(function(p) {
+        return {
+          date: p.placed_at ? new Date(p.placed_at * 1000).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—',
+          resident: p.resident_name || '—', phone: p.resident_phone || '',
+          cell: p.cell_id || '—', barcode: p.barcode || '—',
+          courier: p.courier || '—', status: 'נאספה ✓',
+          _ts: p.placed_at || 0
+        };
+      }));
+
+      all.sort(function(a,b) { return b._ts - a._ts; });
+
+      if (!all.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px">אין רשומות</td></tr>';
+        return;
+      }
+      tbody.innerHTML = all.map(function(r) {
+        var statusColor = r.status === 'נאספה ✓' ? 'var(--green)' : 'var(--accent)';
+        return '<tr>' +
+          '<td>' + r.date + '</td>' +
+          '<td style="font-weight:700">' + r.resident + '</td>' +
+          '<td class="num-cell">' + r.phone + '</td>' +
+          '<td style="font-weight:800;color:var(--accent);font-size:16px;text-align:center">' + r.cell + '</td>' +
+          '<td style="font-family:monospace;font-size:11px;color:var(--accent)">' + r.barcode + '</td>' +
+          '<td>' + r.courier + '</td>' +
+          '<td style="color:' + statusColor + ';font-weight:700">' + r.status + '</td>' +
+          '</tr>';
+      }).join('');
+    }).catch(function() {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:24px">שגיאה בטעינת היסטוריה</td></tr>';
+    });
+  }
+
   // ===== HISTORY RENDERING =====
   function renderHistory() {
     var tbody = document.getElementById('history-tbody');
@@ -2183,7 +2236,7 @@ function buildLockerGrid() {
   }
 
   function showScreen(name, el) {
-    if (name === 'history') renderHistory();
+    if (name === 'history') loadHistoryFromAPI();
     if (name === 'new-package') populateCellSelect();
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));

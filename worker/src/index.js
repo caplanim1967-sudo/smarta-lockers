@@ -772,8 +772,11 @@ async function handleCommunity(path, method, request, env, user, url) {
       SELECT p.*,
         p.assigned_at as placed_at,
         (r.first_name || ' ' || r.last_name) as resident_name,
-        r.phone as resident_phone
-      FROM packages p LEFT JOIN residents r ON p.resident_id = r.id`;
+        r.phone as resident_phone,
+        s.name as community_name
+      FROM packages p
+        LEFT JOIN residents r ON p.resident_id = r.id
+        LEFT JOIN settlements s ON p.community_id = s.id`;
     const { results } = communityId
       ? await db.prepare(pkgSelect + ` WHERE p.community_id = ? AND p.status = 'collected' ORDER BY p.collected_at DESC LIMIT 500`).bind(communityId).all()
       : await db.prepare(pkgSelect + ` WHERE p.status = 'collected' ORDER BY p.collected_at DESC LIMIT 500`).all();
@@ -787,8 +790,11 @@ async function handleCommunity(path, method, request, env, user, url) {
         SELECT p.*,
           p.assigned_at as placed_at,
           (r.first_name || ' ' || r.last_name) as resident_name,
-          r.phone as resident_phone
-        FROM packages p LEFT JOIN residents r ON p.resident_id = r.id`;
+          r.phone as resident_phone,
+          s.name as community_name
+        FROM packages p
+          LEFT JOIN residents r ON p.resident_id = r.id
+          LEFT JOIN settlements s ON p.community_id = s.id`;
       const { results } = communityId
         ? await db.prepare(pkgSelect + ` WHERE p.community_id = ? AND p.status = ? ORDER BY p.assigned_at DESC`).bind(communityId, status).all()
         : await db.prepare(pkgSelect + ` WHERE p.status = ? ORDER BY p.assigned_at DESC`).bind(status).all();
