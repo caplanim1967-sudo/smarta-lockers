@@ -1499,7 +1499,9 @@
     var res = document.getElementById('dep-resident-results');
     if (!q || q.length < 2) { res.style.display = 'none'; return; }
     _depSearchTimer = setTimeout(function() {
-      _apiGet('/api/residents/search?q=' + encodeURIComponent(q)).then(function(data) {
+      var url = '/api/residents/search?q=' + encodeURIComponent(q);
+      if (_dep.lockerId) url += '&locker_id=' + encodeURIComponent(_dep.lockerId);
+      _apiGet(url).then(function(data) {
         if (!data || !data.length) {
           res.innerHTML = '<div style="padding:12px 16px;font-size:13px;color:var(--muted)">לא נמצאו דיירים</div>';
           res.style.display = '';

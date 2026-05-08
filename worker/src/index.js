@@ -637,6 +637,9 @@ async function handleCommunity(path, method, request, env, user, url) {
   if (path === '/api/residents/search' && method === 'GET') {
     const q = (url.searchParams.get('q') || '').trim();
     if (q.length < 2) return ok([]);
+    // locker_id מאפשר לשליח לחפש דיירים לפי הקהילה של הלוקר הנבחר
+    const lockerId = url.searchParams.get('locker_id');
+    const searchCommunityId = lockerId || communityId;
     const pattern = '%' + q + '%';
     const { results } = await db.prepare(`
       SELECT id, first_name, last_name, phone
@@ -644,7 +647,7 @@ async function handleCommunity(path, method, request, env, user, url) {
       WHERE community_id = ? AND active = 1
         AND (phone LIKE ? OR first_name LIKE ? OR last_name LIKE ?)
       ORDER BY last_name, first_name LIMIT 10
-    `).bind(communityId, pattern, pattern, pattern).all();
+    `).bind(searchCommunityId, pattern, pattern, pattern).all();
     return ok(results);
   }
 
