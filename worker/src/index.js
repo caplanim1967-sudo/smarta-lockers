@@ -1189,6 +1189,15 @@ async function handleCommunity(path, method, request, env, user, url) {
     return ok({ package_id: pkgId });
   }
 
+  // ── Locker validate (courier: check locker_id exists) ────
+  if (path === '/api/locker/validate' && method === 'GET') {
+    const lockerId = url.searchParams.get('locker_id');
+    if (!lockerId) return err('locker_id חסר');
+    const row = await db.prepare('SELECT id, name FROM locker_configs WHERE id = ?').bind(lockerId).first();
+    if (!row) return err('לוקר לא נמצא');
+    return ok({ valid: true, name: row.name });
+  }
+
   // ── Locker config (read for community) ───────────────────
   if (path === '/api/locker' && method === 'GET') {
     const row = communityId

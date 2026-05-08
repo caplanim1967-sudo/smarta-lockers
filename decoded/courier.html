@@ -661,6 +661,23 @@
     </div>
 
     <!-- שלב 5: אישור נעילה -->
+    <!-- שלב 5b: עוד חבילה לאותו נמען? -->
+    <div id="dep-step-more" style="display:none">
+      <div style="text-align:center;padding:24px 0">
+        <div style="font-size:48px;margin-bottom:16px">📦</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:8px">יש חבילה נוספת לאותו נמען?</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:32px">אם כן — תוקצה תא נוסף לחבילה הבאה</div>
+        <div style="display:flex;flex-direction:column;gap:12px;align-items:center">
+          <button onclick="depMoreForSameResident()" style="background:var(--accent);color:#fff;border:none;border-radius:12px;padding:14px 40px;font-size:15px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif;width:70%">
+            ✅ כן, יש חבילה נוספת
+          </button>
+          <button onclick="depStep('lock')" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:14px 40px;font-size:15px;font-weight:600;cursor:pointer;font-family:Heebo,sans-serif;width:70%">
+            🔒 לא — הכנס וסגור
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div id="dep-step-lock" style="display:none">
       <div style="text-align:center;padding:24px 0">
         <div style="font-size:48px;margin-bottom:12px">🔒</div>
@@ -1304,7 +1321,7 @@
   };
 
   function depStep(name) {
-    ['locker','resident','cell','barcode','lock','nocells','success'].forEach(function(s) {
+    ['locker','resident','cell','barcode','more','lock','nocells','success'].forEach(function(s) {
       var el = document.getElementById('dep-step-' + s);
       if (el) el.style.display = s === name ? '' : 'none';
     });
@@ -1413,9 +1430,12 @@
   function depConfirmLocker(id) {
     id = (id || '').trim();
     if (!id) { showToast('יש להזין מזהה לוקר', 'var(--red)'); return; }
-    _dep.lockerId = id;
-    document.getElementById('dep-locker-badge').textContent = 'לוקר: ' + id;
-    depStep('resident');
+    _apiGet('/api/locker/validate?locker_id=' + encodeURIComponent(id)).then(function(data) {
+      if (!data || !data.valid) { showToast('לוקר לא נמצא — בדוק את המזהה', 'var(--red)'); return; }
+      _dep.lockerId = id;
+      document.getElementById('dep-locker-badge').textContent = 'לוקר: ' + id;
+      depStep('resident');
+    });
   }
 
   // שלב 2: חיפוש דייר
@@ -1503,7 +1523,15 @@
     barcode = (barcode || '').trim();
     if (!barcode) { showToast('יש לסרוק או להזין ברקוד', 'var(--red)'); return; }
     _dep.barcode = barcode;
-    depStep('lock');
+    depStep('more');
+  }
+
+  function depMoreForSameResident() {
+    _dep.cellNumber = null;
+    _dep.cellVolume = null;
+    document.getElementById('dep-barcode-input').value = '';
+    depStep('cell');
+    depAssignCell();
   }
 
   // שלב 5: אישור נעילה
