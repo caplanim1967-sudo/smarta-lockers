@@ -630,7 +630,7 @@
       <div style="text-align:center;padding:24px 0">
         <div style="font-size:48px;margin-bottom:12px">🗄️</div>
         <div style="font-size:16px;font-weight:700;margin-bottom:6px">תא <span id="dep-cell-num" style="color:var(--accent)"></span> נפתח</div>
-        <div style="font-size:13px;color:var(--muted);margin-bottom:32px">האם גודל התא מספיק לחבילה?</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:32px">תא <span id="dep-cell-num2" style="color:var(--accent)"></span> מתאים לגודל החבילה?</div>
         <div style="display:flex;flex-direction:column;gap:12px">
           <button onclick="depCellFits()" style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:16px;font-size:15px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif">
             ✅ התא מתאים
@@ -1451,6 +1451,7 @@
         _dep.cellNumber = data.cell_number;
         _dep.cellVolume = data.volume;
         document.getElementById('dep-cell-num').textContent = data.cell_number;
+        document.getElementById('dep-cell-num2').textContent = data.cell_number;
         depStep('cell');
       });
   }
@@ -1472,6 +1473,7 @@
       _dep.cellNumber = data.cell_number;
       _dep.cellVolume = data.volume;
       document.getElementById('dep-cell-num').textContent = data.cell_number;
+        document.getElementById('dep-cell-num2').textContent = data.cell_number;
       depStep('cell');
     });
   }
