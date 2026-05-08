@@ -647,7 +647,7 @@
       <div style="text-align:center;padding:16px 0 24px">
         <div style="font-size:48px;margin-bottom:12px">📦</div>
         <div style="font-size:16px;font-weight:700;margin-bottom:6px">סרוק ברקוד חבילה</div>
-        <div style="font-size:13px;color:var(--muted);margin-bottom:24px">החבילה בתא — כעת סרוק את הברקוד</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:24px">סרוק את ברקוד החבילה לפני הכנסתה לתא</div>
         <div id="dep-barcode-reader" style="width:100%;border-radius:12px;overflow:hidden;background:var(--surface2);min-height:160px;display:flex;align-items:center;justify-content:center;margin-bottom:16px">
           <div style="text-align:center;color:var(--muted);font-size:12px">לחץ להפעלת מצלמה</div>
         </div>
@@ -665,8 +665,8 @@
     <div id="dep-step-lock" style="display:none">
       <div style="text-align:center;padding:24px 0">
         <div style="font-size:48px;margin-bottom:12px">🔒</div>
-        <div style="font-size:16px;font-weight:700;margin-bottom:8px">נעל את דלת התא</div>
-        <div style="font-size:13px;color:var(--muted);margin-bottom:32px">סגור את הדלת ובדוק שהיא נעולה היטב</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px">הכנס את החבילה ונעל</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:32px">הכנס את החבילה לתא, סגור את הדלת ובדוק שנעולה היטב</div>
         <button onclick="depConfirmLock()" style="width:100%;background:var(--green);color:#fff;border:none;border-radius:12px;padding:16px;font-size:15px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif">
           ✅ אישרתי — הדלת נעולה
         </button>
@@ -692,9 +692,14 @@
         <div style="font-size:64px;margin-bottom:16px">✅</div>
         <div style="font-size:20px;font-weight:800;margin-bottom:8px">החבילה הופקדה!</div>
         <div style="font-size:13px;color:var(--muted);margin-bottom:32px">הדייר קיבל הודעת SMS</div>
-        <button onclick="depReset()" style="background:var(--accent);color:#fff;border:none;border-radius:12px;padding:14px 36px;font-size:15px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif">
-          📦 הפקד חבילה נוספת
-        </button>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <button onclick="depAnotherSameResident()" style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:14px 36px;font-size:15px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif">
+            📦 חבילה נוספת לאותו דייר
+          </button>
+          <button onclick="depReset()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:14px 36px;font-size:15px;font-weight:600;cursor:pointer;font-family:Heebo,sans-serif">
+            🔄 הפקד לדייר אחר
+          </button>
+        </div>
       </div>
     </div>
 
@@ -1304,6 +1309,15 @@
       var el = document.getElementById('dep-step-' + s);
       if (el) el.style.display = s === name ? '' : 'none';
     });
+  }
+
+  function depAnotherSameResident() {
+    // שומר לוקר ודייר, מאפס תא וברקוד ופותח תא חדש
+    _dep.cellNumber = null;
+    _dep.cellVolume = null;
+    document.getElementById('dep-barcode-input').value = '';
+    depStep('cell');
+    depAssignCell();
   }
 
   function depReset() {
