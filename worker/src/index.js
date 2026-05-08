@@ -1209,8 +1209,9 @@ async function handleCommunity(path, method, request, env, user, url) {
 
   // ── Courier: list authorized lockers ─────────────────────
   if (path === '/api/courier/lockers' && method === 'GET') {
-    if (!['courier','courier_manager'].includes(user.role)) return forbidden();
     const isImpersonated = user.impersonated_by === 'smarta_admin';
+    // community_manager עם impersonation = מנהל Smarta שנכנס לישוב
+    if (!['courier','courier_manager','community_manager'].includes(user.role)) return forbidden();
 
     if (user.role === 'courier' && !isImpersonated) {
       // שליח אמיתי — רק לוקרים מרשימת delivery_zones
