@@ -1191,22 +1191,36 @@ async function handleCommunity(path, method, request, env, user, url) {
 
   // ── Courier: list authorized lockers ─────────────────────
   if (path === '/api/courier/lockers' && method === 'GET') {
-    if (!['courier','courier_manager','smarta_admin'].includes(user.role)) return forbidden();
-    // find courier record via users.username = couriers.phone
-    const courierRow = await db.prepare(
-      'SELECT c.delivery_zones FROM couriers c JOIN users u ON c.phone = u.username WHERE u.id = ?'
-    ).bind(user.sub).first();
-    if (!courierRow || !courierRow.delivery_zones) return ok([]);
-    const lockerIds = courierRow.delivery_zones.split(',').map(s => s.trim()).filter(Boolean);
-    if (!lockerIds.length) return ok([]);
-    const placeholders = lockerIds.map(() => '?').join(',');
-    const { results } = await db.prepare(
-      `SELECT lc.id, s.name as community_name
-       FROM locker_configs lc
-       LEFT JOIN settlements s ON s.id = lc.community_id
-       WHERE lc.id IN (${placeholders})`
-    ).bind(...lockerIds).all();
-    return ok(results);
+    if (!['courier','courier_manager'].includes(user.role)) return forbidden();
+    const isImpersonated = user.impersonated_by === 'smarta_admin';
+
+    if (user.role === 'courier' && !isImpersonated) {
+      // שליח אמיתי — רק לוקרים מרשימת delivery_zones
+      const courierRow = await db.prepare(
+        'SELECT c.delivery_zones FROM couriers c JOIN users u ON c.phone = u.username WHERE u.id = ?'
+      ).bind(user.sub).first();
+      if (!courierRow || !courierRow.delivery_zones) return ok([]);
+      const lockerIds = courierRow.delivery_zones.split(',').map(s => s.trim()).filter(Boolean);
+      if (!lockerIds.length) return ok([]);
+      const placeholders = lockerIds.map(() => '?').join(',');
+      const { results } = await db.prepare(
+        `SELECT lc.id, s.name as community_name
+         FROM locker_configs lc
+         LEFT JOIN settlements s ON s.id = lc.community_id
+         WHERE lc.id IN (${placeholders})`
+      ).bind(...lockerIds).all();
+      return ok(results);
+    } else {
+      // impersonation / courier_manager — כל לוקרי הישוב
+      if (!communityId) return err('community_id חסר');
+      const { results } = await db.prepare(
+        `SELECT lc.id, s.name as community_name
+         FROM locker_configs lc
+         LEFT JOIN settlements s ON s.id = lc.community_id
+         WHERE lc.community_id = ?`
+      ).bind(communityId).all();
+      return ok(results);
+    }
   }
 
   // ── Locker validate (fallback: check single locker_id exists) ──
