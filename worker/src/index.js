@@ -1197,29 +1197,30 @@ async function handleCommunity(path, method, request, env, user, url) {
     if (user.role === 'courier' && !isImpersonated) {
       // שליח אמיתי — רק לוקרים מרשימת delivery_zones
       const courierRow = await db.prepare(
-        'SELECT c.delivery_zones FROM couriers c JOIN users u ON c.phone = u.username WHERE u.id = ?'
+        'SELECT delivery_zones FROM couriers WHERE phone = (SELECT username FROM users WHERE id = ?)'
       ).bind(user.sub).first();
       if (!courierRow || !courierRow.delivery_zones) return ok([]);
       const lockerIds = courierRow.delivery_zones.split(',').map(s => s.trim()).filter(Boolean);
       if (!lockerIds.length) return ok([]);
-      const placeholders = lockerIds.map(() => '?').join(',');
-      const { results } = await db.prepare(
-        `SELECT lc.id, s.name as community_name
-         FROM locker_configs lc
-         LEFT JOIN settlements s ON s.id = lc.community_id
-         WHERE lc.id IN (${placeholders})`
-      ).bind(...lockerIds).all();
-      return ok(results);
+      // קבל שם הישוב לכל לוקר בנפרד
+      const rows = [];
+      for (const lid of lockerIds) {
+        const lc = await db.prepare('SELECT id, community_id FROM locker_configs WHERE id = ?').bind(lid).first();
+        if (!lc) continue;
+        const sett = await db.prepare('SELECT name FROM settlements WHERE id = ?').bind(lc.community_id).first();
+        rows.push({ id: lc.id, community_name: sett?.name || lc.community_id });
+      }
+      return ok(rows);
     } else {
       // impersonation / courier_manager — כל לוקרי הישוב
       if (!communityId) return err('community_id חסר');
-      const { results } = await db.prepare(
-        `SELECT lc.id, s.name as community_name
-         FROM locker_configs lc
-         LEFT JOIN settlements s ON s.id = lc.community_id
-         WHERE lc.community_id = ?`
+      const { results: lcs } = await db.prepare(
+        'SELECT id, community_id FROM locker_configs WHERE community_id = ?'
       ).bind(communityId).all();
-      return ok(results);
+      if (!lcs.length) return ok([]);
+      const sett = await db.prepare('SELECT name FROM settlements WHERE id = ?').bind(communityId).first();
+      const rows = lcs.map(lc => ({ id: lc.id, community_name: sett?.name || communityId }));
+      return ok(rows);
     }
   }
 

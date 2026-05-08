@@ -452,7 +452,7 @@ function doLogin() {
       sessionStorage.setItem('app_token', t);
       sessionStorage.setItem('app_user',  u);
     }
-    if (role === 'courier') {
+    if (role === 'courier' || role === 'courier_manager') {
       sessionStorage.setItem('courier_token', t);
       sessionStorage.setItem('courier_user',  u);
     }
