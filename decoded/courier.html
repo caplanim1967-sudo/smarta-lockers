@@ -673,17 +673,15 @@
     <div id="dep-step-more" style="display:none">
       <div style="text-align:center;padding:24px 0">
         <div style="font-size:48px;margin-bottom:16px">📦</div>
-        <div style="font-size:18px;font-weight:700;margin-bottom:8px">יש חבילה נוספת לאותו נמען?</div>
-        <div style="font-size:13px;color:var(--muted);margin-bottom:32px">בחר את האפשרות המתאימה</div>
+        <div id="dep-more-count" style="font-size:13px;color:var(--accent);font-weight:700;margin-bottom:8px"></div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:8px">האם יש חבילה לאותו נמען?</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:32px">כל החבילות ייכנסו לאותו תא</div>
         <div style="display:flex;flex-direction:column;gap:12px;align-items:center">
           <button onclick="depMoreSameCell()" style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:14px 40px;font-size:15px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif;width:70%">
-            ✅ כן — נכנסת לאותו תא
-          </button>
-          <button onclick="depNewResident()" style="background:var(--accent);color:#fff;border:none;border-radius:12px;padding:14px 40px;font-size:15px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif;width:70%">
-            🔄 כן — תא נפרד לאותו דייר
+            ✅ כן — סרוק ברקוד נוסף
           </button>
           <button onclick="depStep('lock')" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:14px 40px;font-size:15px;font-weight:600;cursor:pointer;font-family:Heebo,sans-serif;width:70%">
-            🔒 לא — הכנס וסגור
+            🔒 לא — נעל ושלח הודעה
           </button>
         </div>
       </div>
@@ -1331,6 +1329,7 @@
     residentPhone: null,
     cellNumber: null,
     cellVolume: null,
+    barcodes: [],
   };
 
   function depStep(name) {
@@ -1341,9 +1340,9 @@
   }
 
   function depNewResident() {
-    // שומר את הלוקר, מאפס דייר/תא/ברקוד וחוזר לבחירת דייר
+    // שומר את הלוקר, מאפס דייר/תא/ברקודים וחוזר לבחירת דייר
     var savedLockerId = _dep.lockerId;
-    _dep = { lockerId: savedLockerId, residentId: null, residentPhone: null, cellNumber: null, cellVolume: null };
+    _dep = { lockerId: savedLockerId, residentId: null, residentPhone: null, cellNumber: null, cellVolume: null, barcodes: [] };
     document.getElementById('dep-phone-input').value = '';
     document.getElementById('dep-resident-results').style.display = 'none';
     document.getElementById('dep-barcode-input').value = '';
@@ -1363,7 +1362,7 @@
 
   function depReset() {
     depStopQr();
-    _dep = { lockerId: null, residentId: null, residentPhone: null, cellNumber: null, cellVolume: null };
+    _dep = { lockerId: null, residentId: null, residentPhone: null, cellNumber: null, cellVolume: null, barcodes: [] };
     document.getElementById('dep-locker-id').value = '';
     document.getElementById('dep-phone-input').value = '';
     document.getElementById('dep-barcode-input').value = '';
@@ -1578,24 +1577,33 @@
   function depConfirmBarcode(barcode) {
     barcode = (barcode || '').trim();
     if (!barcode) { showToast('יש לסרוק או להזין ברקוד', 'var(--red)'); return; }
-    _dep.barcode = barcode;
+    if (_dep.barcodes.indexOf(barcode) !== -1) { showToast('ברקוד זה כבר נסרק', 'var(--red)'); return; }
+    _dep.barcodes.push(barcode);
+    // עדכון תצוגת ספירה בשלב "עוד חבילה?"
+    var countEl = document.getElementById('dep-more-count');
+    if (countEl) countEl.textContent = _dep.barcodes.length === 1
+      ? 'חבילה אחת נסרקה'
+      : _dep.barcodes.length + ' חבילות נסרקו';
     depStep('more');
   }
 
   function depMoreSameCell() {
-    // עוד חבילה לאותו תא — רק מאפס ברקוד וחוזר לסריקה
-    _dep.barcode = null;
+    // עוד חבילה לאותו תא — מאפס שדה קלט וחוזר לסריקה (barcodes[] נשמר)
     document.getElementById('dep-barcode-input').value = '';
     depStep('barcode');
   }
 
-  // שלב 5: אישור נעילה
+  // שלב 6: אישור נעילה — שולח את כל הברקודים במכה אחת
   function depConfirmLock() {
+    if (!_dep.barcodes || !_dep.barcodes.length) {
+      showToast('לא נסרק ברקוד', 'var(--red)');
+      return;
+    }
     _apiPost('/api/deposit/confirm', {
       locker_id:   _dep.lockerId,
       cell_number: _dep.cellNumber,
       resident_id: _dep.residentId,
-      barcode:     _dep.barcode
+      barcodes:    _dep.barcodes
     }).then(function(data) {
       if (!data) return;
       if (data.error) { showToast(data.error, 'var(--red)'); return; }

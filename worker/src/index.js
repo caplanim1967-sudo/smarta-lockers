@@ -1149,47 +1149,62 @@ async function handleCommunity(path, method, request, env, user, url) {
     return ok({ cell_number: chosen.cellNumber, volume: chosen.volume, no_cells: false });
   }
 
-  // ── שלב 2: אישור נעילה + שמירת חבילה + SMS ───────────────
+  // ── שלב 2: אישור נעילה + שמירת חבילות + SMS אחד ───────────
   if (path === '/api/deposit/confirm' && method === 'POST') {
     if (!depositRoles.includes(user.role)) return forbidden();
     const b = await request.json();
     if (!b.cell_number) return err('cell_number חובה');
-    if (!b.barcode)     return err('ברקוד חבילה חובה');
+
+    // תמיכה ב-barcodes[] (חדש) וגם ב-barcode (ישן, לאחורה-תאימות)
+    const barcodes = Array.isArray(b.barcodes) && b.barcodes.length
+      ? b.barcodes
+      : (b.barcode ? [b.barcode] : []);
+    if (!barcodes.length) return err('ברקוד חבילה חובה');
 
     const resident = b.resident_id
       ? await db.prepare('SELECT * FROM residents WHERE id = ? AND community_id = ?')
           .bind(b.resident_id, communityId).first()
       : null;
 
-    const pkgId      = newId();
-    const cellIdStr  = String(b.cell_number);
+    const cellIdStr   = String(b.cell_number);
     const courierName = user.name || '';
+    const packageIds  = [];
 
-    await db.prepare(`
-      INSERT INTO packages (id, community_id, resident_id, cell_id, barcode, courier, status, assigned_at)
-      VALUES (?, ?, ?, ?, ?, ?, 'waiting', ?)
-    `).bind(pkgId, communityId, b.resident_id || null,
-      cellIdStr, b.barcode, courierName, nowSec()).run();
+    // שמור רשומה נפרדת לכל ברקוד
+    for (const bc of barcodes) {
+      const pkgId = newId();
+      packageIds.push(pkgId);
+      await db.prepare(`
+        INSERT INTO packages (id, community_id, resident_id, cell_id, barcode, courier, status, assigned_at)
+        VALUES (?, ?, ?, ?, ?, ?, 'waiting', ?)
+      `).bind(pkgId, communityId, b.resident_id || null,
+        cellIdStr, bc, courierName, nowSec()).run();
+    }
 
-    // שלח SMS לדייר
+    // SMS אחד בלבד — בין אם חבילה אחת ובין אם כמה
     if (resident?.phone) {
       const settRow = await db.prepare(
         'SELECT msg_settings_json FROM settlements WHERE id = ?'
       ).bind(communityId).first();
       let settings = {};
       try { settings = JSON.parse(settRow?.msg_settings_json || '{}'); } catch(_) {}
-      const template = settings.msg_arrival ||
-        'היי {שם}! 📦 הגיעה לך חבילה מ-{חברה}. לאחר משיכת החבילה נא לאשר בהקלדת הספרה 1 בלבד. תודה!';
+      const count = barcodes.length;
+      const template = count > 1
+        ? (settings.msg_arrival_multi ||
+           'היי {שם}! 📦 הגיעו לך {כמות} חבילות מ-{חברה}. לאחר משיכת החבילות נא לאשר בהקלדת 1. תודה!')
+        : (settings.msg_arrival ||
+           'היי {שם}! 📦 הגיעה לך חבילה מ-{חברה}. לאחר משיכת החבילה נא לאשר בהקלדת הספרה 1 בלבד. תודה!');
       const text = template
-        .replace(/\{שם\}/g,   resident.first_name || '')
-        .replace(/\{חברה\}/g, courierName)
-        .replace(/\{תא\}/g,   '')
-        .replace(/\{ימים\}/g, '0')
+        .replace(/\{שם\}/g,    resident.first_name || '')
+        .replace(/\{חברה\}/g,  courierName)
+        .replace(/\{כמות\}/g,  String(count))
+        .replace(/\{תא\}/g,    '')
+        .replace(/\{ימים\}/g,  '0')
         .replace(/ {2,}/g, ' ').trim();
       await sendMessage(resident.phone, text, resident.notify_method || 'sms');
     }
 
-    return ok({ package_id: pkgId });
+    return ok({ package_ids: packageIds, count: barcodes.length });
   }
 
   // ── Courier: list authorized lockers ─────────────────────
