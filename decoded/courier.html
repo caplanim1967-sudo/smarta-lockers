@@ -1453,7 +1453,7 @@
 
   // שלב 3: הקצאת תא
   function depAssignCell() {
-    document.getElementById('dep-cell-num').textContent = '...';
+    depSetCellQuestion('...');
     _apiPost('/api/deposit/start', { locker_id: _dep.lockerId, resident_id: _dep.residentId })
       .then(function(data) {
         if (!data) return;
@@ -1461,16 +1461,19 @@
         if (data.error) { showToast(data.error, 'var(--red)'); depStep('locker'); return; }
         _dep.cellNumber = data.cell_number;
         _dep.cellVolume = data.volume;
-        document.getElementById('dep-cell-num').textContent = data.cell_number;
-        var q = document.getElementById('dep-cell-question');
-        if (q) q.innerHTML = 'תא <span style="color:var(--accent)">' + data.cell_number + '</span> מתאים לגודל החבילה?';
+        depSetCellQuestion(data.cell_number);
         depStep('cell');
       });
   }
 
+  function depSetCellQuestion(num) {
+    var q = document.getElementById('dep-cell-question');
+    if (q) q.innerHTML = 'תא <span id="dep-cell-num" style="color:var(--accent)">' + num + '</span> מתאים לגודל החבילה?';
+  }
+
   function depCellFits() {
     var q = document.getElementById('dep-cell-question');
-    if (q) q.textContent = 'פותח את התא שנבחר...';
+    if (q) q.innerHTML = 'פותח את התא שנבחר...';
     setTimeout(function() { depStep('barcode'); }, 600);
   }
 
@@ -1486,7 +1489,7 @@
       if (data.error) { showToast(data.error, 'var(--red)'); depStep('locker'); return; }
       _dep.cellNumber = data.cell_number;
       _dep.cellVolume = data.volume;
-      document.getElementById('dep-cell-num').textContent = data.cell_number;
+      depSetCellQuestion(data.cell_number);
       depStep('cell');
     });
   }
