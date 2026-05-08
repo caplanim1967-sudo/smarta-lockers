@@ -1161,9 +1161,19 @@ async function handleCommunity(path, method, request, env, user, url) {
       : (b.barcode ? [b.barcode] : []);
     if (!barcodes.length) return err('ברקוד חבילה חובה');
 
+    // community_id נלקח מהלוקר — לא מהטוקן של השליח (שיכול להיות null)
+    let targetCommunityId = communityId;
+    if (b.locker_id) {
+      const lockerRow = await db.prepare(
+        'SELECT community_id FROM locker_configs WHERE id = ?'
+      ).bind(b.locker_id).first();
+      if (lockerRow?.community_id) targetCommunityId = lockerRow.community_id;
+    }
+    if (!targetCommunityId) return err('לא ניתן לזהות את הישוב — locker_id חובה');
+
     const resident = b.resident_id
       ? await db.prepare('SELECT * FROM residents WHERE id = ? AND community_id = ?')
-          .bind(b.resident_id, communityId).first()
+          .bind(b.resident_id, targetCommunityId).first()
       : null;
 
     const cellIdStr   = String(b.cell_number);
@@ -1177,7 +1187,7 @@ async function handleCommunity(path, method, request, env, user, url) {
       await db.prepare(`
         INSERT INTO packages (id, community_id, resident_id, cell_id, barcode, courier, status, assigned_at)
         VALUES (?, ?, ?, ?, ?, ?, 'waiting', ?)
-      `).bind(pkgId, communityId, b.resident_id || null,
+      `).bind(pkgId, targetCommunityId, b.resident_id || null,
         cellIdStr, bc, courierName, nowSec()).run();
     }
 
@@ -1185,7 +1195,7 @@ async function handleCommunity(path, method, request, env, user, url) {
     if (resident?.phone) {
       const settRow = await db.prepare(
         'SELECT msg_settings_json FROM settlements WHERE id = ?'
-      ).bind(communityId).first();
+      ).bind(targetCommunityId).first();
       let settings = {};
       try { settings = JSON.parse(settRow?.msg_settings_json || '{}'); } catch(_) {}
       const count = barcodes.length;

@@ -674,7 +674,7 @@
       <div style="text-align:center;padding:24px 0">
         <div style="font-size:48px;margin-bottom:16px">📦</div>
         <div id="dep-more-count" style="font-size:13px;color:var(--accent);font-weight:700;margin-bottom:8px"></div>
-        <div style="font-size:18px;font-weight:700;margin-bottom:8px">האם יש חבילה לאותו נמען?</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:8px">האם יש חבילה נוספת לאותו נמען?</div>
         <div style="font-size:13px;color:var(--muted);margin-bottom:32px">כל החבילות ייכנסו לאותו תא</div>
         <div style="display:flex;flex-direction:column;gap:12px;align-items:center">
           <button onclick="depMoreSameCell()" style="background:var(--green);color:#fff;border:none;border-radius:12px;padding:14px 40px;font-size:15px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif;width:70%">
@@ -1363,10 +1363,16 @@
   function depReset() {
     depStopQr();
     _dep = { lockerId: null, residentId: null, residentPhone: null, cellNumber: null, cellVolume: null, barcodes: [] };
-    document.getElementById('dep-locker-id').value = '';
-    document.getElementById('dep-phone-input').value = '';
-    document.getElementById('dep-barcode-input').value = '';
-    document.getElementById('dep-resident-results').style.display = 'none';
+    var selEl = document.getElementById('dep-locker-select');
+    if (selEl) selEl.selectedIndex = 0;
+    var phoneEl = document.getElementById('dep-phone-input');
+    if (phoneEl) phoneEl.value = '';
+    var bcEl = document.getElementById('dep-barcode-input');
+    if (bcEl) bcEl.value = '';
+    var resEl = document.getElementById('dep-resident-results');
+    if (resEl) resEl.style.display = 'none';
+    var badge = document.getElementById('dep-locker-badge');
+    if (badge) badge.textContent = '';
     depStep('locker');
   }
 
