@@ -92,13 +92,59 @@ async function sha256hex(str) {
 function newId()  { return crypto.randomUUID(); }
 function nowSec() { return Math.floor(Date.now() / 1000); }
 
-// ── Message sender — Phase 2: replace with InforUMobile API ──────────────────
-async function sendMessage(to, body, channel /*, env */) {
-  // TODO: InforUMobile SMS/WhatsApp API
-  // SMS:      POST https://api.inforumobile.com/...  { to, from, body }
-  // WhatsApp: POST https://api.inforumobile.com/...  { to, from, body }
-  console.log(`[MSG:${(channel||'sms').toUpperCase()}] → ${to} | ${body.substring(0,80)}`);
-  return true; // mock — תמיד מצליח
+// ── Message sender — InforUMobile SMS/WhatsApp ────────────────────────────────
+async function sendMessage(to, body, channel, env) {
+  // נרמול מספר טלפון → פורמט בינלאומי (972XXXXXXXXX)
+  // נרמול מספר → פורמט ישראלי 0XXXXXXXXX (InforUMobile דורש 0XX לא 972XX)
+  const phone = to.replace(/^\+?972/, '0').replace(/[^\d]/g, '');
+
+  console.log(`[MSG:${(channel||'sms').toUpperCase()}] → ${phone} | ${body.substring(0,80)}`);
+
+  const token = env?.INFORU_TOKEN;
+  if (!token) {
+    console.warn('[MSG] INFORU_TOKEN חסר — לא נשלחה הודעה');
+    return false;
+  }
+
+  const sender  = 'Smarta'; // עד 11 תווים אלפאנומריים
+  const msgType = (channel === 'whatsapp') ? 'whatsapp' : 'sms';
+  const safeBody = body.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  // מספרים מרובים — מופרדים ב-; (כרגע שולחים לאחד)
+  const xml = [
+    '<Inforu>',
+    '  <User>',
+    '    <Username>smarta</Username>',
+    `    <ApiToken>${token}</ApiToken>`,
+    '  </User>',
+    `  <Content Type="${msgType}">`,
+    `    <Message>${safeBody}</Message>`,
+    '  </Content>',
+    '  <Recipients>',
+    `    <PhoneNumber>${phone}</PhoneNumber>`,
+    '  </Recipients>',
+    '  <Settings>',
+    `    <Sender>${sender}</Sender>`,
+    '  </Settings>',
+    '</Inforu>'
+  ].join('\n');
+
+  try {
+    const resp = await fetch('https://uapi.inforu.co.il/SendMessageXml.ashx', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body:    'InforuXML=' + encodeURIComponent(xml)
+    });
+    const text = await resp.text();
+    console.log('[MSG] InforUMobile response:', text.substring(0, 300));
+    // Status>1< = הצלחה
+    const success = /<Status>1<\/Status>/i.test(text);
+    if (!success) console.warn('[MSG] InforUMobile הצביע על כישלון:', text.substring(0,300));
+    return success;
+  } catch (e) {
+    console.error('[MSG] שגיאת תקשורת InforUMobile:', e.message);
+    return false;
+  }
 }
 
 // ─── AUTH MIDDLEWARE ──────────────────────────────────────────────────────────
@@ -897,7 +943,7 @@ async function handleCommunity(path, method, request, env, user, url) {
         .replace(/\{ימים\}/g, String(days))
         .replace(/ {2,}/g, ' ').trim();
 
-      const ok2 = await sendMessage(pkg.phone, text, pkg.notify_method || 'sms');
+      const ok2 = await sendMessage(pkg.phone, text, pkg.notify_method || 'sms', env);
       if (ok2) sent++;
       else     failed++;
     }
@@ -1217,7 +1263,7 @@ async function handleCommunity(path, method, request, env, user, url) {
         .replace(/\{תא\}/g,    '')
         .replace(/\{ימים\}/g,  '0')
         .replace(/ {2,}/g, ' ').trim();
-      await sendMessage(resident.phone, text, resident.notify_method || 'sms');
+      await sendMessage(resident.phone, text, resident.notify_method || 'sms', env);
     }
 
     return ok({ package_ids: packageIds, count: barcodes.length });
