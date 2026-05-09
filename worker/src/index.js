@@ -129,18 +129,47 @@ async function sendMessage(to, body, channel, env) {
     '</Inforu>'
   ].join('\n');
 
-  try {
+  const doSend = async (type) => {
+    const xmlBody = [
+      '<Inforu>',
+      '  <User>',
+      '    <Username>smarta</Username>',
+      `    <ApiToken>${token}</ApiToken>`,
+      '  </User>',
+      `  <Content Type="${type}">`,
+      `    <Message>${safeBody}</Message>`,
+      '  </Content>',
+      '  <Recipients>',
+      `    <PhoneNumber>${phone}</PhoneNumber>`,
+      '  </Recipients>',
+      '  <Settings>',
+      `    <Sender>${sender}</Sender>`,
+      '  </Settings>',
+      '</Inforu>'
+    ].join('\n');
     const resp = await fetch('https://uapi.inforu.co.il/SendMessageXml.ashx', {
       method:  'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body:    'InforuXML=' + encodeURIComponent(xml)
+      body:    'InforuXML=' + encodeURIComponent(xmlBody)
     });
     const text = await resp.text();
-    console.log('[MSG] InforUMobile response:', text.substring(0, 300));
-    // Status>1< = הצלחה
-    const success = /<Status>1<\/Status>/i.test(text);
-    if (!success) console.warn('[MSG] InforUMobile הצביע על כישלון:', text.substring(0,300));
-    return success;
+    console.log(`[MSG] InforUMobile (${type}) response:`, text.substring(0, 300));
+    return { success: /<Status>1<\/Status>/i.test(text), text };
+  };
+
+  try {
+    const { success, text } = await doSend(msgType);
+    if (success) return true;
+
+    // Fallback: אם WhatsApp לא מוגדר — שלח SMS
+    if (msgType === 'whatsapp' && /AccountId is not configured/i.test(text)) {
+      console.warn('[MSG] WhatsApp לא מוגדר — עובר ל-SMS');
+      const { success: smsFallback } = await doSend('sms');
+      return smsFallback;
+    }
+
+    console.warn('[MSG] InforUMobile הצביע על כישלון:', text.substring(0, 300));
+    return false;
   } catch (e) {
     console.error('[MSG] שגיאת תקשורת InforUMobile:', e.message);
     return false;
