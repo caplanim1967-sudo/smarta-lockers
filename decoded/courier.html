@@ -521,7 +521,7 @@
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th>שם</th><th>ת"ז</th><th>טלפון</th><th>אזורי חלוקה</th><th>סטטוס</th><th>פעולות</th>
+              <th>שם</th><th>שם משתמש</th><th>טלפון</th><th>סטטוס</th><th>פעולות</th>
             </tr></thead>
             <tbody id="couriers-tbody">
               <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">טוען...</td></tr>
@@ -536,7 +536,7 @@
 
 <!-- COURIER MODAL -->
 <div id="courier-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;width:400px;max-width:90vw">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;width:420px;max-width:90vw">
     <div style="font-size:16px;font-weight:700;margin-bottom:20px" id="courier-modal-title">הוספת שליח</div>
     <div id="courier-modal-err" style="display:none;color:var(--red);font-size:13px;margin-bottom:12px"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
@@ -545,25 +545,22 @@
         <input id="c-first" type="text" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);font-family:Heebo,sans-serif;outline:none">
       </div>
       <div>
-        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">שם משפחה *</label>
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">שם משפחה</label>
         <input id="c-last" type="text" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);font-family:Heebo,sans-serif;outline:none">
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:6px">
-      <div>
-        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">ת"ז *</label>
-        <input id="c-empid" type="text" dir="ltr" maxlength="9" inputmode="numeric" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);font-family:Heebo,sans-serif;outline:none;text-align:right">
-      </div>
-      <div>
-        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">טלפון *</label>
-        <input id="c-phone" type="tel" dir="ltr" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);font-family:Heebo,sans-serif;outline:none;text-align:right">
-      </div>
-    </div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:14px">ת"ז: 9 ספרות (יכולה להתחיל ב-0) · טלפון: 10 ספרות, מתחיל ב-05</div>
     <div style="margin-bottom:14px">
-      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">לוקרים מורשים</label>
-      <input id="c-zones" type="text" placeholder="לדוגמה: NIR-01, KS-02, TA-03" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);font-family:Heebo,sans-serif;outline:none;direction:ltr;text-align:right">
-      <div style="font-size:11px;color:var(--muted);margin-top:5px">מזהי לוקר מופרדים בפסיק — לדוגמה: NIR-01, KS-02</div>
+      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">שם משתמש לכניסה *</label>
+      <input id="c-username" type="text" dir="ltr" autocomplete="off"
+        style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);font-family:Heebo,sans-serif;outline:none">
+      <div id="c-username-hint" style="font-size:11px;color:var(--muted);margin-top:5px">שם משתמש ייחודי לכניסה למערכת · אי-אפשר לשנות לאחר יצירה</div>
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">טלפון</label>
+      <input id="c-phone" type="tel" dir="ltr" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);font-family:Heebo,sans-serif;outline:none;text-align:right">
+    </div>
+    <div id="c-new-password-hint" style="background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--accent);margin-bottom:16px">
+      🔑 סיסמה זמנית: <strong>Smarta2026!</strong> — השליח יתבקש לשנות בכניסה הראשונה
     </div>
     <div id="c-active-row" style="display:none;margin-bottom:20px;padding:12px;background:var(--surface2);border-radius:8px;align-items:center;justify-content:space-between">
       <span style="font-size:13px;font-weight:600">סטטוס שליח</span>
@@ -574,7 +571,7 @@
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button onclick="closeCourierModal()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:9px 18px;cursor:pointer;font-family:Heebo,sans-serif;font-size:14px">ביטול</button>
-      <button id="courier-save-btn" onclick="saveCourier()" style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;font-family:Heebo,sans-serif;font-size:14px;font-weight:700">שמור</button>
+      <button id="courier-save-btn" onclick="saveCourier()" style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;font-family:Heebo,sans-serif;font-size:14px;font-weight:700">שמור שליח</button>
     </div>
   </div>
 </div>
@@ -586,14 +583,14 @@
     <div id="dep-step-locker">
       <div style="text-align:center;margin-bottom:24px">
         <div style="font-size:48px;margin-bottom:12px">🗄️</div>
-        <div style="font-size:18px;font-weight:700;margin-bottom:6px">בחר לוקר</div>
-        <div style="font-size:13px;color:var(--muted)">בחר מהרשימה או סרוק QR על הלוקר</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:6px">בחר ישוב</div>
+        <div style="font-size:13px;color:var(--muted)">בחר ישוב יעד מהרשימה או סרוק QR על הלוקר</div>
       </div>
       <!-- רשימת לוקרים -->
       <div id="dep-locker-loading" style="text-align:center;color:var(--muted);font-size:13px;padding:12px">טוען רשימת לוקרים...</div>
       <select id="dep-locker-select" onchange="depSelectLockerFromDropdown(this.value)"
         style="display:none;width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 12px;color:var(--text);font-size:15px;font-family:Heebo,sans-serif;outline:none;margin-bottom:16px;cursor:pointer">
-        <option value="">— בחר לוקר —</option>
+        <option value="">— בחר ישוב —</option>
       </select>
       <div id="dep-locker-empty" style="display:none;text-align:center;padding:20px 0">
         <div style="font-size:32px;margin-bottom:8px">⚠️</div>
@@ -792,7 +789,7 @@
       if (data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
       document.getElementById('change-pass-screen').style.display = 'none';
       var _user = JSON.parse(sessionStorage.getItem('smarta_user') || sessionStorage.getItem('courier_user') || 'null');
-      var name = _user ? (_user.community_name || _user.name || '') : '';
+      var name = _user ? (_user.company_name || _user.community_name || _user.name || '') : '';
       document.getElementById('app-screen').style.display = 'block';
       document.getElementById('company-name').textContent = name;
       document.getElementById('header-date').textContent = new Date().toLocaleDateString('he-IL', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
@@ -814,12 +811,17 @@
     if (el) el.classList.add('active');
   }
 
-  function showToast(msg, color) {
+  function showToast(msg, durationOrColor, color) {
     const t = document.getElementById('toast');
     t.textContent = msg;
-    t.style.background = color || 'var(--green)';
+    var duration = 3000;
+    var bg = 'var(--green)';
+    if (typeof durationOrColor === 'number') { duration = durationOrColor; }
+    else if (typeof durationOrColor === 'string') { bg = durationOrColor; }
+    if (color) bg = color;
+    t.style.background = bg;
     t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
+    setTimeout(() => t.classList.remove('show'), duration);
   }
 
   function filterPackages(q) {
@@ -1064,8 +1066,9 @@
       document.getElementById('app-screen').style.display = 'none';
       document.getElementById('change-pass-screen').style.display = 'flex';
     } else {
-      if (_user && _user.community_name) {
-        document.getElementById('company-name').textContent = _user.community_name;
+      if (_user) {
+        var headerLabel = _user.company_name || _user.community_name || '';
+        document.getElementById('company-name').textContent = headerLabel;
       }
       document.getElementById('header-date').textContent = new Date().toLocaleDateString('he-IL', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
     }
@@ -1123,44 +1126,54 @@
   var allCouriers = [];
   var editingCourierId = null;
 
+  // חברת השילוח של המשתמש הנוכחי
+  function _myCompanyId() {
+    var u = JSON.parse(sessionStorage.getItem('courier_user') || sessionStorage.getItem('smarta_user') || 'null');
+    return u && u.courier_company_id;
+  }
+
   function loadCouriers() {
     var tbody = document.getElementById('couriers-tbody');
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">טוען...</td></tr>';
-    _apiGet('/api/couriers').then(function(data) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">טוען...</td></tr>';
+    var companyId = _myCompanyId();
+    if (!companyId) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--red);padding:24px">לא מזוהה חברת שילוח</td></tr>';
+      return;
+    }
+    _apiGet('/api/courier-companies/' + companyId + '/users').then(function(data) {
       if (!data) return;
       if (data.error) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--red);padding:24px">' + _esc(data.error) + '</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--red);padding:24px">' + _esc(data.error) + '</td></tr>';
         return;
       }
-      allCouriers = Array.isArray(data) ? data : [];
+      // רק שליחים (לא מנהלי שילוח)
+      allCouriers = (Array.isArray(data) ? data : []).filter(function(u) { return u.role === 'courier'; });
       renderCouriers();
     }).catch(function() {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--red);padding:24px">שגיאת תקשורת</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--red);padding:24px">שגיאת תקשורת</td></tr>';
     });
   }
 
   function renderCouriers() {
     var tbody = document.getElementById('couriers-tbody');
     if (!allCouriers.length) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">אין שליחים רשומים</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">אין שליחים רשומים עדיין — לחץ "+ הוסף שליח" כדי להוסיף</td></tr>';
       return;
     }
     tbody.innerHTML = allCouriers.map(function(c) {
       var name = [c.first_name, c.last_name].filter(Boolean).join(' ') || '—';
       var statusBadge = c.active
         ? '<span style="background:rgba(34,197,94,0.1);color:var(--green);border:1px solid rgba(34,197,94,0.3);border-radius:10px;padding:2px 10px;font-size:11px;font-weight:700">פעיל</span>'
-        : '<span style="background:rgba(107,114,128,0.1);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:2px 10px;font-size:11px;font-weight:700">לא פעיל</span>';
+        : '<span style="background:rgba(107,114,128,0.1);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:2px 10px;font-size:11px;font-weight:700">מושבת</span>';
       return '<tr>' +
         '<td><strong>' + _esc(name) + '</strong></td>' +
-        '<td style="direction:ltr;text-align:right;unicode-bidi:plaintext;font-size:13px">' + _esc(c.employee_id || '—') + '</td>' +
+        '<td style="direction:ltr;text-align:right;unicode-bidi:plaintext;font-size:13px;color:var(--muted)">' + _esc(c.username || '—') + '</td>' +
         '<td style="direction:ltr;text-align:right;unicode-bidi:plaintext;font-size:13px">' + _esc(c.phone || '—') + '</td>' +
-        '<td style="font-size:12px;color:var(--muted)">' + _esc(c.delivery_zones || '—') + '</td>' +
         '<td>' + statusBadge + '</td>' +
         '<td><div style="display:flex;gap:6px">' +
           '<button onclick="openEditCourier(\'' + c.id + '\')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:5px 12px;cursor:pointer;font-size:12px;font-family:Heebo,sans-serif">עריכה</button>' +
           '<button onclick="toggleCourierActive(\'' + c.id + '\',' + (c.active ? 'false' : 'true') + ')" style="background:' + (c.active ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)') + ';border:1px solid ' + (c.active ? 'rgba(245,158,11,0.3)' : 'rgba(34,197,94,0.3)') + ';color:' + (c.active ? 'var(--yellow)' : 'var(--green)') + ';border-radius:7px;padding:5px 12px;cursor:pointer;font-size:12px;font-family:Heebo,sans-serif">' + (c.active ? 'השבת' : 'הפעל') + '</button>' +
-          '<button onclick="createCourierAccount(\'' + c.id + '\',\'' + _esc(name) + '\')" style="background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.3);color:var(--accent);border-radius:7px;padding:5px 12px;cursor:pointer;font-size:12px;font-family:Heebo,sans-serif">צור חשבון</button>' +
-          '<button onclick="deleteCourier(\'' + c.id + '\',\'' + _esc(name) + '\')" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);color:var(--red);border-radius:7px;padding:5px 12px;cursor:pointer;font-size:12px;font-family:Heebo,sans-serif">מחק</button>' +
+          '<button onclick="deleteCourier(\'' + c.id + '\',\'' + _esc(name) + '\')" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);color:var(--red);border-radius:7px;padding:5px 12px;cursor:pointer;font-size:12px;font-family:Heebo,sans-serif">הסר</button>' +
         '</div></td>' +
       '</tr>';
     }).join('');
@@ -1168,32 +1181,38 @@
 
   function openAddCourier() {
     editingCourierId = null;
-    document.getElementById('c-first').value = '';
-    document.getElementById('c-last').value  = '';
-    document.getElementById('c-empid').value = '';
-    document.getElementById('c-phone').value = '';
-    document.getElementById('c-zones').value = '';
+    document.getElementById('c-first').value    = '';
+    document.getElementById('c-last').value     = '';
+    document.getElementById('c-username').value = '';
+    document.getElementById('c-phone').value    = '';
+    document.getElementById('c-username').removeAttribute('readonly');
+    document.getElementById('c-username-hint').style.display = 'block';
+    document.getElementById('c-new-password-hint').style.display = 'block';
     document.getElementById('c-active-row').style.display = 'none';
     document.getElementById('courier-modal-title').textContent = '+ הוספת שליח';
-    document.getElementById('courier-save-btn').textContent = 'שמור שליח';
+    document.getElementById('courier-save-btn').textContent = 'צור חשבון שליח';
     document.getElementById('courier-modal-err').style.display = 'none';
     document.getElementById('courier-modal').style.display = 'flex';
+    setTimeout(function() { document.getElementById('c-first').focus(); }, 50);
   }
 
   function openEditCourier(id) {
     var c = allCouriers.find(function(x) { return x.id === id; });
     if (!c) return;
     editingCourierId = id;
-    document.getElementById('c-first').value = c.first_name      || '';
-    document.getElementById('c-last').value  = c.last_name       || '';
-    document.getElementById('c-empid').value = c.employee_id     || '';
-    document.getElementById('c-phone').value = c.phone           || '';
-    document.getElementById('c-zones').value = c.delivery_zones  || '';
+    document.getElementById('c-first').value    = c.first_name || '';
+    document.getElementById('c-last').value     = c.last_name  || '';
+    document.getElementById('c-username').value = c.username   || '';
+    document.getElementById('c-phone').value    = c.phone      || '';
+    // שם משתמש לא ניתן לשינוי בעריכה
+    document.getElementById('c-username').setAttribute('readonly', 'readonly');
+    document.getElementById('c-username-hint').style.display = 'none';
+    document.getElementById('c-new-password-hint').style.display = 'none';
     var activeChk = document.getElementById('c-active');
     activeChk.checked = !!c.active;
-    document.getElementById('c-active-label').textContent = c.active ? 'פעיל' : 'לא פעיל';
+    document.getElementById('c-active-label').textContent = c.active ? 'פעיל' : 'מושבת';
     activeChk.onchange = function() {
-      document.getElementById('c-active-label').textContent = this.checked ? 'פעיל' : 'לא פעיל';
+      document.getElementById('c-active-label').textContent = this.checked ? 'פעיל' : 'מושבת';
     };
     document.getElementById('c-active-row').style.display = 'flex';
     document.getElementById('courier-modal-title').textContent = '✏️ עריכת שליח';
@@ -1208,65 +1227,69 @@
   }
 
   function saveCourier() {
-    var first  = document.getElementById('c-first').value.trim();
-    var last   = document.getElementById('c-last').value.trim();
-    var empid  = document.getElementById('c-empid').value.trim();
-    var phone  = document.getElementById('c-phone').value.trim();
-    var zones  = document.getElementById('c-zones').value.trim();
-    var errEl  = document.getElementById('courier-modal-err');
+    var first    = document.getElementById('c-first').value.trim();
+    var last     = document.getElementById('c-last').value.trim();
+    var username = document.getElementById('c-username').value.trim();
+    var phone    = document.getElementById('c-phone').value.trim();
+    var errEl    = document.getElementById('courier-modal-err');
     errEl.style.display = 'none';
 
-    if (!first) { alert('שם פרטי הוא שדה חובה');         return; }
-    if (!last)  { alert('שם משפחה הוא שדה חובה');        return; }
-    if (!empid) { alert('ת"ז הוא שדה חובה'); return; }
-    if (!/^\d{9}$/.test(empid)) {
-      alert('ת"ז לא תקינה.\nחייבת להכיל בדיוק 9 ספרות (יכולה להתחיל ב-0).');
-      return;
+    if (!first) { errEl.textContent = 'שם פרטי הוא שדה חובה'; errEl.style.display = 'block'; return; }
+    if (!editingCourierId && !username) { errEl.textContent = 'שם משתמש הוא שדה חובה'; errEl.style.display = 'block'; return; }
+    if (phone) {
+      var cleanPhone = phone.replace(/[-\s]/g, '');
+      if (!/^0\d{8,9}$/.test(cleanPhone)) {
+        errEl.textContent = 'מספר טלפון לא תקין — חייב להתחיל ב-0 ולהכיל 9-10 ספרות';
+        errEl.style.display = 'block';
+        return;
+      }
+      phone = cleanPhone;
     }
-    if (!phone) { alert('טלפון הוא שדה חובה'); return; }
-    if (!/^05\d{8}$/.test(phone)) {
-      alert('מספר טלפון לא תקין.\nחייב להתחיל ב-05, 10 ספרות בלבד, ללא מקפים או רווחים.\nלדוגמה: 0521234567');
-      return;
-    }
+
+    var companyId = _myCompanyId();
+    if (!companyId) { errEl.textContent = 'שגיאה: לא מזוהה חברת שילוח'; errEl.style.display = 'block'; return; }
 
     var btn = document.getElementById('courier-save-btn');
     btn.disabled = true;
     btn.textContent = 'שומר...';
 
-    var isActive = editingCourierId ? document.getElementById('c-active').checked : true;
-    var body = { first_name: first, last_name: last, employee_id: empid, phone: phone, delivery_zones: zones, active: isActive };
-    var req = editingCourierId
-      ? _apiPut('/api/couriers/' + editingCourierId, body)
-      : _apiPost('/api/couriers', body);
+    var req;
+    if (editingCourierId) {
+      var isActive = document.getElementById('c-active').checked;
+      var body = { first_name: first, last_name: last, phone: phone || null, active: isActive };
+      req = _apiPut('/api/courier-companies/' + companyId + '/users/' + editingCourierId, body);
+    } else {
+      var body = { first_name: first, last_name: last, username: username, phone: phone || null, role: 'courier' };
+      req = _apiPost('/api/courier-companies/' + companyId + '/users', body);
+    }
 
     req.then(function(res) {
       btn.disabled = false;
-      btn.textContent = editingCourierId ? 'עדכן שליח' : 'שמור שליח';
+      btn.textContent = editingCourierId ? 'עדכן שליח' : 'צור חשבון שליח';
       if (!res || res.error) {
         errEl.textContent = (res && res.error) || 'שגיאת תקשורת';
         errEl.style.display = 'block';
         return;
       }
       closeCourierModal();
-      showToast(editingCourierId ? 'שליח עודכן ✓' : 'שליח נוסף ✓');
+      if (!editingCourierId && res.temp_password) {
+        showToast('שליח נוסף ✓ · סיסמה זמנית: ' + res.temp_password, 6000);
+      } else {
+        showToast(editingCourierId ? 'שליח עודכן ✓' : 'שליח נוסף ✓');
+      }
       loadCouriers();
     }).catch(function() {
       btn.disabled = false;
-      btn.textContent = editingCourierId ? 'עדכן שליח' : 'שמור שליח';
+      btn.textContent = editingCourierId ? 'עדכן שליח' : 'צור חשבון שליח';
       errEl.textContent = 'שגיאת תקשורת';
       errEl.style.display = 'block';
     });
   }
 
   function toggleCourierActive(id, newActive) {
-    var c = allCouriers.find(function(x) { return x.id === id; });
-    if (!c) return;
-    var body = {
-      first_name: c.first_name, last_name: c.last_name,
-      phone: c.phone, employee_id: c.employee_id,
-      delivery_zones: c.delivery_zones || '', active: newActive
-    };
-    _apiPut('/api/couriers/' + id, body).then(function(res) {
+    var companyId = _myCompanyId();
+    if (!companyId) return;
+    _apiPut('/api/courier-companies/' + companyId + '/users/' + id, { active: newActive }).then(function(res) {
       if (!res || res.error) { alert(res && res.error ? res.error : 'שגיאת תקשורת'); return; }
       showToast(newActive ? 'שליח הופעל ✓' : 'שליח הושבת ✓');
       loadCouriers();
@@ -1274,20 +1297,31 @@
   }
 
   function deleteCourier(id, name) {
-    if (!confirm('למחוק את ' + name + '?')) return;
-    _apiDelete('/api/couriers/' + id).then(function() {
-      showToast('שליח נמחק');
-      loadCouriers();
-    });
-  }
-
-  function createCourierAccount(id, name) {
-    if (!confirm('ליצור חשבון התחברות עבור ' + name + '?\nשם משתמש = טלפון, סיסמה ראשונית = ת"ז')) return;
-    _apiPost('/api/couriers/' + id + '/create-account', {}).then(function(data) {
-      if (!data) return;
-      if (data.error) { alert('שגיאה: ' + data.error); return; }
-      alert('✅ החשבון נוצר בהצלחה!\nשם משתמש: ' + data.username + '\nהשליח יתבקש לשנות סיסמה בכניסה הראשונה.');
-    });
+    // confirm() חסום ב-iframe — מציגים אלמנט אישור בתוך הדף
+    var companyId = _myCompanyId();
+    if (!companyId) return;
+    var existing = document.getElementById('del-courier-confirm');
+    if (existing) existing.remove();
+    var div = document.createElement('div');
+    div.id = 'del-courier-confirm';
+    div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999';
+    div.innerHTML = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px 28px;max-width:340px;width:90%;text-align:center">' +
+      '<div style="font-size:18px;margin-bottom:12px">🚫</div>' +
+      '<div style="font-weight:700;margin-bottom:8px">להסיר את ' + _esc(name) + '?</div>' +
+      '<div style="font-size:13px;color:var(--muted);margin-bottom:20px">החשבון יושבת — השליח לא יוכל להתחבר</div>' +
+      '<div style="display:flex;gap:10px;justify-content:center">' +
+        '<button onclick="document.getElementById(\'del-courier-confirm\').remove()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 20px;cursor:pointer;font-family:Heebo,sans-serif;font-size:14px">ביטול</button>' +
+        '<button id="del-courier-ok" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);color:var(--red);border-radius:8px;padding:8px 20px;cursor:pointer;font-family:Heebo,sans-serif;font-size:14px;font-weight:700">הסר</button>' +
+      '</div>' +
+    '</div>';
+    document.body.appendChild(div);
+    document.getElementById('del-courier-ok').onclick = function() {
+      div.remove();
+      _apiDelete('/api/courier-companies/' + companyId + '/users/' + id).then(function(res) {
+        showToast('שליח הוסר ✓');
+        loadCouriers();
+      });
+    };
   }
 
   // ─── PACKAGES REPORT ──────────────────────────────────────
@@ -1560,11 +1594,11 @@
       }
       _depLockers = data;
       if (selEl) {
-        selEl.innerHTML = '<option value="">— בחר לוקר —</option>';
+        selEl.innerHTML = '<option value="">— בחר ישוב —</option>';
         data.forEach(function(l) {
           var opt = document.createElement('option');
           opt.value = l.id;
-          opt.textContent = l.id + ' — ' + (l.community_name || l.id);
+          opt.textContent = l.community_name || l.id;
           selEl.appendChild(opt);
         });
         selEl.style.display = '';
@@ -1579,7 +1613,7 @@
     if (!locker) { showToast('לוקר לא מורשה', 'var(--red)'); return; }
     _dep.lockerId = id;
     var badge = document.getElementById('dep-locker-badge');
-    if (badge) badge.textContent = id + ' — ' + (locker.community_name || id);
+    if (badge) badge.textContent = locker.community_name || id;
     depStep('resident');
   }
 
@@ -1593,7 +1627,7 @@
     var selEl = document.getElementById('dep-locker-select');
     if (selEl) selEl.value = id;
     var badge = document.getElementById('dep-locker-badge');
-    if (badge) badge.textContent = id + ' — ' + (locker.community_name || id);
+    if (badge) badge.textContent = locker.community_name || id;
     depStep('resident');
   }
 
