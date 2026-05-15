@@ -40,4 +40,12 @@ if(!sessionStorage.getItem("smarta_token")||!sessionStorage.getItem("smarta_role
            : 'app';
   showTab(tab);
 })();
+// האזנה להודעות מה-iframes (logout, refresh)
+window.addEventListener('message', function(e) {
+  if (!e.data || typeof e.data !== 'object') return;
+  if (e.data.type === 'smarta-logout') {
+    sessionStorage.clear();
+    window.location.href = './login.html';
+  }
+});
 </script></body></html>

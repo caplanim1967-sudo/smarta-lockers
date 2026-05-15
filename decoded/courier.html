@@ -385,8 +385,8 @@
         </div>
         <div class="filter-row">
           <span class="filter-label">סינון:</span>
-          <select id="pkg-month">
-            <option>מרץ 2026</option><option>פברואר 2026</option><option>ינואר 2026</option>
+          <select id="pkg-month" onchange="renderPkgRows()">
+            <option value="">כל החודשים</option>
           </select>
           <select id="pkg-village">
             <option value="">כל הישובים</option>
@@ -401,10 +401,10 @@
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th>תאריך</th><th>ישוב</th><th>שם דייר</th><th>תא</th><th>ברקוד</th><th>סטטוס</th><th>ימי המתנה</th>
+              <th>תאריך</th><th>ישוב</th><th>שם דייר</th><th>תא</th><th>ברקוד</th><th>שליח</th><th>סטטוס</th><th>ימי המתנה</th>
             </tr></thead>
             <tbody id="pkg-table">
-<tr><td colspan="7" style="text-align:center;color:#6b7499;padding:32px">אין חבילות</td></tr>
+<tr><td colspan="8" style="text-align:center;color:#6b7499;padding:32px">אין חבילות</td></tr>
 </tbody>
           </table>
         </div>
@@ -674,6 +674,9 @@
 
     <!-- שלב 5b: עוד חבילה לאותו נמען? -->
     <div id="dep-step-more" style="display:none">
+      <div style="margin-bottom:12px">
+        <button onclick="depStep('barcode')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;font-family:Heebo,sans-serif;padding:0;display:flex;align-items:center;gap:4px">← חזור לסריקה</button>
+      </div>
       <div style="text-align:center;padding:24px 0">
         <div style="font-size:48px;margin-bottom:16px">📦</div>
         <div id="dep-more-count" style="font-size:13px;color:var(--accent);font-weight:700;margin-bottom:8px"></div>
@@ -798,7 +801,11 @@
     });
   }
 
-  function doLogout() { sessionStorage.clear(); try { window.parent.location.href = "./login.html"; } catch(e) { window.location.href = "./login.html"; } }
+  function doLogout() {
+    sessionStorage.clear();
+    try { window.parent.postMessage({ type: 'smarta-logout' }, '*'); }
+    catch(e) { window.location.href = './login.html'; }
+  }
 
   function showScreen(name, el) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -816,10 +823,10 @@
   }
 
   function filterPackages(q) {
-    const rows = document.querySelectorAll('#pkg-table tr');
-    let count = 0;
-    rows.forEach(r => {
-      const match = !q || r.textContent.includes(q);
+    var rows = document.querySelectorAll('#pkg-table tr');
+    var count = 0;
+    rows.forEach(function(r) {
+      var match = !q || r.textContent.includes(q);
       r.style.display = match ? '' : 'none';
       if (match) count++;
     });
@@ -1284,48 +1291,89 @@
   }
 
   // ─── PACKAGES REPORT ──────────────────────────────────────
+  var _allPkgRows = [];
+
   function loadPackagesReport() {
     var tbody = document.getElementById('pkg-table');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">טוען...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">טוען...</td></tr>';
     Promise.all([
       _apiGet('/api/packages/history'),
       _apiGet('/api/packages?status=waiting')
     ]).then(function(results) {
       var collected = Array.isArray(results[0]) ? results[0] : [];
       var waiting   = Array.isArray(results[1]) ? results[1] : [];
-      var rows = [];
+      _allPkgRows = [];
       waiting.forEach(function(p) {
-        rows.push({ p: p, status: 'ממתינה', statusColor: 'var(--accent)',
-          date: p.placed_at ? new Date(p.placed_at * 1000).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—',
-          days: p.placed_at ? String(Math.max(0, Math.floor((Date.now()/1000 - p.placed_at)/86400))) : '0'
+        var ts = p.assigned_at || p.placed_at || 0;
+        _allPkgRows.push({ p: p, status: 'ממתינה', statusColor: 'var(--accent)',
+          date: ts ? new Date(ts * 1000).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—',
+          days: ts ? String(Math.max(0, Math.floor((Date.now()/1000 - ts)/86400))) : '0',
+          ts: ts
         });
       });
       collected.forEach(function(p) {
-        rows.push({ p: p, status: 'נאספה ✓', statusColor: 'var(--green)',
-          date: p.placed_at ? new Date(p.placed_at * 1000).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—',
-          days: (p.placed_at && p.collected_at) ? String(Math.max(0, Math.floor((p.collected_at - p.placed_at)/86400))) : '0'
+        var ts = p.assigned_at || p.placed_at || 0;
+        _allPkgRows.push({ p: p, status: 'נאספה ✓', statusColor: 'var(--green)',
+          date: ts ? new Date(ts * 1000).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—',
+          days: (ts && p.collected_at) ? String(Math.max(0, Math.floor((p.collected_at - ts)/86400))) : '0',
+          ts: ts
         });
       });
-      if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px">אין חבילות</td></tr>';
-        return;
+
+      // בנה רשימת חודשים דינמית מהנתונים
+      var monthsSeen = {};
+      _allPkgRows.forEach(function(r) {
+        if (!r.ts) return;
+        var d = new Date(r.ts * 1000);
+        var key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+        var label = d.toLocaleString('he-IL', {month:'long', year:'numeric'});
+        monthsSeen[key] = label;
+      });
+      var monthKeys = Object.keys(monthsSeen).sort().reverse();
+      var pkgMonthEl = document.getElementById('pkg-month');
+      if (pkgMonthEl) {
+        var prevVal = pkgMonthEl.value;
+        pkgMonthEl.innerHTML = '<option value="">כל החודשים</option>' +
+          monthKeys.map(function(k){ return '<option value="'+k+'">'+monthsSeen[k]+'</option>'; }).join('');
+        if (prevVal && monthsSeen[prevVal]) pkgMonthEl.value = prevVal;
       }
-      tbody.innerHTML = rows.map(function(r) {
-        var p = r.p;
-        return '<tr>' +
-          '<td>' + r.date + '</td>' +
-          '<td>' + (p.community_name || p.community_id || '—') + '</td>' +
-          '<td>' + (p.resident_name || '—') + '</td>' +
-          '<td style="font-weight:800;color:var(--accent);text-align:center">' + (p.cell_id || '—') + '</td>' +
-          '<td style="font-family:monospace;font-size:11px;color:var(--accent)">' + (p.barcode || '—') + '</td>' +
-          '<td style="color:' + r.statusColor + ';font-weight:700">' + r.status + '</td>' +
-          '<td style="text-align:center">' + r.days + '</td>' +
-          '</tr>';
-      }).join('');
+
+      renderPkgRows();
     }).catch(function() {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:24px">שגיאה בטעינת הנתונים</td></tr>';
+      document.getElementById('pkg-table').innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--red);padding:24px">שגיאה בטעינת הנתונים</td></tr>';
     });
+  }
+
+  function renderPkgRows() {
+    var tbody = document.getElementById('pkg-table');
+    var monthFilter = (document.getElementById('pkg-month') || {}).value || '';
+    var rows = _allPkgRows.filter(function(r) {
+      if (!monthFilter) return true;
+      if (!r.ts) return false;
+      var d = new Date(r.ts * 1000);
+      var key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+      return key === monthFilter;
+    });
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:32px">אין חבילות</td></tr>';
+      document.getElementById('pkg-count').textContent = 'מציג 0 רשומות';
+      return;
+    }
+    tbody.innerHTML = rows.map(function(r) {
+      var p = r.p;
+      return '<tr>' +
+        '<td>' + r.date + '</td>' +
+        '<td>' + _esc(p.community_name || p.community_id || '—') + '</td>' +
+        '<td>' + _esc(p.resident_name || '—') + '</td>' +
+        '<td style="font-weight:800;color:var(--accent);text-align:center">' + _esc(p.cell_id || '—') + '</td>' +
+        '<td style="font-family:monospace;font-size:11px">' + _esc(p.barcode || '—') + '</td>' +
+        '<td style="font-size:12px;color:var(--muted)">' + _esc(p.courier || '—') + '</td>' +
+        '<td style="color:' + r.statusColor + ';font-weight:700">' + r.status + '</td>' +
+        '<td style="text-align:center">' + r.days + '</td>' +
+        '</tr>';
+    }).join('');
+    document.getElementById('pkg-count').textContent = 'מציג ' + rows.length + ' רשומות';
   }
 
   // טעינה בכניסה לטאב
@@ -1385,7 +1433,7 @@
   };
 
   function depStep(name) {
-    ['locker','resident','cell','barcode','more','lock','nocells','success'].forEach(function(s) {
+    ['locker','resident','cell','lockcode','barcode','more','lock','nocells','success'].forEach(function(s) {
       var el = document.getElementById('dep-step-' + s);
       if (el) el.style.display = s === name ? '' : 'none';
     });
@@ -1661,7 +1709,8 @@
       locker_id:   _dep.lockerId,
       cell_number: _dep.cellNumber,
       resident_id: _dep.residentId,
-      barcodes:    _dep.barcodes
+      barcodes:    _dep.barcodes,
+      lock_code:   _dep.lockCode || null
     }).then(function(data) {
       if (!data) return;
       if (data.error) { showToast(data.error, 'var(--red)'); return; }
