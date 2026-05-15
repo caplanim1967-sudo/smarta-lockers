@@ -222,6 +222,9 @@ tr:hover td { background:rgba(255,255,255,0.015); }
   <button class="sidebar-item" id="sb-reminders" onclick="showPage('reminders',this)">
     <span class="icon">⏰</span> תזכורות
   </button>
+  <button class="sidebar-item" id="sb-courier-co" onclick="showPage('courier-co',this)">
+    <span class="icon">🚚</span> חברת שילוח
+  </button>
 </aside>
 
 <main>
@@ -448,6 +451,58 @@ tr:hover td { background:rgba(255,255,255,0.015); }
     </div>
 
     <div id="rem-err" style="display:none;color:var(--red);font-size:12px;margin-bottom:12px"></div>
+  </div>
+
+
+  <!-- COURIER COMPANY PAGE -->
+  <div class="page" id="page-courier-co">
+    <div class="page-header">
+      <div>
+        <div class="page-title">חברות שילוח</div>
+        <div class="page-sub">חברות השילוח המורשות לשרת את הישוב</div>
+      </div>
+      <button class="btn btn-primary" onclick="showCcForm(true)">+ קשר חברה חדשה</button>
+    </div>
+
+    <!-- טבלת חברות מקושרות -->
+    <div class="card">
+      <div class="card-title">🚚 חברות מקושרות לישוב</div>
+      <div id="cc-table-wrap">
+        <div style="color:var(--muted);font-size:13px">טוען...</div>
+      </div>
+    </div>
+
+    <!-- טופס קישור חברה חדשה (מתקפל) -->
+    <div class="card" id="cc-assign-card" style="display:none">
+      <div class="card-title" style="justify-content:space-between">
+        <span>➕ קשר חברת שילוח לישוב</span>
+        <button onclick="showCcForm(false)" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1">×</button>
+      </div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:16px">
+        המזהה העסקי (ח.פ / עוסק מורשה) הוא המפתח — אם החברה כבר קיימת במערכת, הישוב שלך יצורף אליה אוטומטית.
+      </div>
+      <div class="form-group">
+        <label class="form-label">ח.פ / עוסק מורשה *</label>
+        <input class="form-input" id="cc-new-bizid" placeholder="515123456" dir="ltr" style="text-align:right" oninput="onBizIdInput(this.value)">
+        <div id="cc-bizid-hint" style="font-size:11px;color:var(--muted);margin-top:4px;display:none"></div>
+      </div>
+      <div id="cc-new-name-row" class="form-group">
+        <label class="form-label">שם חברת השילוח *</label>
+        <input class="form-input" id="cc-new-name" placeholder="מגבית שירות, DHL...">
+      </div>
+      <div class="form-row" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px" id="cc-new-details-row">
+        <div class="form-group">
+          <label class="form-label">איש קשר</label>
+          <input class="form-input" id="cc-new-contact" placeholder="ישראל ישראלי">
+        </div>
+        <div class="form-group">
+          <label class="form-label">טלפון</label>
+          <input class="form-input" id="cc-new-phone" placeholder="050-0000000" dir="ltr" style="text-align:right">
+        </div>
+      </div>
+      <div id="cc-assign-err" style="display:none;color:var(--red);font-size:12px;margin-bottom:10px"></div>
+      <button class="btn btn-primary" id="cc-assign-btn" onclick="createAndAssignCompany()">קשר חברה לישוב</button>
+    </div>
   </div>
 
 </main>
@@ -1335,6 +1390,313 @@ function esc(str) {
   if (!str) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// ─── COURIER COMPANY (מנהל ישוב) ─────────────────────────
+var _mgrCompanyId = null;  // החברה שנבחרה לניהול מנהלים / עריכה
+
+function showCcForm(show) {
+  document.getElementById('cc-assign-card').style.display = show ? '' : 'none';
+  if (show) {
+    document.getElementById('cc-new-bizid').value = '';
+    document.getElementById('cc-new-name').value  = '';
+    document.getElementById('cc-new-contact').value = '';
+    document.getElementById('cc-new-phone').value = '';
+    document.getElementById('cc-assign-err').style.display = 'none';
+    document.getElementById('cc-bizid-hint').style.display = 'none';
+    document.getElementById('cc-new-name-row').style.display = '';
+    document.getElementById('cc-new-details-row').style.display = '';
+    setTimeout(function() { document.getElementById('cc-new-bizid').focus(); }, 50);
+  }
+}
+
+function loadCourierCoPage() {
+  var wrap = document.getElementById('cc-table-wrap');
+  wrap.innerHTML = '<div style="color:var(--muted);font-size:13px">טוען...</div>';
+  apiGet('/api/courier-companies').then(function(data) {
+    if (!data || !data.length) {
+      wrap.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px 0">אין חברות שילוח מקושרות לישוב זה — לחץ "קשר חברה חדשה" כדי להוסיף.</div>';
+      return;
+    }
+    var TH = 'style="text-align:right;padding:8px 10px;color:var(--muted);font-size:11px;font-weight:600;border-bottom:1px solid var(--border);white-space:nowrap"';
+    var html = '<div style="overflow-x:auto"><table style="width:100%;font-size:13px;border-collapse:collapse">' +
+      '<thead><tr>' +
+        '<th ' + TH + '>שם חברה</th>' +
+        '<th ' + TH + '>ח.פ / עוסק מורשה</th>' +
+        '<th ' + TH + '>איש קשר</th>' +
+        '<th ' + TH + '>טלפון</th>' +
+        '<th ' + TH + '>סטטוס</th>' +
+        '<th ' + TH + '>פעולות</th>' +
+      '</tr></thead><tbody>';
+    data.forEach(function(c) {
+      var statusBadge = c.active
+        ? '<span style="background:rgba(34,197,94,0.1);color:var(--green);border:1px solid rgba(34,197,94,0.3);border-radius:10px;padding:2px 10px;font-size:11px;font-weight:700">פעיל</span>'
+        : '<span style="background:rgba(107,114,128,0.1);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:2px 10px;font-size:11px;font-weight:700">חסום</span>';
+      var bizWarn = !c.business_id ? ' <span title="ח.פ לא הוגדר" style="color:var(--yellow)">⚠️</span>' : '';
+      var TD = 'style="padding:10px"';
+      html += '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td ' + TD + '><strong>' + esc(c.name) + '</strong>' + bizWarn + '</td>' +
+        '<td ' + TD + ' style="padding:10px;font-family:monospace;direction:ltr;text-align:right;unicode-bidi:plaintext;font-size:12px">' + esc(c.business_id || '—') + '</td>' +
+        '<td ' + TD + '>' + esc(c.contact_name || '—') + '</td>' +
+        '<td ' + TD + ' style="padding:10px;direction:ltr;text-align:right;unicode-bidi:plaintext">' + esc(c.phone || '—') + '</td>' +
+        '<td ' + TD + '>' + statusBadge + '</td>' +
+        '<td ' + TD + '><div style="display:flex;gap:6px;flex-wrap:wrap">' +
+          '<button class="btn btn-secondary btn-sm" onclick="openEditCompanyModal(\'' + esc(c.id) + '\',\'' + esc(c.name) + '\',\'' + esc(c.business_id||'') + '\',\'' + esc(c.contact_name||'') + '\',\'' + esc(c.phone||'') + '\',' + (c.active?1:0) + ')">✏️ עריכה</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="openManagersForCompany(\'' + esc(c.id) + '\',\'' + esc(c.name) + '\')" style="color:var(--accent);border-color:rgba(79,142,247,0.4)">🪪 מנהלים</button>' +
+        '</div></td>' +
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+    wrap.innerHTML = html;
+  }).catch(function() {
+    wrap.innerHTML = '<div style="color:var(--red);font-size:13px">שגיאה בטעינה</div>';
+  });
+}
+
+// בדיקת ח.פ בזמן אמת
+var _bizIdTimer = null;
+function onBizIdInput(val) {
+  clearTimeout(_bizIdTimer);
+  var hint = document.getElementById('cc-bizid-hint');
+  var nameRow = document.getElementById('cc-new-name-row');
+  var detailsRow = document.getElementById('cc-new-details-row');
+  var btn = document.getElementById('cc-assign-btn');
+  if (!val || val.trim().length < 5) {
+    hint.style.display = 'none';
+    nameRow.style.display = '';
+    detailsRow.style.display = '';
+    btn.textContent = 'קשר חברה לישוב';
+    return;
+  }
+  hint.style.display = 'none';
+  nameRow.style.display = '';
+  detailsRow.style.display = '';
+  btn.textContent = 'קשר חברה לישוב';
+}
+
+function createAndAssignCompany() {
+  var bizId = document.getElementById('cc-new-bizid').value.trim();
+  var name  = document.getElementById('cc-new-name').value.trim();
+  var errEl = document.getElementById('cc-assign-err');
+  errEl.style.display = 'none';
+  if (!bizId) { errEl.textContent = 'ח.פ / עוסק מורשה הוא שדה חובה'; errEl.style.display = 'block'; return; }
+  if (!name)  { errEl.textContent = 'שם חברה הוא שדה חובה'; errEl.style.display = 'block'; return; }
+  var btn = document.getElementById('cc-assign-btn');
+  btn.disabled = true;
+  var body = {
+    business_id:  bizId,
+    name:         name,
+    contact_name: document.getElementById('cc-new-contact').value.trim(),
+    phone:        document.getElementById('cc-new-phone').value.trim()
+  };
+  apiPost('/api/courier-companies', body).then(function(data) {
+    btn.disabled = false;
+    if (data && data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
+    var msg = data.is_new ? 'חברה חדשה נוצרה וקושרה לישוב ✓' : ('חברת "' + esc(data.name) + '" קושרה לישוב ✓');
+    showToast(msg);
+    showCcForm(false);
+    loadCourierCoPage();
+  }).catch(function() {
+    btn.disabled = false;
+    errEl.textContent = 'שגיאת שרת';
+    errEl.style.display = 'block';
+  });
+}
+
+// ──── מנהלי שילוח של חברה ────────────────────────────────
+function openManagersForCompany(companyId, companyName) {
+  _mgrCompanyId = companyId;
+  document.getElementById('cm-company-name').textContent = companyName;
+  document.getElementById('cm-managers-list').innerHTML = '<div style="color:var(--muted);font-size:12px">טוען...</div>';
+  openModal('courier-manager-modal');
+  loadCourierManagersList(companyId);
+}
+
+function loadCourierManagersList(companyId) {
+  apiGet('/api/courier-companies/' + companyId + '/users').then(function(data) {
+    data = (data || []).filter(function(u) { return u.role === 'courier_manager'; });
+    var listEl = document.getElementById('cm-managers-list');
+    if (!data.length) {
+      listEl.innerHTML = '<div style="color:var(--muted);font-size:12px;margin-top:4px">אין מנהלי שילוח רשומים — צור את הראשון.</div>';
+      return;
+    }
+    listEl.innerHTML = '<table style="width:100%;font-size:13px;border-collapse:collapse;margin-top:8px">' +
+      '<thead><tr>' +
+        '<th style="text-align:right;padding:5px 8px;color:var(--muted);font-size:11px;border-bottom:1px solid var(--border)">שם</th>' +
+        '<th style="text-align:right;padding:5px 8px;color:var(--muted);font-size:11px;border-bottom:1px solid var(--border)">שם משתמש</th>' +
+        '<th style="text-align:right;padding:5px 8px;color:var(--muted);font-size:11px;border-bottom:1px solid var(--border)">סטטוס</th>' +
+      '</tr></thead><tbody>' +
+      data.map(function(u) {
+        var s = u.active
+          ? '<span style="color:var(--green);font-size:11px;font-weight:700">● פעיל</span>'
+          : '<span style="color:var(--muted);font-size:11px">○ לא פעיל</span>';
+        return '<tr style="border-bottom:1px solid var(--border)">' +
+          '<td style="padding:7px 8px">' + esc((u.first_name||'') + ' ' + (u.last_name||'')) + '</td>' +
+          '<td style="padding:7px 8px;font-family:monospace;font-size:12px;direction:ltr;text-align:right;unicode-bidi:plaintext">' + esc(u.username) + '</td>' +
+          '<td style="padding:7px 8px">' + s + '</td>' +
+        '</tr>';
+      }).join('') + '</tbody></table>';
+  });
+}
+
+function saveCourierManager() {
+  if (!_mgrCompanyId) return;
+  var errEl = document.getElementById('cm-err');
+  var body = {
+    first_name: document.getElementById('cm-first').value.trim(),
+    last_name:  document.getElementById('cm-last').value.trim(),
+    username:   document.getElementById('cm-username').value.trim(),
+    role: 'courier_manager'
+  };
+  if (!body.first_name || !body.username) {
+    errEl.textContent = 'שם פרטי ושם משתמש הם שדות חובה';
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+  apiPost('/api/courier-companies/' + _mgrCompanyId + '/users', body).then(function(data) {
+    if (data && data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
+    document.getElementById('cm-first').value = '';
+    document.getElementById('cm-last').value = '';
+    document.getElementById('cm-username').value = '';
+    showToast('מנהל שילוח נוצר ✓ · סיסמה: Smarta2026!');
+    loadCourierManagersList(_mgrCompanyId);
+  }).catch(function() {
+    errEl.textContent = 'שגיאת שרת';
+    errEl.style.display = 'block';
+  });
+}
+
+function openEditCompanyModal(id, name, bizId, contact, phone, active) {
+  document.getElementById('ec-id').value      = id;
+  document.getElementById('ec-name').value    = name;
+  document.getElementById('ec-bizid').value   = bizId;
+  document.getElementById('ec-contact').value = contact;
+  document.getElementById('ec-phone').value   = phone;
+  var chk = document.getElementById('ec-active');
+  chk.checked = (active !== 0 && active !== '0' && active !== false);
+  document.getElementById('ec-status-label').textContent = chk.checked ? 'פעילה' : 'מושבתת — שליחים לא יוכלו להתחבר';
+  document.getElementById('ec-err').style.display = 'none';
+  openModal('edit-company-modal');
+}
+
+function saveEditCompany() {
+  var id    = document.getElementById('ec-id').value;
+  var bizId = document.getElementById('ec-bizid').value.trim();
+  var name  = document.getElementById('ec-name').value.trim();
+  var errEl = document.getElementById('ec-err');
+  errEl.style.display = 'none';
+  if (!bizId) { errEl.textContent = 'ח.פ / עוסק מורשה הוא שדה חובה'; errEl.style.display = 'block'; return; }
+  if (!name)  { errEl.textContent = 'שם חברה הוא שדה חובה'; errEl.style.display = 'block'; return; }
+  var body = {
+    business_id:  bizId,
+    name:         name,
+    contact_name: document.getElementById('ec-contact').value.trim(),
+    phone:        document.getElementById('ec-phone').value.trim(),
+    active:       document.getElementById('ec-active').checked ? 1 : 0
+  };
+  apiPut('/api/courier-companies/' + id, body).then(function(data) {
+    if (data && data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
+    closeModal('edit-company-modal');
+    showToast('פרטי החברה עודכנו ✓');
+    loadCourierCoPage();
+  }).catch(function() {
+    errEl.textContent = 'שגיאת שרת';
+    errEl.style.display = 'block';
+  });
+}
+
+// טעינה בכניסה לדף
+var _mgr_origShowPage = showPage;
+showPage = function(name, el) {
+  _mgr_origShowPage(name, el);
+  if (name === 'courier-co') loadCourierCoPage();
+};
 </script>
+
+<!-- MODAL: עריכת חברת שילוח -->
+<div class="modal-overlay" id="edit-company-modal">
+  <div class="modal">
+    <div class="modal-title">✏️ עריכת חברת שילוח</div>
+    <input type="hidden" id="ec-id">
+    <div class="form-group">
+      <label class="form-label">ח.פ / עוסק מורשה *</label>
+      <input class="form-input" id="ec-bizid" placeholder="515123456" dir="ltr" style="text-align:right">
+    </div>
+    <div class="form-group">
+      <label class="form-label">שם החברה *</label>
+      <input class="form-input" id="ec-name">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group">
+        <label class="form-label">איש קשר</label>
+        <input class="form-input" id="ec-contact">
+      </div>
+      <div class="form-group">
+        <label class="form-label">טלפון</label>
+        <input class="form-input" id="ec-phone" dir="ltr" style="text-align:right">
+      </div>
+    </div>
+    <!-- toggle פעיל / לא פעיל -->
+    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-top:4px">
+      <div>
+        <div style="font-size:13px;font-weight:600">סטטוס חברה</div>
+        <div id="ec-status-label" style="font-size:12px;color:var(--muted);margin-top:2px">פעילה</div>
+      </div>
+      <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer">
+        <input type="checkbox" id="ec-active" checked style="opacity:0;width:0;height:0;position:absolute"
+          onchange="document.getElementById('ec-status-label').textContent = this.checked ? 'פעילה' : 'מושבתת — שליחים לא יוכלו להתחבר'">
+        <span style="position:absolute;inset:0;background:var(--border);border-radius:24px;transition:0.2s"></span>
+        <span id="ec-toggle-knob" style="position:absolute;top:3px;right:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:0.2s"></span>
+      </label>
+    </div>
+    <style>
+      #ec-active:checked + span { background: var(--green); }
+      #ec-active:checked + span + span { right: auto; left: 3px; }
+    </style>
+    <div id="ec-err" style="display:none;color:var(--red);font-size:12px;margin-top:10px;margin-bottom:4px"></div>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button class="btn btn-primary" style="flex:1" onclick="saveEditCompany()">שמור שינויים</button>
+      <button class="btn btn-secondary" style="flex:1" onclick="closeModal('edit-company-modal')">ביטול</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: מנהלי שילוח של חברה -->
+<div class="modal-overlay" id="courier-manager-modal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-title">🪪 מנהלי שילוח — <span id="cm-company-name" style="color:var(--accent)"></span></div>
+
+    <!-- רשימת מנהלים קיימים -->
+    <div id="cm-managers-list" style="margin-bottom:20px"></div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:0 0 16px">
+
+    <!-- הוספת מנהל חדש -->
+    <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">+ הוספת מנהל שילוח</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group">
+        <label class="form-label">שם פרטי *</label>
+        <input class="form-input" id="cm-first" placeholder="ישראל">
+      </div>
+      <div class="form-group">
+        <label class="form-label">שם משפחה</label>
+        <input class="form-input" id="cm-last" placeholder="ישראלי">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">שם משתמש *</label>
+      <input class="form-input" id="cm-username" placeholder="mgr_delivery" dir="ltr" style="text-align:right">
+    </div>
+    <div style="background:rgba(79,142,247,0.07);border:1px solid rgba(79,142,247,0.2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--muted);margin-bottom:12px">
+      סיסמה ראשונית: <strong>Smarta2026!</strong> — יידרש לשנות בכניסה הראשונה
+    </div>
+    <div id="cm-err" style="display:none;color:var(--red);font-size:12px;margin-bottom:10px"></div>
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button class="btn btn-primary" style="flex:1" onclick="saveCourierManager()">צור מנהל שילוח</button>
+      <button class="btn btn-secondary" style="flex:1" onclick="closeModal('courier-manager-modal')">סגור</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
