@@ -353,11 +353,13 @@ tr:hover td { background:rgba(255,255,255,0.015); }
       <strong style="color:var(--accent)">משתני תבנית זמינים:</strong>
       &nbsp;
       <code style="background:var(--surface2);padding:2px 7px;border-radius:4px;color:var(--text)">{שם}</code>
-      <code style="background:var(--surface2);padding:2px 7px;border-radius:4px;color:var(--text)">{חברה}</code>
+      <code style="background:var(--surface2);padding:2px 7px;border-radius:4px;color:var(--text)">{כמות}</code>
       <code style="background:var(--surface2);padding:2px 7px;border-radius:4px;color:var(--text)">{תא}</code>
+      <code style="background:var(--surface2);padding:2px 7px;border-radius:4px;color:var(--text)">{קוד}</code>
       <code style="background:var(--surface2);padding:2px 7px;border-radius:4px;color:var(--text)">{ימים}</code>
+      <code style="background:var(--surface2);padding:2px 7px;border-radius:4px;color:var(--text)">{הערה}</code>
       &nbsp;|&nbsp;
-      <span>{תא} מוצג בתוכנית <strong>Basic</strong> בלבד</span>
+      <span>{תא} ו-{קוד} — Basic בלבד &nbsp;·&nbsp; {הערה} — מוצג רק אם קיימת הערה לחבילה</span>
     </div>
 
     <!-- אינטרוולים -->
@@ -396,9 +398,29 @@ tr:hover td { background:rgba(255,255,255,0.015); }
 
     <!-- נוסח הגעה -->
     <div class="card">
-      <div class="card-title">📦 הודעת הגעה</div>
+      <div class="card-title">📦 הודעת הגעה — Basic</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px">לוקר Basic — מנעול מכני, הדייר מקבל מספר תא וקוד פתיחה</div>
       <div class="form-group">
-        <textarea id="rem-msg-arrival" rows="4" placeholder="היי {שם}! 📦 הגיעה לך חבילה מ-{חברה}{תא}. לאחר משיכת החבילה/ות נא לאשר את משיכת החבילה בהקלדת הספרה 1 בלבד. תודה!"></textarea>
+        <label>חבילה אחת</label>
+        <textarea id="rem-msg-arrival" rows="3" placeholder="היי {שם}! הגיעה לך חבילה בתא {תא}, קוד: {קוד}. תודה!"></textarea>
+      </div>
+      <div class="form-group">
+        <label>כמה חבילות</label>
+        <textarea id="rem-msg-arrival-multi" rows="3" placeholder="היי {שם}! הגיעו לך {כמות} חבילות בתא {תא}, קוד: {קוד}. תודה!"></textarea>
+      </div>
+    </div>
+
+    <!-- נוסח הגעה Premium -->
+    <div class="card">
+      <div class="card-title">📦 הודעת הגעה — Premium</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px">לוקר Premium — מנעול חשמלי, הדייר מתקשר ללוקר לפתיחה (ללא תא וקוד)</div>
+      <div class="form-group">
+        <label>חבילה אחת</label>
+        <textarea id="rem-msg-arrival-premium" rows="3" placeholder="היי {שם}! הגיעה לך חבילה בלוקר. התקשר לאיסוף. תודה!"></textarea>
+      </div>
+      <div class="form-group">
+        <label>כמה חבילות</label>
+        <textarea id="rem-msg-arrival-multi-premium" rows="3" placeholder="היי {שם}! הגיעו לך {כמות} חבילות בלוקר. התקשר לאיסוף. תודה!"></textarea>
       </div>
     </div>
 
@@ -408,19 +430,19 @@ tr:hover td { background:rgba(255,255,255,0.015); }
       <div style="display:flex;flex-direction:column;gap:14px">
         <div class="form-group">
           <label>תזכורת ראשונה</label>
-          <textarea id="rem-msg-r1" rows="4" placeholder="היי {שם} 👋 תזכורת — יש לך חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם. לאחר משיכת החבילה/ות נא לאשר בהקלדת הספרה 1 בלבד. תודה!"></textarea>
+          <textarea id="rem-msg-r1" rows="3" placeholder="היי {שם}! תזכורת — יש לך חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם. תודה!"></textarea>
         </div>
         <div class="form-group">
           <label>תזכורת שנייה</label>
-          <textarea id="rem-msg-r2" rows="4" placeholder="היי {שם} ⚠️ תזכורת שנייה — חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם. לאחר משיכת החבילה/ות נא לאשר בהקלדת הספרה 1 בלבד. תודה!"></textarea>
+          <textarea id="rem-msg-r2" rows="3" placeholder="היי {שם}! תזכורת שנייה — חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם. תודה!"></textarea>
         </div>
         <div class="form-group">
           <label>תזכורת שלישית</label>
-          <textarea id="rem-msg-r3" rows="4" placeholder="היי {שם} 🚨 תזכורת שלישית — חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם. לאחר משיכת החבילה/ות נא לאשר בהקלדת הספרה 1 בלבד. תודה!"></textarea>
+          <textarea id="rem-msg-r3" rows="3" placeholder="היי {שם}! תזכורת שלישית — חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם. תודה!"></textarea>
         </div>
         <div class="form-group">
           <label>תזכורת רביעית <span style="font-weight:400;text-transform:none;color:var(--yellow)">(לפני קנס)</span></label>
-          <textarea id="rem-msg-r4" rows="4" placeholder="היי {שם} ⛔ תזכורת אחרונה — חבילה כבר {ימים} ימים{תא}. ללא איסוף תחויב בקנס. לאחר משיכת החבילה/ות נא לאשר בהקלדת הספרה 1 בלבד. תודה!"></textarea>
+          <textarea id="rem-msg-r4" rows="3" placeholder="היי {שם}! תזכורת אחרונה — חבילה כבר {ימים} ימים{תא}. ללא איסוף תחויב בקנס. תודה!"></textarea>
         </div>
       </div>
     </div>
@@ -522,8 +544,7 @@ var editingResidentId = null;
 // ─── AUTH ───────────────────────────────────────────────
 function doLogout() {
   sessionStorage.clear();
-  // Redirect parent frame to login page
-  try { window.parent.location.href = './login.html'; } catch(e) { window.location.href = './login.html'; }
+  try { window.parent.postMessage({ type: 'smarta-logout' }, '*'); } catch(e) { window.location.href = './login.html'; }
 }
 
 // ─── פענוח JWT (ללא אימות חתימה — רק לUI) ───────────────
@@ -1220,11 +1241,14 @@ function loadReminders() {
     document.getElementById('rem-r4-days').value           = s.reminder4_days   || 7;
     document.getElementById('rem-fine-days').value         = s.fine_days        || 10;
     document.getElementById('rem-fine-amount').value       = s.fine_amount      || 20;
-    document.getElementById('rem-msg-arrival').value       = s.msg_arrival      || '';
-    document.getElementById('rem-msg-r1').value            = s.msg_reminder1    || '';
-    document.getElementById('rem-msg-r2').value            = s.msg_reminder2    || '';
-    document.getElementById('rem-msg-r3').value            = s.msg_reminder3    || '';
-    document.getElementById('rem-msg-r4').value            = s.msg_reminder4    || '';
+    document.getElementById('rem-msg-arrival').value               = s.msg_arrival               || '';
+    document.getElementById('rem-msg-arrival-multi').value         = s.msg_arrival_multi         || '';
+    document.getElementById('rem-msg-arrival-premium').value       = s.msg_arrival_premium       || '';
+    document.getElementById('rem-msg-arrival-multi-premium').value = s.msg_arrival_multi_premium || '';
+    document.getElementById('rem-msg-r1').value                    = s.msg_reminder1             || '';
+    document.getElementById('rem-msg-r2').value                    = s.msg_reminder2             || '';
+    document.getElementById('rem-msg-r3').value                    = s.msg_reminder3             || '';
+    document.getElementById('rem-msg-r4').value                    = s.msg_reminder4             || '';
     saveBtn.disabled = false;
     saveBtn.textContent = 'שמור הגדרות';
   }).catch(function() {
@@ -1260,11 +1284,14 @@ function saveReminders() {
     reminder4_days:    r4,
     fine_days:         fd,
     fine_amount:       fa,
-    msg_arrival:       document.getElementById('rem-msg-arrival').value.trim(),
-    msg_reminder1:     document.getElementById('rem-msg-r1').value.trim(),
-    msg_reminder2:     document.getElementById('rem-msg-r2').value.trim(),
-    msg_reminder3:     document.getElementById('rem-msg-r3').value.trim(),
-    msg_reminder4:     document.getElementById('rem-msg-r4').value.trim(),
+    msg_arrival:               document.getElementById('rem-msg-arrival').value.trim(),
+    msg_arrival_multi:         document.getElementById('rem-msg-arrival-multi').value.trim(),
+    msg_arrival_premium:       document.getElementById('rem-msg-arrival-premium').value.trim(),
+    msg_arrival_multi_premium: document.getElementById('rem-msg-arrival-multi-premium').value.trim(),
+    msg_reminder1:             document.getElementById('rem-msg-r1').value.trim(),
+    msg_reminder2:             document.getElementById('rem-msg-r2').value.trim(),
+    msg_reminder3:             document.getElementById('rem-msg-r3').value.trim(),
+    msg_reminder4:             document.getElementById('rem-msg-r4').value.trim(),
   };
 
   saveBtn.disabled = true;

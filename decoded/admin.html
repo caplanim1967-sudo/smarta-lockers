@@ -804,7 +804,7 @@ var allUsers         = [];   // beit-tafkidim cache
 
 function doLogout() {
   ['admin_token','smarta_token','smarta_user','admin_user','smarta_role'].forEach(function(k) { sessionStorage.removeItem(k); });
-  try { window.parent.location.href = './login.html'; } catch(e) { window.location.href = './login.html'; }
+  try { window.parent.postMessage({ type: 'smarta-logout' }, '*'); } catch(e) { window.location.href = './login.html'; }
 }
 
 // ─── API ──────────────────────────────────────────────────

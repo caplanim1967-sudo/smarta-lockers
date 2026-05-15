@@ -472,7 +472,7 @@
     checkDebtBanner();
   }
 
-  function doLogout() { sessionStorage.clear(); try { window.parent.location.href = "./login.html"; } catch(e) { window.location.href = "./login.html"; } }
+  function doLogout() { sessionStorage.clear(); try { window.parent.postMessage({ type: 'smarta-logout' }, '*'); } catch(e) { window.location.href = './login.html'; } }
 
   // ======= TABS =======
   function showTab(id, btn) {
