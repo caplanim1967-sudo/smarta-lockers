@@ -49,7 +49,7 @@ run(f'python "{sync_script}"')
 
 # ── 3. Git commit & push ──────────────────────────────────────────────────────
 print(f'\n[3] Git commit & push...')
-run(f'git add bundle/smarta-all-v2.html smarta-all-v2.html')
+run(f'git add bundle/smarta-all-v2.html smarta-all-v2.html index.html')
 run(f'git commit -m "{page}: {msg}"')
 run(f'git push origin main')
 

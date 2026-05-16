@@ -1,36 +1,49 @@
 """
-Copy the encoded app/admin/manager/etc from bundle/smarta-all-v2.html to root smarta-all-v2.html.
+Copy the encoded app/admin/manager/etc from bundle/smarta-all-v2.html
+to root smarta-all-v2.html AND index.html.
 Run after any reencode-*.py script.
 """
 import re, os
 
 ROOT   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUNDLE = os.path.join(ROOT, 'bundle', 'smarta-all-v2.html')
-ROOT_F = os.path.join(ROOT, 'smarta-all-v2.html')
 
 with open(BUNDLE, 'r', encoding='utf-8') as f:
     bundle = f.read()
 
-with open(ROOT_F, 'r', encoding='utf-8') as f:
-    root = f.read()
-
 keys = ['app', 'admin', 'manager', 'courier', 'finance', 'test']
-updated = 0
+
+# Build map of key → encoded value from bundle
+encoded_map = {}
 for key in keys:
     m = re.search(r'"' + key + r'"\s*:\s*"([A-Za-z0-9+/=]+)"', bundle)
-    if not m:
-        print(f'  skip {key}: not found in bundle')
-        continue
-    encoded = m.group(1)
-    pattern = r'("' + key + r'"\s*:\s*")[A-Za-z0-9+/=]+(")'
-    new_root, count = re.subn(pattern, r'\g<1>' + encoded + r'\2', root)
-    if count == 0:
-        print(f'  skip {key}: not found in root')
+    if m:
+        encoded_map[key] = m.group(1)
     else:
-        root = new_root
-        updated += 1
-        print(f'  {key}: synced ({len(encoded):,} chars)')
+        print(f'  WARNING: {key} not found in bundle')
 
-with open(ROOT_F, 'w', encoding='utf-8') as f:
-    f.write(root)
-print(f'Done — {updated} keys synced to root smarta-all-v2.html')
+# Sync to all root files
+targets = [
+    os.path.join(ROOT, 'smarta-all-v2.html'),
+    os.path.join(ROOT, 'index.html'),
+]
+
+for target_path in targets:
+    if not os.path.exists(target_path):
+        print(f'  skip {os.path.basename(target_path)}: not found')
+        continue
+    with open(target_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    updated = 0
+    for key, encoded in encoded_map.items():
+        pattern = r'("' + key + r'"\s*:\s*")[A-Za-z0-9+/=]+(")'
+        new_content, count = re.subn(pattern, r'\g<1>' + encoded + r'\2', content)
+        if count > 0:
+            content = new_content
+            updated += 1
+            print(f'  {os.path.basename(target_path)} ← {key}: {len(encoded):,} chars')
+    with open(target_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+    print(f'  {os.path.basename(target_path)}: {updated} keys synced')
+
+print('Done.')
