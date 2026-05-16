@@ -492,16 +492,36 @@ tr:hover td { background:rgba(255,255,255,0.015); }
       </div>
       <div class="form-row" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px" id="cc-new-details-row">
         <div class="form-group">
-          <label class="form-label">איש קשר</label>
-          <input class="form-input" id="cc-new-contact" placeholder="ישראל ישראלי">
-        </div>
-        <div class="form-group">
-          <label class="form-label">טלפון</label>
+          <label class="form-label">טלפון חברה</label>
           <input class="form-input" id="cc-new-phone" placeholder="050-0000000" dir="ltr" style="text-align:right">
         </div>
+        <div class="form-group" style="visibility:hidden"></div>
       </div>
+
+      <!-- פרטי מנהל ראשי -->
+      <div id="cc-manager-section" style="border-top:1px solid var(--border);margin-top:6px;padding-top:16px">
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px">👤 מנהל ראשי של החברה</div>
+        <div class="form-row" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
+          <div class="form-group">
+            <label class="form-label">שם פרטי *</label>
+            <input class="form-input" id="cc-mgr-first" placeholder="ישראל">
+          </div>
+          <div class="form-group">
+            <label class="form-label">שם משפחה</label>
+            <input class="form-input" id="cc-mgr-last" placeholder="ישראלי">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">שם משתמש לכניסה *</label>
+          <input class="form-input" id="cc-mgr-username" placeholder="mgr_magavit" dir="ltr" style="text-align:right" autocomplete="off">
+        </div>
+        <div style="background:rgba(79,142,247,0.07);border:1px solid rgba(79,142,247,0.2);border-radius:8px;padding:9px 13px;font-size:12px;color:var(--muted);margin-bottom:10px">
+          סיסמה ראשונית: <strong style="color:var(--text)">Smarta2026!</strong> — המנהל יוכל לשנות בכניסה הראשונה
+        </div>
+      </div>
+
       <div id="cc-assign-err" style="display:none;color:var(--red);font-size:12px;margin-bottom:10px"></div>
-      <button class="btn btn-primary" id="cc-assign-btn" onclick="createAndAssignCompany()">קשר חברה לישוב</button>
+      <button class="btn btn-primary" id="cc-assign-btn" onclick="createAndAssignCompany()">צור חברה ומנהל</button>
     </div>
   </div>
 
@@ -1397,14 +1417,15 @@ var _mgrCompanyId = null;  // החברה שנבחרה לניהול מנהלים 
 function showCcForm(show) {
   document.getElementById('cc-assign-card').style.display = show ? '' : 'none';
   if (show) {
-    document.getElementById('cc-new-bizid').value = '';
-    document.getElementById('cc-new-name').value  = '';
-    document.getElementById('cc-new-contact').value = '';
-    document.getElementById('cc-new-phone').value = '';
+    ['cc-new-bizid','cc-new-name','cc-new-phone','cc-mgr-first','cc-mgr-last','cc-mgr-username'].forEach(function(id) {
+      document.getElementById(id).value = '';
+    });
     document.getElementById('cc-assign-err').style.display = 'none';
     document.getElementById('cc-bizid-hint').style.display = 'none';
     document.getElementById('cc-new-name-row').style.display = '';
     document.getElementById('cc-new-details-row').style.display = '';
+    document.getElementById('cc-manager-section').style.display = '';
+    document.getElementById('cc-assign-btn').textContent = 'צור חברה ומנהל';
     setTimeout(function() { document.getElementById('cc-new-bizid').focus(); }, 50);
   }
 }
@@ -1441,7 +1462,6 @@ function loadCourierCoPage() {
         '<td ' + TD + '>' + statusBadge + '</td>' +
         '<td ' + TD + '><div style="display:flex;gap:6px;flex-wrap:wrap">' +
           '<button class="btn btn-secondary btn-sm" onclick="openEditCompanyModal(\'' + esc(c.id) + '\',\'' + esc(c.name) + '\',\'' + esc(c.business_id||'') + '\',\'' + esc(c.contact_name||'') + '\',\'' + esc(c.phone||'') + '\',' + (c.active?1:0) + ')">✏️ עריכה</button>' +
-          '<button class="btn btn-secondary btn-sm" onclick="openManagersForCompany(\'' + esc(c.id) + '\',\'' + esc(c.name) + '\')" style="color:var(--accent);border-color:rgba(79,142,247,0.4)">🪪 מנהלים</button>' +
         '</div></td>' +
       '</tr>';
     });
@@ -1474,25 +1494,34 @@ function onBizIdInput(val) {
 }
 
 function createAndAssignCompany() {
-  var bizId = document.getElementById('cc-new-bizid').value.trim();
-  var name  = document.getElementById('cc-new-name').value.trim();
-  var errEl = document.getElementById('cc-assign-err');
+  var bizId      = document.getElementById('cc-new-bizid').value.trim();
+  var name       = document.getElementById('cc-new-name').value.trim();
+  var mgrFirst   = document.getElementById('cc-mgr-first').value.trim();
+  var mgrLast    = document.getElementById('cc-mgr-last').value.trim();
+  var mgrUser    = document.getElementById('cc-mgr-username').value.trim();
+  var errEl      = document.getElementById('cc-assign-err');
   errEl.style.display = 'none';
-  if (!bizId) { errEl.textContent = 'ח.פ / עוסק מורשה הוא שדה חובה'; errEl.style.display = 'block'; return; }
-  if (!name)  { errEl.textContent = 'שם חברה הוא שדה חובה'; errEl.style.display = 'block'; return; }
+  if (!bizId)    { errEl.textContent = 'ח.פ / עוסק מורשה הוא שדה חובה'; errEl.style.display = 'block'; return; }
+  if (!name)     { errEl.textContent = 'שם חברה הוא שדה חובה'; errEl.style.display = 'block'; return; }
+  if (!mgrFirst) { errEl.textContent = 'שם פרטי של המנהל הוא שדה חובה'; errEl.style.display = 'block'; return; }
+  if (!mgrUser)  { errEl.textContent = 'שם משתמש של המנהל הוא שדה חובה'; errEl.style.display = 'block'; return; }
   var btn = document.getElementById('cc-assign-btn');
   btn.disabled = true;
   var body = {
-    business_id:  bizId,
-    name:         name,
-    contact_name: document.getElementById('cc-new-contact').value.trim(),
-    phone:        document.getElementById('cc-new-phone').value.trim()
+    business_id:        bizId,
+    name:               name,
+    phone:              document.getElementById('cc-new-phone').value.trim(),
+    manager_first_name: mgrFirst,
+    manager_last_name:  mgrLast,
+    manager_username:   mgrUser
   };
   apiPost('/api/courier-companies', body).then(function(data) {
     btn.disabled = false;
     if (data && data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
-    var msg = data.is_new ? 'חברה חדשה נוצרה וקושרה לישוב ✓' : ('חברת "' + esc(data.name) + '" קושרה לישוב ✓');
-    showToast(msg);
+    var msg = data.is_new
+      ? ('חברה "' + esc(data.name) + '" נוצרה' + (data.manager_created ? ' + מנהל "' + esc(mgrUser) + '" נוצר ✓' : ' ✓'))
+      : ('חברת "' + esc(data.name) + '" כבר קיימת — קושרה לישוב ✓');
+    showToast(msg, 5000);
     showCcForm(false);
     loadCourierCoPage();
   }).catch(function() {
@@ -1672,7 +1701,7 @@ showPage = function(name, el) {
     <hr style="border:none;border-top:1px solid var(--border);margin:0 0 16px">
 
     <!-- הוספת מנהל חדש -->
-    <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">+ הגדר משתמשים למנהלי שילוח</div>
+    <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:14px">+ הגדר משתמשים למנהלי שילוח</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-group">
         <label class="form-label">שם פרטי *</label>

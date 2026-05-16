@@ -297,6 +297,7 @@
     <button class="nav-tab manager-only" onclick="showScreen('report',this)">📋 דוח חודשי</button>
     <button class="nav-tab manager-only" onclick="showScreen('fines',this)">⚠️ קנסות</button>
     <button class="nav-tab manager-only" onclick="showScreen('couriers',this)">🚴 שליחים</button>
+    <button class="nav-tab manager-only" onclick="showScreen('managers',this)">🪪 מנהלי שילוח</button>
     <button class="nav-tab courier-only" id="tab-deposit" onclick="showScreen('deposit',this)">📦 הפקדת חבילה</button>
   </nav>
 
@@ -510,6 +511,27 @@
       </div>
     </div>
 
+    <!-- MANAGERS -->
+    <div class="screen" id="screen-managers">
+      <div class="card">
+        <div class="card-title" style="justify-content:space-between">
+          <span>🪪 מנהלי שילוח</span>
+          <button class="btn btn-primary btn-sm" onclick="openAddManager()">+ הוסף מנהל שילוח נוסף</button>
+        </div>
+        <div id="managers-err" style="display:none;color:var(--red);font-size:13px;margin-bottom:12px"></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>שם</th><th>שם משתמש</th><th>סטטוס</th><th>פעולות</th>
+            </tr></thead>
+            <tbody id="managers-tbody">
+              <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">טוען...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- COURIERS -->
     <div class="screen" id="screen-couriers">
       <div class="card">
@@ -532,6 +554,42 @@
     </div>
 
   </main>
+</div>
+
+<!-- MANAGER MODAL -->
+<div id="manager-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;width:420px;max-width:90vw">
+    <div style="font-size:16px;font-weight:700;margin-bottom:20px">הוספת מנהל שילוח נוסף</div>
+    <div id="manager-modal-err" style="display:none;color:var(--red);font-size:13px;margin-bottom:12px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <div>
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">שם פרטי *</label>
+        <input id="mgr-first" type="text" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);font-family:Heebo,sans-serif;outline:none">
+      </div>
+      <div>
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">שם משפחה</label>
+        <input id="mgr-last" type="text" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);font-family:Heebo,sans-serif;outline:none">
+      </div>
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">שם משתמש לכניסה *</label>
+      <input id="mgr-username" type="text" dir="ltr" autocomplete="off"
+        style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);font-family:monospace;outline:none;text-align:right">
+    </div>
+    <div style="background:rgba(79,142,247,0.07);border:1px solid rgba(79,142,247,0.2);border-radius:8px;padding:9px 13px;font-size:12px;color:var(--muted);margin-bottom:18px">
+      סיסמה ראשונית: <strong style="color:var(--text)">Smarta2026!</strong>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button id="mgr-save-btn" onclick="saveManager()"
+        style="flex:1;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;font-family:Heebo,sans-serif;cursor:pointer">
+        צור מנהל שילוח
+      </button>
+      <button onclick="closeManagerModal()"
+        style="flex:1;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:14px;font-weight:600;font-family:Heebo,sans-serif;cursor:pointer">
+        סגור
+      </button>
+    </div>
+  </div>
 </div>
 
 <!-- COURIER MODAL -->
@@ -1410,11 +1468,92 @@
     document.getElementById('pkg-count').textContent = 'מציג ' + rows.length + ' רשומות';
   }
 
+  // ──── מנהלי שילוח נוספים ────────────────────────────────
+  function loadManagers() {
+    var tbody = document.getElementById('managers-tbody');
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">טוען...</td></tr>';
+    var companyId = _myCompanyId();
+    if (!companyId) return;
+    _apiGet('/api/courier-companies/' + companyId + '/users').then(function(data) {
+      var mgrs = (Array.isArray(data) ? data : []).filter(function(u) { return u.role === 'courier_manager'; });
+      if (!mgrs.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">אין מנהלי שילוח נוספים</td></tr>';
+        return;
+      }
+      tbody.innerHTML = mgrs.map(function(m) {
+        var statusBadge = m.active
+          ? '<span style="background:rgba(34,197,94,0.12);color:var(--green);border:1px solid rgba(34,197,94,0.3);border-radius:10px;padding:2px 9px;font-size:11px;font-weight:700">פעיל</span>'
+          : '<span style="background:rgba(107,114,128,0.1);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:2px 9px;font-size:11px;font-weight:700">מושבת</span>';
+        return '<tr>' +
+          '<td>' + _esc((m.first_name||'') + ' ' + (m.last_name||'')) + '</td>' +
+          '<td style="font-family:monospace;direction:ltr;text-align:right">' + _esc(m.username||'') + '</td>' +
+          '<td>' + statusBadge + '</td>' +
+          '<td>' +
+            '<button onclick="toggleManagerActive(\'' + m.id + '\',' + (m.active?0:1) + ')" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:11px;padding:3px 8px;cursor:pointer">' +
+              (m.active ? 'השבת' : 'הפעל') +
+            '</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+    }).catch(function() {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--red);padding:24px">שגיאה בטעינה</td></tr>';
+    });
+  }
+
+  function openAddManager() {
+    ['mgr-first','mgr-last','mgr-username'].forEach(function(id) { document.getElementById(id).value = ''; });
+    document.getElementById('manager-modal-err').style.display = 'none';
+    document.getElementById('manager-modal').style.display = 'flex';
+    setTimeout(function() { document.getElementById('mgr-first').focus(); }, 50);
+  }
+
+  function closeManagerModal() {
+    document.getElementById('manager-modal').style.display = 'none';
+  }
+
+  function saveManager() {
+    var first    = document.getElementById('mgr-first').value.trim();
+    var last     = document.getElementById('mgr-last').value.trim();
+    var username = document.getElementById('mgr-username').value.trim();
+    var errEl    = document.getElementById('manager-modal-err');
+    errEl.style.display = 'none';
+    if (!first)    { errEl.textContent = 'שם פרטי הוא שדה חובה'; errEl.style.display = 'block'; return; }
+    if (!username) { errEl.textContent = 'שם משתמש הוא שדה חובה'; errEl.style.display = 'block'; return; }
+    var companyId = _myCompanyId();
+    if (!companyId) return;
+    var btn = document.getElementById('mgr-save-btn');
+    btn.disabled = true;
+    _apiPost('/api/courier-companies/' + companyId + '/users', {
+      first_name: first, last_name: last, username: username, role: 'courier_manager'
+    }).then(function(data) {
+      btn.disabled = false;
+      if (data && data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
+      closeManagerModal();
+      showToast('מנהל שילוח "' + username + '" נוצר ✓');
+      loadManagers();
+    }).catch(function() {
+      btn.disabled = false;
+      errEl.textContent = 'שגיאת שרת';
+      errEl.style.display = 'block';
+    });
+  }
+
+  function toggleManagerActive(id, newActive) {
+    var companyId = _myCompanyId();
+    if (!companyId) return;
+    _apiPut('/api/courier-companies/' + companyId + '/users/' + id, { active: newActive }).then(function(res) {
+      if (!res || res.error) { alert(res && res.error ? res.error : 'שגיאת תקשורת'); return; }
+      showToast(newActive ? 'מנהל הופעל ✓' : 'מנהל הושבת ✓');
+      loadManagers();
+    }).catch(function() { alert('שגיאת תקשורת'); });
+  }
+
   // טעינה בכניסה לטאב
   var _origShowScreen = showScreen;
   showScreen = function(name, el) {
     _origShowScreen(name, el);
     if (name === 'couriers') loadCouriers();
+    if (name === 'managers') loadManagers();
     if (name === 'packages') loadPackagesReport();
     if (name === 'deposit')  depReset();
   };

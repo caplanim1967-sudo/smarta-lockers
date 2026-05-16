@@ -1287,7 +1287,19 @@ async function handleCommunity(path, method, request, env, user, url) {
       ).bind(newId(), companyId_cc, communityId, user.sub, nowSec()).run();
     }
 
-    return ok({ id: companyId_cc, is_new: isNew, name: company?.name || b.name });
+    // יצירת מנהל ראשי של החברה (רק לחברה חדשה)
+    let managerCreated = false;
+    if (isNew && b.manager_username && b.manager_first_name) {
+      const mgExisting = await db.prepare('SELECT id FROM users WHERE username = ?').bind(b.manager_username).first();
+      if (mgExisting) return err('שם המשתמש של המנהל כבר קיים במערכת');
+      const hash = await sha256hex('Smarta2026!');
+      await db.prepare(
+        'INSERT INTO users (id, first_name, last_name, role, community_id, courier_company_id, username, password_hash, active) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, 1)'
+      ).bind(newId(), b.manager_first_name, b.manager_last_name || '', 'courier_manager', companyId_cc, b.manager_username, hash).run();
+      managerCreated = true;
+    }
+
+    return ok({ id: companyId_cc, is_new: isNew, name: company?.name || b.name, manager_created: managerCreated });
   }
 
   // עדכון חברת שילוח
