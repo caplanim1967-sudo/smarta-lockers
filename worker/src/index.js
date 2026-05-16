@@ -1245,7 +1245,7 @@ async function handleCommunity(path, method, request, env, user, url) {
       return ok(results);
     } else {
       const { results } = await db.prepare(
-        'SELECT cc.* FROM courier_companies cc INNER JOIN courier_company_access cca ON cca.company_id = cc.id WHERE cca.community_id = ? AND cc.active = 1 ORDER BY cc.name'
+        'SELECT cc.* FROM courier_companies cc INNER JOIN courier_company_access cca ON cca.company_id = cc.id WHERE cca.community_id = ? ORDER BY cc.name'
       ).bind(communityId).all();
       return ok(results);
     }
