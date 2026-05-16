@@ -250,9 +250,15 @@ body {
       <div style="color:var(--green);font-size:12px;margin-bottom:10px">✅ קוד נשלח לנייד הרשום — בתוקף 10 דקות</div>
       <label>קוד אימות (6 ספרות)</label>
       <input type="text" id="forgot-otp" dir="ltr" maxlength="6" placeholder="123456" inputmode="numeric" style="letter-spacing:4px;font-size:18px;text-align:center">
-      <label style="margin-top:10px">סיסמה חדשה (לפחות 8 תווים)</label>
-      <input type="password" id="forgot-newpass" placeholder="סיסמה חדשה" style="margin-bottom:4px">
-      <input type="password" id="forgot-newpass2" placeholder="אימות סיסמה">
+      <label style="margin-top:10px">סיסמה חדשה</label>
+      <div class="pass-wrap" style="margin-bottom:6px">
+        <input type="password" id="forgot-newpass" placeholder="סיסמה חדשה">
+        <button type="button" class="pass-eye" id="fp-eye1" onclick="togglePass('forgot-newpass','fp-eye1')" title="הצג/הסתר">👁</button>
+      </div>
+      <div class="pass-wrap">
+        <input type="password" id="forgot-newpass2" placeholder="אימות סיסמה">
+        <button type="button" class="pass-eye" id="fp-eye2" onclick="togglePass('forgot-newpass2','fp-eye2')" title="הצג/הסתר">👁</button>
+      </div>
       <button class="btn-send" style="margin-top:10px" onclick="confirmReset()">אפס סיסמה ✓</button>
       <div style="color:var(--red);font-size:12px;margin-top:8px;display:none" id="forgot-err2"></div>
       <div style="color:var(--muted);font-size:11px;margin-top:8px;text-align:center;cursor:pointer;text-decoration:underline" onclick="resetForgotPanel()">לא קיבלתי — שלח שוב</div>
@@ -263,13 +269,25 @@ body {
   <div id="must-change-panel" style="display:none;margin-top:16px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:18px">
     <div style="font-size:14px;font-weight:700;color:#f59e0b;margin-bottom:4px">🔑 נדרש שינוי סיסמה</div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:14px">זוהי כניסתך הראשונה. יש לבחור סיסמה אישית לפני הכניסה למערכת.</div>
-    <div class="form-group" style="margin-bottom:10px">
-      <label>סיסמה חדשה (לפחות 8 תווים)</label>
-      <input type="password" id="mcp-pass1" placeholder="בחר סיסמה חדשה">
+    <div class="form-group" style="margin-bottom:6px">
+      <label>סיסמה חדשה</label>
+      <div class="pass-wrap">
+        <input type="password" id="mcp-pass1" placeholder="בחר סיסמה חדשה" oninput="updatePassReqs(this.value)">
+        <button type="button" class="pass-eye" id="mcp-eye1" onclick="togglePass('mcp-pass1','mcp-eye1')" title="הצג/הסתר">👁</button>
+      </div>
+      <!-- דרישות סיסמה -->
+      <div id="mcp-reqs" style="margin-top:8px;font-size:11px;line-height:1.8">
+        <div id="req-len"    style="color:var(--muted)">○ לפחות 8 תווים</div>
+        <div id="req-letter" style="color:var(--muted)">○ לפחות אות אחת</div>
+        <div id="req-digit"  style="color:var(--muted)">○ לפחות ספרה אחת (0–9)</div>
+      </div>
     </div>
-    <div class="form-group" style="margin-bottom:12px">
+    <div class="form-group" style="margin-bottom:12px;margin-top:10px">
       <label>אימות סיסמה</label>
-      <input type="password" id="mcp-pass2" placeholder="הכנס שוב את הסיסמה">
+      <div class="pass-wrap">
+        <input type="password" id="mcp-pass2" placeholder="הכנס שוב את הסיסמה">
+        <button type="button" class="pass-eye" id="mcp-eye2" onclick="togglePass('mcp-pass2','mcp-eye2')" title="הצג/הסתר">👁</button>
+      </div>
     </div>
     <div style="color:var(--red);font-size:12px;margin-bottom:10px;display:none" id="mcp-err"></div>
     <button class="btn-login" onclick="doMustChangePassword()">שמור וכנס למערכת</button>
@@ -308,6 +326,31 @@ function toggleLoginEye() {
   var btn = document.getElementById('login-eye');
   inp.type = inp.type === 'password' ? 'text' : 'password';
   btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+}
+
+function togglePass(inputId, btnId) {
+  var inp = document.getElementById(inputId);
+  var btn = document.getElementById(btnId);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+}
+
+function updatePassReqs(val) {
+  var checks = [
+    { id: 'req-len',    ok: val.length >= 8,           label: 'לפחות 8 תווים' },
+    { id: 'req-letter', ok: /[a-zA-Zא-ת]/.test(val),  label: 'לפחות אות אחת' },
+    { id: 'req-digit',  ok: /[0-9]/.test(val),         label: 'לפחות ספרה אחת (0–9)' },
+  ];
+  checks.forEach(function(c) {
+    var el = document.getElementById(c.id);
+    if (!el) return;
+    el.textContent = (c.ok ? '✓ ' : '○ ') + c.label;
+    el.style.color = c.ok ? '#22c55e' : '';
+  });
+}
+
+function passIsValid(val) {
+  return val.length >= 8 && /[a-zA-Zא-ת]/.test(val) && /[0-9]/.test(val);
 }
 
 function toggleForgot() {
@@ -429,8 +472,8 @@ function confirmReset() {
   var errEl = document.getElementById('forgot-err2');
   errEl.style.display = 'none';
   if (!otp || otp.length !== 6) { errEl.textContent = 'הכנס קוד בן 6 ספרות'; errEl.style.display = 'block'; return; }
-  if (pass1.length < 8)  { errEl.textContent = 'סיסמה חייבת להכיל לפחות 8 תווים'; errEl.style.display = 'block'; return; }
-  if (pass1 !== pass2)   { errEl.textContent = 'הסיסמאות אינן תואמות'; errEl.style.display = 'block'; return; }
+  if (!passIsValid(pass1)) { errEl.textContent = 'הסיסמה אינה עומדת בדרישות המינימום (8 תווים, אות, ספרה)'; errEl.style.display = 'block'; return; }
+  if (pass1 !== pass2)     { errEl.textContent = 'הסיסמאות אינן תואמות'; errEl.style.display = 'block'; return; }
   fetch(API_BASE + '/api/auth/reset-password', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -456,8 +499,8 @@ function doMustChangePassword() {
   var pass2 = document.getElementById('mcp-pass2').value;
   var errEl = document.getElementById('mcp-err');
   errEl.style.display = 'none';
-  if (pass1.length < 8) { errEl.textContent = 'סיסמה חייבת להכיל לפחות 8 תווים'; errEl.style.display = 'block'; return; }
-  if (pass1 !== pass2)  { errEl.textContent = 'הסיסמאות אינן תואמות'; errEl.style.display = 'block'; return; }
+  if (!passIsValid(pass1)) { errEl.textContent = 'הסיסמה אינה עומדת בדרישות המינימום (8 תווים, אות, ספרה)'; errEl.style.display = 'block'; return; }
+  if (pass1 !== pass2)     { errEl.textContent = 'הסיסמאות אינן תואמות'; errEl.style.display = 'block'; return; }
   fetch(API_BASE + '/api/auth/change-password', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + _mustChangeToken },
