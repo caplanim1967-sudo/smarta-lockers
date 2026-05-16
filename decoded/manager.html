@@ -507,7 +507,7 @@ tr:hover td { background:rgba(255,255,255,0.015); }
             <input class="form-input" id="cc-mgr-first" placeholder="ישראל">
           </div>
           <div class="form-group">
-            <label class="form-label">שם משפחה</label>
+            <label class="form-label">שם משפחה *</label>
             <input class="form-input" id="cc-mgr-last" placeholder="ישראלי">
           </div>
         </div>
@@ -1503,7 +1503,8 @@ function createAndAssignCompany() {
   errEl.style.display = 'none';
   if (!bizId)    { errEl.textContent = 'ח.פ / עוסק מורשה הוא שדה חובה'; errEl.style.display = 'block'; return; }
   if (!name)     { errEl.textContent = 'שם חברה הוא שדה חובה'; errEl.style.display = 'block'; return; }
-  if (!mgrFirst) { errEl.textContent = 'שם פרטי של המנהל הוא שדה חובה'; errEl.style.display = 'block'; return; }
+  if (!mgrFirst) { errEl.textContent = 'שם פרטי של המנהל הוא שדה חובה';   errEl.style.display = 'block'; return; }
+  if (!mgrLast)  { errEl.textContent = 'שם משפחה של המנהל הוא שדה חובה'; errEl.style.display = 'block'; return; }
   if (!mgrUser)  { errEl.textContent = 'שם משתמש של המנהל הוא שדה חובה'; errEl.style.display = 'block'; return; }
   var btn = document.getElementById('cc-assign-btn');
   btn.disabled = true;
@@ -1605,17 +1606,49 @@ function openEditCompanyModal(id, name, bizId, contact, phone, active) {
   chk.checked = (active !== 0 && active !== '0' && active !== false);
   document.getElementById('ec-status-label').textContent = chk.checked ? 'פעילה' : 'מושבתת — שליחים לא יוכלו להתחבר';
   document.getElementById('ec-err').style.display = 'none';
+  document.getElementById('ec-add-manager-form').style.display = 'none';
+  document.getElementById('ec-manager-status').textContent = 'בודק מנהל...';
+  ['ec-mgr-first','ec-mgr-last','ec-mgr-username'].forEach(function(f){ document.getElementById(f).value=''; });
   openModal('edit-company-modal');
+  // טען מנהלים — בדוק אם יש courier_manager
+  apiGet('/api/courier-companies/' + id + '/users').then(function(users) {
+    var mgr = (users || []).find(function(u) { return u.role === 'courier_manager' && u.active; });
+    if (mgr) {
+      document.getElementById('ec-manager-status').innerHTML =
+        '👤 מנהל ראשי: <strong>' + esc((mgr.first_name||'') + ' ' + (mgr.last_name||'')) + '</strong>' +
+        ' <span style="font-family:monospace;color:var(--accent)">(' + esc(mgr.username||'') + ')</span>';
+      document.getElementById('ec-add-manager-form').style.display = 'none';
+    } else {
+      document.getElementById('ec-manager-status').innerHTML =
+        '<span style="color:var(--yellow)">⚠️ אין מנהל ראשי — הגדר אחד:</span>';
+      document.getElementById('ec-add-manager-form').style.display = '';
+    }
+  }).catch(function() {
+    document.getElementById('ec-manager-status').textContent = '';
+  });
 }
 
 function saveEditCompany() {
-  var id    = document.getElementById('ec-id').value;
-  var bizId = document.getElementById('ec-bizid').value.trim();
-  var name  = document.getElementById('ec-name').value.trim();
-  var errEl = document.getElementById('ec-err');
+  var id       = document.getElementById('ec-id').value;
+  var bizId    = document.getElementById('ec-bizid').value.trim();
+  var name     = document.getElementById('ec-name').value.trim();
+  var errEl    = document.getElementById('ec-err');
   errEl.style.display = 'none';
   if (!bizId) { errEl.textContent = 'ח.פ / עוסק מורשה הוא שדה חובה'; errEl.style.display = 'block'; return; }
   if (!name)  { errEl.textContent = 'שם חברה הוא שדה חובה'; errEl.style.display = 'block'; return; }
+
+  // אם מוצג טופס מנהל — ודא שדות
+  var addMgrForm = document.getElementById('ec-add-manager-form');
+  var mgrFirst = '', mgrLast = '', mgrUser = '';
+  if (addMgrForm.style.display !== 'none') {
+    mgrFirst = document.getElementById('ec-mgr-first').value.trim();
+    mgrLast  = document.getElementById('ec-mgr-last').value.trim();
+    mgrUser  = document.getElementById('ec-mgr-username').value.trim();
+    if (!mgrFirst) { errEl.textContent = 'שם פרטי של המנהל הוא שדה חובה'; errEl.style.display = 'block'; return; }
+    if (!mgrLast)  { errEl.textContent = 'שם משפחה של המנהל הוא שדה חובה'; errEl.style.display = 'block'; return; }
+    if (!mgrUser)  { errEl.textContent = 'שם משתמש של המנהל הוא שדה חובה'; errEl.style.display = 'block'; return; }
+  }
+
   var body = {
     business_id:  bizId,
     name:         name,
@@ -1623,8 +1656,20 @@ function saveEditCompany() {
     phone:        document.getElementById('ec-phone').value.trim(),
     active:       document.getElementById('ec-active').checked ? 1 : 0
   };
+
   apiPut('/api/courier-companies/' + id, body).then(function(data) {
     if (data && data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
+    // אם יש מנהל להוסיף — צור אותו
+    if (mgrFirst && mgrUser) {
+      return apiPost('/api/courier-companies/' + id + '/users', {
+        first_name: mgrFirst, last_name: mgrLast, username: mgrUser, role: 'courier_manager'
+      }).then(function(mgrData) {
+        if (mgrData && mgrData.error) { errEl.textContent = mgrData.error; errEl.style.display = 'block'; return; }
+        closeModal('edit-company-modal');
+        showToast('חברה עודכנה + מנהל "' + esc(mgrUser) + '" נוצר ✓', 5000);
+        loadCourierCoPage();
+      });
+    }
     closeModal('edit-company-modal');
     showToast('פרטי החברה עודכנו ✓');
     loadCourierCoPage();
@@ -1632,6 +1677,21 @@ function saveEditCompany() {
     errEl.textContent = 'שגיאת שרת';
     errEl.style.display = 'block';
   });
+}
+
+function removeCompanyFromCommunity() {
+  var id   = document.getElementById('ec-id').value;
+  var name = document.getElementById('ec-name').value;
+  if (!confirm('הסר את "' + name + '" מהישוב?\nהחברה תישאר במערכת אך לא תשרת את הישוב הזה יותר.')) return;
+  var _user = JSON.parse(sessionStorage.getItem('manager_user') || sessionStorage.getItem('smarta_user') || 'null');
+  var communityId = _user && _user.community_id;
+  if (!communityId) { alert('לא נמצא מזהה ישוב'); return; }
+  apiDelete('/api/courier-companies/' + id + '/access/' + communityId).then(function(data) {
+    if (data && data.error) { alert(data.error); return; }
+    closeModal('edit-company-modal');
+    showToast('החברה הוסרה מהישוב ✓');
+    loadCourierCoPage();
+  }).catch(function() { alert('שגיאת שרת'); });
 }
 
 // טעינה בכניסה לדף
@@ -1682,10 +1742,38 @@ showPage = function(name, el) {
       #ec-active:checked + span { background: var(--green); }
       #ec-active:checked + span + span { right: auto; left: 3px; }
     </style>
+    <!-- סטטוס מנהל ראשי -->
+    <div id="ec-manager-section" style="border-top:1px solid var(--border);margin-top:14px;padding-top:14px">
+      <div id="ec-manager-status" style="font-size:12px;color:var(--muted);margin-bottom:10px">בודק מנהל...</div>
+      <div id="ec-add-manager-form" style="display:none">
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">👤 הגדר מנהל ראשי לחברה</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div class="form-group">
+            <label class="form-label">שם פרטי *</label>
+            <input class="form-input" id="ec-mgr-first" placeholder="ישראל">
+          </div>
+          <div class="form-group">
+            <label class="form-label">שם משפחה *</label>
+            <input class="form-input" id="ec-mgr-last" placeholder="ישראלי">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">שם משתמש *</label>
+          <input class="form-input" id="ec-mgr-username" placeholder="mgr_magavit" dir="ltr" style="text-align:right" autocomplete="off">
+        </div>
+        <div style="background:rgba(79,142,247,0.07);border:1px solid rgba(79,142,247,0.2);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--muted);margin-bottom:10px">
+          סיסמה ראשונית: <strong style="color:var(--text)">Smarta2026!</strong>
+        </div>
+      </div>
+    </div>
+
     <div id="ec-err" style="display:none;color:var(--red);font-size:12px;margin-top:10px;margin-bottom:4px"></div>
-    <div style="display:flex;gap:10px;margin-top:12px">
-      <button class="btn btn-primary" style="flex:1" onclick="saveEditCompany()">שמור שינויים</button>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn btn-primary" style="flex:2" onclick="saveEditCompany()">שמור שינויים</button>
       <button class="btn btn-secondary" style="flex:1" onclick="closeModal('edit-company-modal')">ביטול</button>
+    </div>
+    <div style="margin-top:10px;text-align:center">
+      <button onclick="removeCompanyFromCommunity()" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;text-decoration:underline">הסר חברה מהישוב</button>
     </div>
   </div>
 </div>
