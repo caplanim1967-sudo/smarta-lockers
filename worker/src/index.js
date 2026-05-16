@@ -408,6 +408,7 @@ async function handleLogin(request, env) {
     name:                 payload.name,
     community_name:       communityName,
     community_id:         user.community_id || null,
+    courier_company_id:   companyId || null,
     must_change_password: mustChangePassword,
   });
 }
