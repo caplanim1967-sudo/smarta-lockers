@@ -238,10 +238,41 @@ body {
   <span class="forgot-link" onclick="toggleForgot()">שכחתי שם משתמש / סיסמה</span>
 
   <div class="forgot-panel" id="forgot-panel">
-    <label>שם משתמש או מספר נייד</label>
-    <input type="text" id="forgot-input" dir="ltr" placeholder="הכנס שם משתמש או נייד">
-    <button class="btn-send" onclick="sendForgot()">שלח לאיפוס →</button>
-    <div class="forgot-ok" id="forgot-ok">✅ אם הפרטים קיימים במערכת — תשלח הודעה לנייד הרשום</div>
+    <!-- שלב 1: שם משתמש / טלפון -->
+    <div id="forgot-step1">
+      <label>שם משתמש או מספר נייד</label>
+      <input type="text" id="forgot-input" dir="ltr" placeholder="הכנס שם משתמש או נייד">
+      <button class="btn-send" onclick="sendForgot()">שלח קוד SMS →</button>
+      <div style="color:var(--red);font-size:12px;margin-top:8px;display:none" id="forgot-err1"></div>
+    </div>
+    <!-- שלב 2: קוד OTP + סיסמה חדשה -->
+    <div id="forgot-step2" style="display:none">
+      <div style="color:var(--green);font-size:12px;margin-bottom:10px">✅ קוד נשלח לנייד הרשום — בתוקף 10 דקות</div>
+      <label>קוד אימות (6 ספרות)</label>
+      <input type="text" id="forgot-otp" dir="ltr" maxlength="6" placeholder="123456" inputmode="numeric" style="letter-spacing:4px;font-size:18px;text-align:center">
+      <label style="margin-top:10px">סיסמה חדשה (לפחות 8 תווים)</label>
+      <input type="password" id="forgot-newpass" placeholder="סיסמה חדשה" style="margin-bottom:4px">
+      <input type="password" id="forgot-newpass2" placeholder="אימות סיסמה">
+      <button class="btn-send" style="margin-top:10px" onclick="confirmReset()">אפס סיסמה ✓</button>
+      <div style="color:var(--red);font-size:12px;margin-top:8px;display:none" id="forgot-err2"></div>
+      <div style="color:var(--muted);font-size:11px;margin-top:8px;text-align:center;cursor:pointer;text-decoration:underline" onclick="resetForgotPanel()">לא קיבלתי — שלח שוב</div>
+    </div>
+  </div>
+
+  <!-- שלב שינוי סיסמה חובה (כניסה ראשונה) -->
+  <div id="must-change-panel" style="display:none;margin-top:16px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:18px">
+    <div style="font-size:14px;font-weight:700;color:#f59e0b;margin-bottom:4px">🔑 נדרש שינוי סיסמה</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">זוהי כניסתך הראשונה. יש לבחור סיסמה אישית לפני הכניסה למערכת.</div>
+    <div class="form-group" style="margin-bottom:10px">
+      <label>סיסמה חדשה (לפחות 8 תווים)</label>
+      <input type="password" id="mcp-pass1" placeholder="בחר סיסמה חדשה">
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label>אימות סיסמה</label>
+      <input type="password" id="mcp-pass2" placeholder="הכנס שוב את הסיסמה">
+    </div>
+    <div style="color:var(--red);font-size:12px;margin-bottom:10px;display:none" id="mcp-err"></div>
+    <button class="btn-login" onclick="doMustChangePassword()">שמור וכנס למערכת</button>
   </div>
 
   <div class="card-footer">
@@ -356,18 +387,94 @@ function tryLocalLogin(username, password, errBox, btn) {
   }
 }
 
+var _forgotIdentifier = '';
+var _mustChangeToken = '';
+var _mustChangeRole = '';
+var _mustChangeUser = null;
+
+function resetForgotPanel() {
+  document.getElementById('forgot-step1').style.display = '';
+  document.getElementById('forgot-step2').style.display = 'none';
+  document.getElementById('forgot-otp').value = '';
+  document.getElementById('forgot-newpass').value = '';
+  document.getElementById('forgot-newpass2').value = '';
+  document.getElementById('forgot-err1').style.display = 'none';
+  document.getElementById('forgot-err2').style.display = 'none';
+  document.getElementById('forgot-input').value = '';
+  _forgotIdentifier = '';
+}
+
 function sendForgot() {
   var val = (document.getElementById('forgot-input').value || '').trim();
-  if (!val) return;
-  var okEl = document.getElementById('forgot-ok');
+  var errEl = document.getElementById('forgot-err1');
+  errEl.style.display = 'none';
+  if (!val) { errEl.textContent = 'יש להזין שם משתמש או מספר נייד'; errEl.style.display = 'block'; return; }
+  _forgotIdentifier = val;
   fetch(API_BASE + '/api/auth/forgot-password', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ identifier: val })
   }).catch(function(){}).finally(function() {
-    // Always show success message — don't reveal if user exists
-    okEl.style.display = 'block';
-    document.getElementById('forgot-input').value = '';
+    // תמיד מראים שלב 2 — לא מגלים אם משתמש קיים
+    document.getElementById('forgot-step1').style.display = 'none';
+    document.getElementById('forgot-step2').style.display = '';
+    setTimeout(function() { document.getElementById('forgot-otp').focus(); }, 50);
+  });
+}
+
+function confirmReset() {
+  var otp   = (document.getElementById('forgot-otp').value || '').trim();
+  var pass1 = document.getElementById('forgot-newpass').value;
+  var pass2 = document.getElementById('forgot-newpass2').value;
+  var errEl = document.getElementById('forgot-err2');
+  errEl.style.display = 'none';
+  if (!otp || otp.length !== 6) { errEl.textContent = 'הכנס קוד בן 6 ספרות'; errEl.style.display = 'block'; return; }
+  if (pass1.length < 8)  { errEl.textContent = 'סיסמה חייבת להכיל לפחות 8 תווים'; errEl.style.display = 'block'; return; }
+  if (pass1 !== pass2)   { errEl.textContent = 'הסיסמאות אינן תואמות'; errEl.style.display = 'block'; return; }
+  fetch(API_BASE + '/api/auth/reset-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identifier: _forgotIdentifier, otp: otp, password: pass1 })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data && data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
+    // הצלחה — סגור פאנל + הצג הודעה
+    document.getElementById('forgot-panel').classList.remove('open');
+    resetForgotPanel();
+    var errBox = document.getElementById('err-box');
+    errBox.style.background = 'rgba(34,197,94,0.1)';
+    errBox.style.borderColor = 'rgba(34,197,94,0.3)';
+    errBox.style.color = 'var(--green)';
+    errBox.textContent = '✅ הסיסמה אופסה בהצלחה — כעת ניתן להתחבר';
+    errBox.style.display = 'block';
+  }).catch(function() {
+    errEl.textContent = 'שגיאת תקשורת — נסה שוב'; errEl.style.display = 'block';
+  });
+}
+
+function doMustChangePassword() {
+  var pass1 = document.getElementById('mcp-pass1').value;
+  var pass2 = document.getElementById('mcp-pass2').value;
+  var errEl = document.getElementById('mcp-err');
+  errEl.style.display = 'none';
+  if (pass1.length < 8) { errEl.textContent = 'סיסמה חייבת להכיל לפחות 8 תווים'; errEl.style.display = 'block'; return; }
+  if (pass1 !== pass2)  { errEl.textContent = 'הסיסמאות אינן תואמות'; errEl.style.display = 'block'; return; }
+  fetch(API_BASE + '/api/auth/change-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + _mustChangeToken },
+    body: JSON.stringify({ password: pass1 })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data && data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
+    // עדכון must_change_password בsessionStorage
+    if (_mustChangeUser) {
+      _mustChangeUser.must_change_password = false;
+      sessionStorage.setItem('smarta_user', JSON.stringify(_mustChangeUser));
+      var role = _mustChangeUser.role;
+      var roleKey = role === 'community_manager' ? 'manager' : (role === 'mail_manager' ? 'app' : (role === 'courier' || role === 'courier_manager' ? 'courier' : role));
+      if (roleKey) sessionStorage.setItem(roleKey + '_user', JSON.stringify(_mustChangeUser));
+    }
+    window.location.href = './smarta-all-v2.html#' + (ROLE_TAB[_mustChangeRole] || 'app');
+  }).catch(function() {
+    errEl.textContent = 'שגיאת תקשורת — נסה שוב'; errEl.style.display = 'block';
   });
 }
 
@@ -430,12 +537,36 @@ function doLogin() {
 
     var role = data.role;
     var user = {
-      full_name:           data.name || username,
-      username:            username,
-      role:                role,
-      community_name:      data.community_name || '',
+      full_name:            data.name || username,
+      username:             username,
+      role:                 role,
+      community_name:       data.community_name || '',
+      community_id:         data.community_id || null,
+      courier_company_id:   data.courier_company_id || null,
       must_change_password: data.must_change_password || false
     };
+
+    // ── אם חייב לשנות סיסמה — עצור כאן ─────────────────
+    if (data.must_change_password) {
+      _mustChangeToken = data.token;
+      _mustChangeRole  = role;
+      _mustChangeUser  = user;
+      // שמור session (עם must_change_password=true) כך שאחרי שינוי הסיסמה אפשר להמשיך
+      sessionStorage.clear();
+      sessionStorage.setItem('smarta_token', data.token);
+      sessionStorage.setItem('smarta_role',  role);
+      sessionStorage.setItem('smarta_user',  JSON.stringify(user));
+      sessionStorage.setItem('smarta_tabs',  JSON.stringify(ROLE_TABS[role] || ['app']));
+      var t2 = data.token, u2 = JSON.stringify(user);
+      if (role === 'community_manager') { sessionStorage.setItem('manager_token', t2); sessionStorage.setItem('manager_user', u2); }
+      if (role === 'mail_manager')      { sessionStorage.setItem('app_token', t2);     sessionStorage.setItem('app_user', u2); }
+      if (role === 'courier' || role === 'courier_manager') { sessionStorage.setItem('courier_token', t2); sessionStorage.setItem('courier_user', u2); }
+      if (role === 'smarta_admin') { ['admin','manager','app','courier','finance'].forEach(function(k) { sessionStorage.setItem(k+'_token',t2); sessionStorage.setItem(k+'_user',u2); }); }
+      btn.disabled = false; btn.textContent = 'כניסה למערכת';
+      document.getElementById('must-change-panel').style.display = '';
+      document.getElementById('mcp-pass1').focus();
+      return;
+    }
 
     // ── Clear previous session, then set new one ─────────
     sessionStorage.clear();

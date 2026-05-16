@@ -228,8 +228,38 @@ export default {
       }
 
       if (path === '/api/auth/forgot-password' && method === 'POST') {
-        // Twilio integration pending
-        return ok({ message: 'אם המשתמש קיים — תישלח הודעת SMS' });
+        const b = await request.json().catch(() => ({}));
+        const identifier = (b.identifier || '').trim();
+        if (!identifier) return ok({ sent: false });
+        const db = env.smarta_db;
+        // חיפוש לפי שם משתמש או טלפון
+        let u = await db.prepare('SELECT id, phone FROM users WHERE username = ? AND active = 1').bind(identifier).first();
+        if (!u) u = await db.prepare('SELECT id, phone FROM users WHERE phone = ? AND active = 1').bind(identifier).first();
+        // תמיד מחזירים ok — לא מגלים אם משתמש קיים
+        if (!u || !u.phone) return ok({ sent: true });
+        const otp = String(Math.floor(100000 + Math.random() * 900000));
+        const expires = nowSec() + 600; // 10 דקות
+        await db.prepare('UPDATE users SET reset_otp = ?, reset_otp_expires = ? WHERE id = ?')
+          .bind(otp, expires, u.id).run();
+        await sendMessage(u.phone, `קוד איפוס סיסמה Smarta: ${otp} — בתוקף ל-10 דקות`, 'sms', env);
+        return ok({ sent: true });
+      }
+
+      if (path === '/api/auth/reset-password' && method === 'POST') {
+        const b = await request.json().catch(() => ({}));
+        const { identifier, otp, password } = b;
+        if (!identifier || !otp || !password) return err('חסרים שדות');
+        if (password.length < 8) return err('סיסמה חייבת להכיל לפחות 8 תווים');
+        const db = env.smarta_db;
+        let u = await db.prepare('SELECT id, reset_otp, reset_otp_expires FROM users WHERE username = ? AND active = 1').bind(identifier).first();
+        if (!u) u = await db.prepare('SELECT id, reset_otp, reset_otp_expires FROM users WHERE phone = ? AND active = 1').bind(identifier).first();
+        if (!u || !u.reset_otp) return err('קוד לא נמצא — בקש קוד חדש');
+        if (nowSec() > (u.reset_otp_expires || 0)) return err('הקוד פג תוקף — בקש קוד חדש');
+        if (String(otp).trim() !== String(u.reset_otp)) return err('קוד שגוי');
+        const hash = await sha256hex(password);
+        await db.prepare('UPDATE users SET password_hash = ?, password_changed_at = ?, reset_otp = NULL, reset_otp_expires = NULL WHERE id = ?')
+          .bind(hash, nowSec(), u.id).run();
+        return ok({ reset: true });
       }
 
       // ── שינוי סיסמה (כניסה ראשונה) ────────────────────────
