@@ -41,7 +41,7 @@ for target_path in targets:
         if count > 0:
             content = new_content
             updated += 1
-            print(f'  {os.path.basename(target_path)} ← {key}: {len(encoded):,} chars')
+            print(f'  {os.path.basename(target_path)} <- {key}: {len(encoded):,} chars')
     with open(target_path, 'w', encoding='utf-8') as f:
         f.write(content)
     print(f'  {os.path.basename(target_path)}: {updated} keys synced')
