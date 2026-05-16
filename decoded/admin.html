@@ -637,7 +637,7 @@ textarea{resize:vertical;min-height:80px;}
     <div class="feature-row">
       <div>
         <div class="feature-label">📱 SMS / WhatsApp</div>
-        <div class="feature-desc">שליחת הודעות אוטומטיות לדיירים דרך Twilio</div>
+        <div class="feature-desc">שליחת הודעות אוטומטיות לדיירים</div>
       </div>
       <label class="toggle-switch">
         <input type="checkbox" id="feat-sms">
@@ -861,6 +861,7 @@ function showPage(name, el) {
   else { stopMonitoringAutoRefresh(); }
   if (name === 'payments')   { renderPayments(); }
   if (name === 'locker-builder') { populateBuilderComm(); loadBuilderFromStorage(); buildColConfig(); buildLocker(); }
+  if (name === 'couriers')      { loadCourierCompanies(); }
 }
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
