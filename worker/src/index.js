@@ -268,10 +268,13 @@ export default {
         if (!authUser) return unauthorized();
         const b = await request.json().catch(() => ({}));
         if (!b.password || b.password.length < 8) return err('סיסמה חייבת להכיל לפחות 8 תווים');
-        const hash = await sha256hex(b.password);
+        const newHash = await sha256hex(b.password);
+        // מניעת שימוש חוזר בסיסמה הקיימת
+        const cur = await env.smarta_db.prepare('SELECT password_hash FROM users WHERE id = ?').bind(authUser.sub).first();
+        if (cur && cur.password_hash === newHash) return err('לא ניתן לבחור את הסיסמה הקיימת — יש לבחור סיסמה חדשה');
         await env.smarta_db.prepare(
           'UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?'
-        ).bind(hash, nowSec(), authUser.sub).run();
+        ).bind(newHash, nowSec(), authUser.sub).run();
         return ok({ changed: true });
       }
 
@@ -1271,12 +1274,22 @@ async function handleCommunity(path, method, request, env, user, url) {
     if (!ccRoles.includes(user.role)) return forbidden();
     if (user.role === 'smarta_admin') {
       const { results } = await db.prepare(
-        'SELECT cc.*, GROUP_CONCAT(cca.community_id) as communities FROM courier_companies cc LEFT JOIN courier_company_access cca ON cca.company_id = cc.id GROUP BY cc.id ORDER BY cc.name'
+        `SELECT cc.*, GROUP_CONCAT(cca.community_id) as communities,
+          u.first_name as mgr_first_name, u.last_name as mgr_last_name, u.username as mgr_username, u.phone as mgr_phone
+         FROM courier_companies cc
+         LEFT JOIN courier_company_access cca ON cca.company_id = cc.id
+         LEFT JOIN users u ON u.courier_company_id = cc.id AND u.role = 'courier_manager' AND u.active = 1
+         GROUP BY cc.id ORDER BY cc.name`
       ).all();
       return ok(results);
     } else {
       const { results } = await db.prepare(
-        'SELECT cc.* FROM courier_companies cc INNER JOIN courier_company_access cca ON cca.company_id = cc.id WHERE cca.community_id = ? ORDER BY cc.name'
+        `SELECT cc.*,
+          u.first_name as mgr_first_name, u.last_name as mgr_last_name, u.username as mgr_username, u.phone as mgr_phone
+         FROM courier_companies cc
+         INNER JOIN courier_company_access cca ON cca.company_id = cc.id
+         LEFT JOIN users u ON u.courier_company_id = cc.id AND u.role = 'courier_manager' AND u.active = 1
+         WHERE cca.community_id = ? ORDER BY cc.name`
       ).bind(communityId).all();
       return ok(results);
     }
@@ -1325,8 +1338,8 @@ async function handleCommunity(path, method, request, env, user, url) {
       if (mgExisting) return err('שם המשתמש של המנהל כבר קיים במערכת');
       const hash = await sha256hex('Smarta2026!');
       await db.prepare(
-        'INSERT INTO users (id, first_name, last_name, role, community_id, courier_company_id, username, password_hash, active) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, 1)'
-      ).bind(newId(), b.manager_first_name, b.manager_last_name || '', 'courier_manager', companyId_cc, b.manager_username, hash).run();
+        'INSERT INTO users (id, first_name, last_name, role, community_id, courier_company_id, username, password_hash, phone, active) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, 1)'
+      ).bind(newId(), b.manager_first_name, b.manager_last_name || '', 'courier_manager', companyId_cc, b.manager_username, hash, b.manager_phone || null).run();
       managerCreated = true;
     }
 

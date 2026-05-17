@@ -454,6 +454,7 @@
     letter-spacing: 0.5px;
     border-bottom: 1px solid var(--border);
   }
+  th.th-center { text-align: center !important; }
 
   td {
     padding: 12px 14px;
@@ -812,15 +813,14 @@
   <!-- HISTORY -->
   <div class="screen" id="screen-history">
     <div class="card">
-      <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
         <span>📋 היסטוריית פעולות</span>
-        <div style="display:flex;gap:8px">
-          <input type="text" id="hist-search" placeholder="חיפוש חופשי בכל העמודות..." style="font-size:12px;padding:6px 12px;width:220px" oninput="filterHistory(this.value)">
-          <select style="font-size:12px;padding:6px 10px">
-            <option>כל הפעולות</option>
-            <option>הגיעה חבילה</option>
-            <option>נאספה</option>
-            <option>תזכורת נשלחה</option>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input type="text" id="hist-search" placeholder="חיפוש חופשי..." style="font-size:12px;padding:6px 12px;width:180px" oninput="filterAndRenderHistory()">
+          <select id="hist-status-filter" style="font-size:12px;padding:6px 10px" onchange="filterAndRenderHistory()">
+            <option value="">כל הסטטוסים</option>
+            <option value="ממתינה">ממתינה</option>
+            <option value="נאספה">נאספה</option>
           </select>
         </div>
       </div>
@@ -828,13 +828,13 @@
         <table>
           <thead>
             <tr>
-              <th>תאריך ושעה</th>
-              <th>דייר</th>
-              <th>נייד</th>
-              <th>תא</th>
-              <th>ברקוד</th>
-              <th>חברת שילוח</th>
-              <th>הערה</th>
+              <th onclick="sortHistory(0)" style="cursor:pointer;white-space:nowrap">תאריך ושעה <span class="sort-ind" data-col="0">↕</span></th>
+              <th onclick="sortHistory(1)" style="cursor:pointer">דייר <span class="sort-ind" data-col="1">↕</span></th>
+              <th onclick="sortHistory(2)" style="cursor:pointer">נייד <span class="sort-ind" data-col="2">↕</span></th>
+              <th class="th-center" onclick="sortHistory(3)" style="cursor:pointer">תא <span class="sort-ind" data-col="3">↕</span></th>
+              <th class="th-center" onclick="sortHistory(4)" style="cursor:pointer">ברקוד <span class="sort-ind" data-col="4">↕</span></th>
+              <th onclick="sortHistory(5)" style="cursor:pointer">חברת שילוח <span class="sort-ind" data-col="5">↕</span></th>
+              <th onclick="sortHistory(6)" style="cursor:pointer">סטטוס <span class="sort-ind" data-col="6">↕</span></th>
             </tr>
           </thead>
           <tbody id="history-tbody"></tbody>
@@ -1083,7 +1083,7 @@
           if (!num) return;
           if (!fresh[num]) {
             fresh[num] = {
-              status: 'occupied',
+              status: pkg.notified_at ? 'occupied' : 'loading',
               resident: pkg.resident_name || '',
               courier: pkg.courier || '',
               time: pkg.placed_at ? new Date(pkg.placed_at * 1000).toLocaleString('he-IL', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '',
@@ -1195,25 +1195,18 @@
       }));
 
       all.sort(function(a,b) { return b._ts - a._ts; });
-
-      if (!all.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px">אין רשומות</td></tr>';
-        return;
-      }
-      tbody.innerHTML = all.map(function(r) {
-        var statusColor = r.status === 'נאספה ✓' ? 'var(--green)' : 'var(--accent)';
-        return '<tr>' +
-          '<td>' + r.date + '</td>' +
-          '<td style="font-weight:700">' + r.resident + '</td>' +
-          '<td class="num-cell">' + r.phone + '</td>' +
-          '<td style="font-weight:800;color:var(--accent);font-size:16px;text-align:center">' + r.cell + '</td>' +
-          '<td style="font-family:monospace;font-size:11px;color:var(--accent)">' + r.barcode + '</td>' +
-          '<td>' + r.courier + '</td>' +
-          '<td style="color:' + statusColor + ';font-weight:700">' + r.status + '</td>' +
-          '</tr>';
-      }).join('');
+      _histAllRows = all;
+      // איפוס פילטרים בטעינה ראשונית
+      var sf = document.getElementById('hist-status-filter');
+      var sh = document.getElementById('hist-search');
+      if (sf) sf.value = '';
+      if (sh) sh.value = '';
+      histSortCol = 0; histSortDir = -1;
+      document.querySelectorAll('.sort-ind').forEach(function(el) { el.textContent = ' ↕'; });
+      filterAndRenderHistory();
     }).catch(function() {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:24px">שגיאה בטעינת היסטוריה</td></tr>';
+      var tbody = document.getElementById('history-tbody');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:24px">שגיאה בטעינת היסטוריה</td></tr>';
     });
   }
 
@@ -1302,39 +1295,65 @@
 
 
   // ===== HISTORY SORT & FILTER =====
-  var histSortCol = null;
-  var histSortDir = 1;
-  
-  function filterHistory(q) {
-    var tbody = document.querySelector('#screen-history tbody');
+  var _histAllRows  = [];   // כל השורות שנטענו מה-API
+  var histSortCol   = 0;    // ברירת מחדל: תאריך
+  var histSortDir   = -1;   // יורד (החדש ראשון)
+
+  function renderHistoryRows(rows) {
+    var tbody = document.getElementById('history-tbody');
     if (!tbody) return;
-    var rows = Array.from(tbody.querySelectorAll('tr'));
-    rows.forEach(function(row) {
-      var text = row.textContent.toLowerCase();
-      row.style.display = (!q || text.includes(q.toLowerCase())) ? '' : 'none';
-    });
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px">אין רשומות</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(function(r) {
+      var statusColor = r.status.indexOf('נאספה') !== -1 ? 'var(--green)' : 'var(--accent)';
+      return '<tr>' +
+        '<td>' + r.date + '</td>' +
+        '<td style="font-weight:700">' + r.resident + '</td>' +
+        '<td class="num-cell">' + r.phone + '</td>' +
+        '<td style="font-weight:800;color:var(--accent);font-size:16px;text-align:center">' + r.cell + '</td>' +
+        '<td style="font-family:monospace;font-size:11px;color:var(--accent);text-align:center">' + r.barcode + '</td>' +
+        '<td>' + r.courier + '</td>' +
+        '<td style="color:' + statusColor + ';font-weight:700">' + r.status + '</td>' +
+        '</tr>';
+    }).join('');
   }
-  
+
+  function filterAndRenderHistory() {
+    var q      = (document.getElementById('hist-search')       || {}).value || '';
+    var status = (document.getElementById('hist-status-filter') || {}).value || '';
+    var rows   = _histAllRows.filter(function(r) {
+      var matchText   = !q      || (r.date + r.resident + r.phone + r.cell + r.barcode + r.courier + r.status).toLowerCase().includes(q.toLowerCase());
+      var matchStatus = !status || r.status.indexOf(status) !== -1;
+      return matchText && matchStatus;
+    });
+    // מיון
+    rows = rows.slice().sort(function(a, b) {
+      var av, bv;
+      switch(histSortCol) {
+        case 0: av = a._ts; bv = b._ts; return (av - bv) * histSortDir;
+        case 1: av = a.resident; bv = b.resident; break;
+        case 2: av = a.phone;    bv = b.phone;    break;
+        case 3: av = parseInt(a.cell)||0; bv = parseInt(b.cell)||0; return (av - bv) * histSortDir;
+        case 4: av = a.barcode;  bv = b.barcode;  break;
+        case 5: av = a.courier;  bv = b.courier;  break;
+        case 6: av = a.status;   bv = b.status;   break;
+        default: return 0;
+      }
+      return String(av).localeCompare(String(bv), 'he') * histSortDir;
+    });
+    renderHistoryRows(rows);
+  }
+
   function sortHistory(colIdx) {
-    var tbody = document.querySelector('#screen-history tbody');
-    if (!tbody) return;
-    var rows = Array.from(tbody.querySelectorAll('tr'));
-    
     if (histSortCol === colIdx) histSortDir *= -1;
     else { histSortCol = colIdx; histSortDir = 1; }
-    
-    // Update indicators
     document.querySelectorAll('.sort-ind').forEach(function(el) {
       var c = parseInt(el.getAttribute('data-col'));
-      el.textContent = c === colIdx ? (histSortDir === 1 ? '↑' : '↓') : '↕';
+      el.textContent = c === colIdx ? (histSortDir === 1 ? ' ↑' : ' ↓') : ' ↕';
     });
-    
-    rows.sort(function(a, b) {
-      var av = a.cells[colIdx] ? a.cells[colIdx].textContent.trim() : '';
-      var bv = b.cells[colIdx] ? b.cells[colIdx].textContent.trim() : '';
-      return av.localeCompare(bv, 'he') * histSortDir;
-    });
-    rows.forEach(function(r) { tbody.appendChild(r); });
+    filterAndRenderHistory();
   }
 
   // ===== BARCODE SCANNER =====
@@ -2255,7 +2274,7 @@ function buildLockerGrid() {
     } else {
       document.body.classList.remove('dashboard-mode');
     }
-    if (name === 'status') updateStatusScreen();
+    if (name === 'status') loadPackagesFromAPI().then(updateStatusScreen);
   }
 
   function updateStatusScreen() {
@@ -2344,13 +2363,20 @@ function buildLockerGrid() {
 
   function openCell() { closeModal('modal'); showToast('תא ' + _currentCellNum + ' נפתח ✓', 'var(--red)'); }
   function sendCellMessage() {
-    if (_currentCellNum !== null && packageData[_currentCellNum]) {
-      packageData[_currentCellNum].status = 'occupied';
-      savePackageData();
-    }
+    var num = _currentCellNum;
+    if (!num) return;
     closeModal('modal');
-    showToast('הודעה נשלחה לדייר בתא ' + _currentCellNum + ' ✓');
-    buildLockerGrid();
+    if (packageData[num]) {
+      packageData[num].status = 'occupied';
+      savePackageData();
+      buildLockerGrid();
+    }
+    apiPost('/api/messages/send', { messages: [{ cell_id: String(num), type: 'arrival' }] })
+      .then(function(res) {
+        if (res && res.sent > 0) showToast('הודעה נשלחה לדייר בתא ' + num + ' ✓');
+        else showToast('שליחת ההודעה נכשלה — בדוק נייד דייר', 'var(--red)');
+      })
+      .catch(function() { showToast('שגיאה בשליחת הודעה', 'var(--red)'); });
   }
 
   function saveCellSelection() {
@@ -2428,7 +2454,8 @@ function buildLockerGrid() {
 
   // ── עזרים לmodal שלח לכולם (ברמת מודול כדי לגשת ל-esc) ──
   function _fillCell(template, cellNum, isBasic) {
-    var cellVal = isBasic ? (' בתא ' + cellNum) : '';
+    // תמיד מציג מספר תא בתצוגה המקדימה (isBasic אינו מזוהה נכון כשlockerConfig לא נטען)
+    var cellVal = String(cellNum);
     return template.replace(/\{תא\}/g, cellVal).replace(/ {2,}/g, ' ').trim();
   }
   function _recipientList(cells) {
@@ -2468,7 +2495,7 @@ function buildLockerGrid() {
     var r4d = s.reminder4_days || 7;
 
     // ── סיווג תאים (מדלגים על confirmed) ────────────────────
-    var newCells = [];   // loading → הגעה
+    var newCells = [];   // loading + occupied → הגעה (כולל שליחה חוזרת)
     var r1Cells  = [];   // occupied, days ∈ [r1d, r2d)
     var r2Cells  = [];   // occupied, days ∈ [r2d, r3d)
     var r3Cells  = [];   // occupied, days ∈ [r3d, r4d)
@@ -2478,9 +2505,10 @@ function buildLockerGrid() {
       var num = entry[0], d = entry[1];
       if (!d || d.status === 'confirmed') return;
       var days = parseInt(d.days || '0');
-      if (d.status === 'loading') {
+      if (d.status === 'loading' || d.status === 'occupied') {
         newCells.push({ num: num, resident: d.resident || '?', courier: d.courier || '' });
-      } else if (d.status === 'occupied') {
+      }
+      if (d.status === 'occupied') {
         if      (days >= r4d) r4Cells.push({ num: num, resident: d.resident || '?', days: days });
         else if (days >= r3d) r3Cells.push({ num: num, resident: d.resident || '?', days: days });
         else if (days >= r2d) r2Cells.push({ num: num, resident: d.resident || '?', days: days });

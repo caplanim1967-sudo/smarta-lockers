@@ -1,0 +1,116 @@
+
+ ⛅️ wrangler 4.83.0 (update available 4.90.0)
+─────────────────────────────────────────────
+Successfully created tail, expires at 2026-05-10T20:39:03Z
+Connected to smarta-api, waiting for logs...
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/cells - Ok @ 10.5.2026, 17:41:57
+GET https://smarta-api.smarta-api.workers.dev/api/packages?status=waiting - Ok @ 10.5.2026, 17:41:57
+GET https://smarta-api.smarta-api.workers.dev/api/residents - Ok @ 10.5.2026, 17:41:57
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/packages?status=waiting - Ok @ 10.5.2026, 17:41:57
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/residents - Ok @ 10.5.2026, 17:41:57
+GET https://smarta-api.smarta-api.workers.dev/api/cells - Ok @ 10.5.2026, 17:41:57
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/messages/send - Ok @ 10.5.2026, 17:42:08
+POST https://smarta-api.smarta-api.workers.dev/api/messages/send - Ok @ 10.5.2026, 17:42:08
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/admin/settlements - Ok @ 10.5.2026, 17:47:23
+GET https://smarta-api.smarta-api.workers.dev/api/admin/settlements - Ok @ 10.5.2026, 17:47:23
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/admin/lockers - Ok @ 10.5.2026, 17:47:23
+GET https://smarta-api.smarta-api.workers.dev/api/admin/lockers - Ok @ 10.5.2026, 17:47:23
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/admin/impersonate - Ok @ 10.5.2026, 17:47:26
+POST https://smarta-api.smarta-api.workers.dev/api/admin/impersonate - Ok @ 10.5.2026, 17:47:26
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/courier/lockers - Ok @ 10.5.2026, 17:47:27
+GET https://smarta-api.smarta-api.workers.dev/api/courier/lockers - Ok @ 10.5.2026, 17:47:27
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/locker - Ok @ 10.5.2026, 17:47:30
+GET https://smarta-api.smarta-api.workers.dev/api/locker - Ok @ 10.5.2026, 17:47:30
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/packages?status=waiting - Ok @ 10.5.2026, 17:47:30
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/residents - Ok @ 10.5.2026, 17:47:30
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/cells - Ok @ 10.5.2026, 17:47:30
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/settings/messages - Ok @ 10.5.2026, 17:47:30
+GET https://smarta-api.smarta-api.workers.dev/api/residents - Ok @ 10.5.2026, 17:47:30
+GET https://smarta-api.smarta-api.workers.dev/api/packages?status=waiting - Ok @ 10.5.2026, 17:47:30
+GET https://smarta-api.smarta-api.workers.dev/api/settings/messages - Ok @ 10.5.2026, 17:47:30
+GET https://smarta-api.smarta-api.workers.dev/api/cells - Ok @ 10.5.2026, 17:47:30
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/packages/REDACTED/collect - Ok @ 10.5.2026, 17:53:38
+POST https://smarta-api.smarta-api.workers.dev/api/packages/REDACTED/collect - Ok @ 10.5.2026, 17:53:38
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/packages/REDACTED/collect - Ok @ 10.5.2026, 17:53:42
+POST https://smarta-api.smarta-api.workers.dev/api/packages/REDACTED/collect - Ok @ 10.5.2026, 17:53:42
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/packages/REDACTED/collect - Ok @ 10.5.2026, 17:53:44
+POST https://smarta-api.smarta-api.workers.dev/api/packages/REDACTED/collect - Ok @ 10.5.2026, 17:53:44
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/packages/REDACTED/collect - Ok @ 10.5.2026, 17:53:46
+POST https://smarta-api.smarta-api.workers.dev/api/packages/REDACTED/collect - Ok @ 10.5.2026, 17:53:46
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/packages/REDACTED/collect - Ok @ 10.5.2026, 17:53:48
+POST https://smarta-api.smarta-api.workers.dev/api/packages/REDACTED/collect - Ok @ 10.5.2026, 17:53:48
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/packages/REDACTED/collect - Ok @ 10.5.2026, 17:53:52
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/packages/REDACTED/collect - Ok @ 10.5.2026, 17:53:52
+POST https://smarta-api.smarta-api.workers.dev/api/packages/REDACTED/collect - Ok @ 10.5.2026, 17:53:52
+POST https://smarta-api.smarta-api.workers.dev/api/packages/REDACTED/collect - Ok @ 10.5.2026, 17:53:52
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/packages/REDACTED/collect - Ok @ 10.5.2026, 17:53:54
+POST https://smarta-api.smarta-api.workers.dev/api/packages/REDACTED/collect - Ok @ 10.5.2026, 17:53:54
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/packages?status=waiting - Ok @ 10.5.2026, 17:54:55
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/packages - Ok @ 10.5.2026, 17:54:55
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/residents - Ok @ 10.5.2026, 17:54:55
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/cells - Ok @ 10.5.2026, 17:54:55
+POST https://smarta-api.smarta-api.workers.dev/api/packages - Ok @ 10.5.2026, 17:54:55
+GET https://smarta-api.smarta-api.workers.dev/api/packages?status=waiting - Ok @ 10.5.2026, 17:54:55
+GET https://smarta-api.smarta-api.workers.dev/api/residents - Ok @ 10.5.2026, 17:54:55
+GET https://smarta-api.smarta-api.workers.dev/api/cells - Ok @ 10.5.2026, 17:54:55
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/residents - Ok @ 10.5.2026, 17:55:16
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/cells - Ok @ 10.5.2026, 17:55:16
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/packages?status=waiting - Ok @ 10.5.2026, 17:55:16
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/packages - Ok @ 10.5.2026, 17:55:16
+GET https://smarta-api.smarta-api.workers.dev/api/residents - Ok @ 10.5.2026, 17:55:16
+GET https://smarta-api.smarta-api.workers.dev/api/packages?status=waiting - Ok @ 10.5.2026, 17:55:16
+POST https://smarta-api.smarta-api.workers.dev/api/packages - Ok @ 10.5.2026, 17:55:16
+GET https://smarta-api.smarta-api.workers.dev/api/cells - Ok @ 10.5.2026, 17:55:16
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/messages/send - Ok @ 10.5.2026, 17:55:22
+POST https://smarta-api.smarta-api.workers.dev/api/messages/send - Ok @ 10.5.2026, 17:55:22
+  (log) [MSG:SMS] → 0522497446 | היי משה! 📦 הגיעה לך חבילה והיא נמצאת בתא מס' 6.
+חבילה פתוחה. 
+קיבוץ ניר עד
+תודה
+  (log) [MSG] InforUMobile (sms) response: <Result><Status>1</Status><Description>Message accepted successfully</Description><NumberOfRecipients>1</NumberOfRecipients></Result>
+  (log) [MSG:SMS] → 0522497446 | היי משה! 📦 הגיעה לך חבילה והיא נמצאת בתא מס' 11.
+. 
+קיבוץ ניר עד
+תודה!
+  (log) [MSG] InforUMobile (sms) response: <Result><Status>1</Status><Description>Message accepted successfully</Description><NumberOfRecipients>1</NumberOfRecipients></Result>
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/admin/settlements - Ok @ 10.5.2026, 18:03:15
+GET https://smarta-api.smarta-api.workers.dev/api/admin/settlements - Ok @ 10.5.2026, 18:03:15
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/admin/lockers - Ok @ 10.5.2026, 18:03:15
+GET https://smarta-api.smarta-api.workers.dev/api/admin/lockers - Ok @ 10.5.2026, 18:03:15
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/admin/settlements/NIR-01 - Ok @ 10.5.2026, 18:03:24
+PUT https://smarta-api.smarta-api.workers.dev/api/admin/settlements/NIR-01 - Ok @ 10.5.2026, 18:03:24
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/auth/login - Ok @ 10.5.2026, 18:05:50
+POST https://smarta-api.smarta-api.workers.dev/api/auth/login - Ok @ 10.5.2026, 18:05:50
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/auth/login - Ok @ 10.5.2026, 18:06:39
+POST https://smarta-api.smarta-api.workers.dev/api/auth/login - Ok @ 10.5.2026, 18:06:39
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/admin/settlements - Ok @ 10.5.2026, 18:06:40
+GET https://smarta-api.smarta-api.workers.dev/api/admin/settlements - Ok @ 10.5.2026, 18:06:40
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/admin/lockers - Ok @ 10.5.2026, 18:06:40
+GET https://smarta-api.smarta-api.workers.dev/api/admin/lockers - Ok @ 10.5.2026, 18:06:40
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/admin/settlements/NIR-01 - Ok @ 10.5.2026, 18:06:56
+PUT https://smarta-api.smarta-api.workers.dev/api/admin/settlements/NIR-01 - Ok @ 10.5.2026, 18:06:56
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/auth/login - Ok @ 10.5.2026, 18:07:26
+POST https://smarta-api.smarta-api.workers.dev/api/auth/login - Ok @ 10.5.2026, 18:07:26
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/locker - Ok @ 10.5.2026, 18:07:27
+GET https://smarta-api.smarta-api.workers.dev/api/locker - Ok @ 10.5.2026, 18:07:27
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/packages?status=waiting - Ok @ 10.5.2026, 18:07:27
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/residents - Ok @ 10.5.2026, 18:07:27
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/cells - Ok @ 10.5.2026, 18:07:27
+OPTIONS https://smarta-api.smarta-api.workers.dev/api/settings/messages - Ok @ 10.5.2026, 18:07:27
+GET https://smarta-api.smarta-api.workers.dev/api/settings/messages - Ok @ 10.5.2026, 18:07:27
+GET https://smarta-api.smarta-api.workers.dev/api/residents - Ok @ 10.5.2026, 18:07:27
+GET https://smarta-api.smarta-api.workers.dev/api/packages?status=waiting - Ok @ 10.5.2026, 18:07:27
+GET https://smarta-api.smarta-api.workers.dev/api/cells - Ok @ 10.5.2026, 18:07:27
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mFailed to fetch auth token: 401 Unauthorized[0m
+
+
+This error originated either by throwing inside of an async function without a catch block, or by rejecting a promise which was not handled with .catch(). The promise rejected with the reason:
+Error: Not logged in.
+    at requireLoggedIn (C:\Users\bitah\AppData\Roaming\npm\node_modules\wrangler\wrangler-dist\cli.js:131482:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async performApiFetch (C:\Users\bitah\AppData\Roaming\npm\node_modules\wrangler\wrangler-dist\cli.js:131381:3)
+    at async fetchInternal (C:\Users\bitah\AppData\Roaming\npm\node_modules\wrangler\wrangler-dist\cli.js:131423:20)
+    at async fetchResult (C:\Users\bitah\AppData\Roaming\npm\node_modules\wrangler\wrangler-dist\cli.js:131632:47)
+    at async deleteTail (C:\Users\bitah\AppData\Roaming\npm\node_modules\wrangler\wrangler-dist\cli.js:243147:5)
+    at async _WebSocket.exit (C:\Users\bitah\AppData\Roaming\npm\node_modules\wrangler\wrangler-dist\cli.js:292288:11)
+🪵  Logs were written to "C:\Users\bitah\AppData\Roaming\xdg.config\.wrangler\logs\wrangler-2026-05-10_14-41-11_384.log"
