@@ -312,12 +312,21 @@ tr:hover td { background:rgba(255,255,255,0.015); }
         </div>
         <div class="form-group">
           <label>תפקיד</label>
-          <select id="staff-role">
+          <select id="staff-role" onchange="onStaffRoleChange()">
             <option value="">— בחר תפקיד —</option>
             <option value="mail_manager">אחראי/ת דואר</option>
             <option value="courier_manager">חברת שילוח</option>
             <option value="finance">חשבונות</option>
           </select>
+        </div>
+      </div>
+      <div class="form-row cols-1" id="staff-courier-company-row" style="display:none">
+        <div class="form-group">
+          <label>חברת שילוח <span style="color:var(--red)">*</span></label>
+          <select id="staff-courier-company">
+            <option value="">— בחר חברת שילוח —</option>
+          </select>
+          <div class="field-err" id="staff-courier-company-err">יש לבחור חברת שילוח</div>
         </div>
       </div>
       <div class="form-row cols-1">
@@ -1193,11 +1202,40 @@ function staffClearErrors() {
   document.getElementById('staff-err').style.display = 'none';
 }
 
+function onStaffRoleChange() {
+  var role = document.getElementById('staff-role').value;
+  var row = document.getElementById('staff-courier-company-row');
+  if (!row) return;
+  row.style.display = (role === 'courier_manager') ? 'block' : 'none';
+}
+
+var _courierCompaniesCache = [];
+
 function openAddStaff() {
   editingStaffId = null;
   ['staff-first','staff-last','staff-phone','staff-email','staff-role','staff-username','staff-password'].forEach(function(id) {
     var el = document.getElementById(id); if (el) el.value = '';
   });
+  // טען רשימת חברות שילוח לתפריט
+  var ccSel = document.getElementById('staff-courier-company');
+  if (ccSel) {
+    ccSel.innerHTML = '<option value="">— בחר חברת שילוח —</option>';
+    if (_courierCompaniesCache.length > 0) {
+      _courierCompaniesCache.forEach(function(cc) {
+        ccSel.innerHTML += '<option value="' + cc.id + '">' + cc.name + '</option>';
+      });
+    } else {
+      apiGet('/api/courier-companies').then(function(data) {
+        if (!data) return;
+        _courierCompaniesCache = data;
+        ccSel.innerHTML = '<option value="">— בחר חברת שילוח —</option>';
+        data.forEach(function(cc) {
+          ccSel.innerHTML += '<option value="' + cc.id + '">' + cc.name + '</option>';
+        });
+      });
+    }
+  }
+  document.getElementById('staff-courier-company-row').style.display = 'none';
   staffClearErrors();
   document.getElementById('staff-modal-title').textContent = '🪪 הוספת בעל תפקיד';
   document.getElementById('staff-save-btn').textContent = 'שמור בעל תפקיד';
@@ -1219,6 +1257,8 @@ function openEditStaff(id) {
   document.getElementById('staff-username').value = u.username   || '';
   document.getElementById('staff-password').value = '';
   document.getElementById('staff-username').disabled = true;
+  // הצג/הסתר שדה חברת שילוח לפי תפקיד
+  onStaffRoleChange();
   staffClearErrors();
   document.getElementById('staff-modal-title').textContent = '✏️ עריכת בעל תפקיד';
   document.getElementById('staff-save-btn').textContent = 'עדכן בעל תפקיד';
@@ -1263,10 +1303,25 @@ function saveStaff() {
   }
   var PWD_ERR = 'סיסמה חייבת: לפחות 8 תווים, אות גדולה, מספר ותו מיוחד (!@#$%)';
 
+  // ולידציית חברת שילוח לcourier_manager
+  var courierCompanyId = null;
+  if (role === 'courier_manager') {
+    var ccSel = document.getElementById('staff-courier-company');
+    courierCompanyId = ccSel ? ccSel.value : '';
+    if (!courierCompanyId) {
+      var ccErr = document.getElementById('staff-courier-company-err');
+      if (ccErr) ccErr.style.display = 'block';
+      errEl.textContent = 'יש לבחור חברת שילוח עבור מנהל שילוח';
+      errEl.style.display = 'block';
+      return;
+    }
+  }
+
   if (editingStaffId) {
     if (password && !validatePassword(password)) { errEl.textContent = PWD_ERR; errEl.style.display = 'block'; return; }
     var payload = { first_name: first, last_name: last, phone: phone || null, email: email || '', role: role };
     if (password) payload.password = password;
+    if (role === 'courier_manager' && courierCompanyId) payload.courier_company_id = courierCompanyId;
     apiPatch('/api/users/' + editingStaffId, payload)
       .then(function(res) {
         if (res && res.error) { errEl.textContent = res.error; errEl.style.display = 'block'; return; }
@@ -1277,7 +1332,7 @@ function saveStaff() {
     if (!/^[a-zA-Z0-9_]+$/.test(username))     { errEl.textContent = 'שם משתמש: אותיות לועזיות, ספרות וקו תחתון בלבד'; errEl.style.display = 'block'; return; }
     if (!password)                              { errEl.textContent = 'נא להזין סיסמה';                                 errEl.style.display = 'block'; return; }
     if (!validatePassword(password))            { errEl.textContent = PWD_ERR;                                          errEl.style.display = 'block'; return; }
-    apiPost('/api/users', { first_name: first, last_name: last, phone: phone || null, email: email || '', role: role, username: username, password: password })
+    apiPost('/api/users', { first_name: first, last_name: last, phone: phone || null, email: email || '', role: role, username: username, password: password, courier_company_id: courierCompanyId || null })
       .then(function(res) {
         if (res && res.error) { errEl.textContent = res.error; errEl.style.display = 'block'; return; }
         closeAddStaff(); showToast(first + ' ' + last + ' נוסף ✓'); loadStaff();

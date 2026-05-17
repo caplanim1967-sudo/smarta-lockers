@@ -1099,11 +1099,20 @@ async function handleCommunity(path, method, request, env, user, url) {
       if (!b.username || !b.password) return err('username ו-password חובה');
       const id   = 'local_' + Date.now();
       const hash = await sha256hex(b.password);
+      // אם תפקיד courier_manager — ודא שהחברה שייכת לישוב
+      let courierCompanyId = null;
+      if (b.role === 'courier_manager' && b.courier_company_id) {
+        const ccAccess = await db.prepare(
+          'SELECT id FROM courier_company_access WHERE company_id = ? AND community_id = ?'
+        ).bind(b.courier_company_id, communityId).first();
+        if (!ccAccess) return err('חברת השילוח אינה מקושרת לישוב זה');
+        courierCompanyId = b.courier_company_id;
+      }
       await db.prepare(`
-        INSERT INTO users (id, first_name, last_name, role, community_id, username, phone, email, password_hash, password_changed_at, active, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        INSERT INTO users (id, first_name, last_name, role, community_id, courier_company_id, username, phone, email, password_hash, password_changed_at, active, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
       `).bind(id, b.first_name || '', b.last_name || '',
-        b.role || '', communityId,
+        b.role || '', communityId, courierCompanyId,
         b.username, b.phone || null, b.email || '', hash, nowSec(), nowSec()).run();
       return ok({ id });
     }
@@ -1126,6 +1135,7 @@ async function handleCommunity(path, method, request, env, user, url) {
       if (b.phone      !== undefined) { sets.push('phone = ?');      vals.push(b.phone || null); }
       if (b.email      !== undefined) { sets.push('email = ?');      vals.push(b.email || ''); }
       if (b.role       !== undefined) { sets.push('role = ?');       vals.push(b.role);       }
+      if (b.courier_company_id !== undefined) { sets.push('courier_company_id = ?'); vals.push(b.courier_company_id || null); }
       if (b.password) {
         const hash = await sha256hex(b.password);
         sets.push('password_hash = ?', 'password_changed_at = ?');
