@@ -244,6 +244,9 @@ body {
       <input type="text" id="forgot-input" dir="ltr" placeholder="הכנס שם משתמש או נייד">
       <button class="btn-send" onclick="sendForgot()">שלח קוד SMS →</button>
       <div style="color:var(--red);font-size:12px;margin-top:8px;display:none" id="forgot-err1"></div>
+      <div style="text-align:center;margin-top:10px">
+        <span onclick="toggleForgot()" style="color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline">ביטול — חזור לכניסה</span>
+      </div>
     </div>
     <!-- שלב 2: קוד OTP + סיסמה חדשה -->
     <div id="forgot-step2" style="display:none">
@@ -262,6 +265,9 @@ body {
       <button class="btn-send" style="margin-top:10px" onclick="confirmReset()">אפס סיסמה ✓</button>
       <div style="color:var(--red);font-size:12px;margin-top:8px;display:none" id="forgot-err2"></div>
       <div style="color:var(--muted);font-size:11px;margin-top:8px;text-align:center;cursor:pointer;text-decoration:underline" onclick="resetForgotPanel()">לא קיבלתי — שלח שוב</div>
+      <div style="text-align:center;margin-top:6px">
+        <span onclick="toggleForgot()" style="color:var(--muted);font-size:11px;cursor:pointer;text-decoration:underline">ביטול — חזור לכניסה</span>
+      </div>
     </div>
   </div>
 
