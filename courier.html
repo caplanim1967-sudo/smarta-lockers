@@ -707,29 +707,58 @@
   </div>
 </div>
 
+  <!-- YISHUV + COMPANY SELECTION SCREEN -->
+  <div class="screen" id="screen-yishuv" style="max-width:480px;margin:0 auto;padding:32px 16px">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-size:48px;margin-bottom:10px">📦</div>
+      <div style="font-size:20px;font-weight:800;margin-bottom:4px">הפקדת חבילה</div>
+      <div style="font-size:13px;color:var(--muted)">בחר ישוב יעד</div>
+    </div>
+
+    <div id="yishuv-loading" style="text-align:center;color:var(--muted);font-size:13px;padding:20px">טוען ישובים...</div>
+
+    <div id="yishuv-form" style="display:none">
+      <!-- רשימת ישובים נפתחת -->
+      <div style="margin-bottom:16px">
+        <label style="font-size:13px;color:var(--muted);display:block;margin-bottom:8px;font-weight:600">ישוב יעד</label>
+        <select id="yishuv-select" onchange="onYishuvChange(this.value)"
+          style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px 12px;color:var(--text);font-size:16px;font-family:Heebo,sans-serif;outline:none;cursor:pointer;appearance:auto">
+          <option value="">— בחר ישוב —</option>
+        </select>
+      </div>
+
+      <!-- בחירת חברת שילוח (מוצגת רק אם >1 חברה לישוב הנבחר) -->
+      <div id="company-section" style="display:none;margin-bottom:16px">
+        <label style="font-size:13px;color:var(--muted);display:block;margin-bottom:8px;font-weight:600">חברת שילוח</label>
+        <select id="company-select"
+          style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px 12px;color:var(--text);font-size:16px;font-family:Heebo,sans-serif;outline:none;cursor:pointer;appearance:auto">
+          <option value="">— בחר חברה —</option>
+        </select>
+      </div>
+
+      <button type="button" id="start-deposit-btn" onclick="startDepositFromForm()" style="display:none;width:100%;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:18px;font-size:16px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif">
+        התחל הפקדה ›
+      </button>
+
+      <div id="yishuv-empty" style="display:none;text-align:center;padding:20px">
+        <div style="font-size:13px;color:var(--muted)">פנה למנהל השילוח</div>
+      </div>
+    </div>
+  </div>
+
   <!-- DEPOSIT SCREEN -->
   <div class="screen" id="screen-deposit" style="max-width:480px;margin:0 auto;padding:24px 16px">
 
-    <!-- שלב 1: סריקת QR לוקר -->
-    <div id="dep-step-locker">
-      <div id="dep-cancel-wrap" style="margin-bottom:12px;display:none">
-        <button onclick="depCancel()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;font-family:Heebo,sans-serif;padding:0;display:flex;align-items:center;gap:4px">← ביטול הפקדה</button>
+    <!-- שלב 1: סריקת QR לוקר (מוצג רק כשיש מספר לוקרים בישוב) -->
+    <div id="dep-step-locker" style="display:none">
+      <div style="margin-bottom:16px">
+        <button onclick="depGoBackFromLocker()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 18px;color:var(--text);cursor:pointer;font-size:14px;font-weight:700;font-family:Heebo,sans-serif">‹ חזור</button>
       </div>
       <div style="text-align:center;margin-bottom:24px">
-        <div style="font-size:48px;margin-bottom:12px">🗄️</div>
-        <div style="font-size:18px;font-weight:700;margin-bottom:6px">בחר ישוב</div>
-        <div style="font-size:13px;color:var(--muted)">בחר ישוב יעד מהרשימה או סרוק QR על הלוקר</div>
-      </div>
-      <!-- רשימת לוקרים -->
-      <div id="dep-locker-loading" style="text-align:center;color:var(--muted);font-size:13px;padding:12px">טוען רשימת לוקרים...</div>
-      <select id="dep-locker-select" onchange="depSelectLockerFromDropdown(this.value)"
-        style="display:none;width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 12px;color:var(--text);font-size:15px;font-family:Heebo,sans-serif;outline:none;margin-bottom:16px;cursor:pointer">
-        <option value="">— בחר ישוב —</option>
-      </select>
-      <div id="dep-locker-empty" style="display:none;text-align:center;padding:20px 0">
-        <div style="font-size:32px;margin-bottom:8px">⚠️</div>
-        <div style="font-size:14px;font-weight:600;margin-bottom:4px">לא הוגדרו לוקרים</div>
-        <div style="font-size:12px;color:var(--muted)">פנה למנהל להגדרת לוקרים מורשים</div>
+        <div style="font-size:48px;margin-bottom:12px">🔍</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:6px">זיהוי לוקר</div>
+        <div style="font-size:13px;color:var(--muted)">סרוק את קוד ה-QR הספציפי על הלוקר</div>
+        <div id="dep-locker-community-name" style="font-size:13px;color:var(--accent);font-weight:600;margin-top:6px"></div>
       </div>
       <!-- סריקת QR -->
       <div id="dep-qr-section" style="display:none">
@@ -749,10 +778,10 @@
     <!-- שלב 2: חיפוש דייר -->
     <div id="dep-step-resident" style="display:none">
       <div style="margin-bottom:16px">
-        <button onclick="depGoBack('locker')" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 16px;color:var(--text);cursor:pointer;font-size:14px;font-weight:600;font-family:Heebo,sans-serif">‹ חזור לישוב</button>
+        <button onclick="depGoBackFromResident()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 18px;color:var(--text);cursor:pointer;font-size:14px;font-weight:700;font-family:Heebo,sans-serif">‹ חזור לישוב</button>
       </div>
       <div style="font-size:16px;font-weight:700;margin-bottom:4px">חיפוש דייר</div>
-      <div id="dep-locker-badge" style="font-size:12px;color:var(--muted);margin-bottom:20px"></div>
+      <div id="dep-resident-community-badge" style="font-size:12px;color:var(--muted);margin-bottom:20px"></div>
       <input id="dep-phone-input" type="search"
         inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
         placeholder="הזן שם או טלפון..."
@@ -1878,8 +1907,8 @@
       var navEl = document.querySelector('nav');
       if (navEl) navEl.style.display = 'none';
       document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
-      var depScreen = document.getElementById('screen-deposit');
-      if (depScreen) depScreen.classList.add('active');
+      var yishuvScreen = document.getElementById('screen-yishuv');
+      if (yishuvScreen) yishuvScreen.classList.add('active');
       return;
     }
 
@@ -1893,8 +1922,8 @@
       var navEl2 = document.querySelector('nav');
       if (navEl2) navEl2.style.display = 'none';
       document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
-      var depScreen2 = document.getElementById('screen-deposit');
-      if (depScreen2) depScreen2.classList.add('active');
+      var yishuvScreen2 = document.getElementById('screen-yishuv');
+      if (yishuvScreen2) yishuvScreen2.classList.add('active');
     } else if (role === 'courier_manager' || isImpersonatedAdmin) {
       document.querySelectorAll('.manager-only').forEach(function(el) { el.style.display = 'block'; });
       document.querySelectorAll('.courier-only').forEach(function(el) { el.style.display = 'block'; });
@@ -1920,12 +1949,11 @@
 
   // ─── DEPOSIT FLOW ─────────────────────────────────────────
   var _dep = {
-    lockerId: null,
-    residentId: null,
-    residentPhone: null,
-    cellNumber: null,
-    cellVolume: null,
-    barcodes: [],
+    lockerId: null, residentId: null, residentPhone: null,
+    cellNumber: null, cellVolume: null, barcodes: [],
+    lockCode: null, tier: null,
+    communityId: null, communityName: null, communityLockers: [],
+    companyId: null, companyName: null, companyAutoSelected: false, communityIdx: -1,
   };
 
   function depStep(name) {
@@ -1981,9 +2009,9 @@
 
   function depReset() {
     depStopQr();
-    _dep = { lockerId: null, residentId: null, residentPhone: null, cellNumber: null, cellVolume: null, barcodes: [] };
-    var selEl = document.getElementById('dep-locker-select');
-    if (selEl) selEl.selectedIndex = 0;
+    _dep = { lockerId: null, residentId: null, residentPhone: null, cellNumber: null, cellVolume: null, barcodes: [],
+             lockCode: null, tier: null, communityId: null, communityName: null, communityLockers: [],
+             companyId: null, companyName: null, companyAutoSelected: false, communityIdx: -1 };
     var phoneEl = document.getElementById('dep-phone-input');
     if (phoneEl) phoneEl.value = '';
     var bcEl = document.getElementById('dep-barcode-input');
@@ -1992,7 +2020,8 @@
     if (resEl) resEl.style.display = 'none';
     var badge = document.getElementById('dep-locker-badge');
     if (badge) badge.textContent = '';
-    depStep('locker');
+    // חזור למסך בחירת ישוב
+    showScreen('yishuv');
   }
 
   function depCancel() {
@@ -2084,55 +2113,185 @@
     if (btn) { btn.textContent = '📷 סרוק QR על הלוקר'; btn.onclick = depStartQr; }
   }
 
-  // טעינת רשימת לוקרים מורשים
-  var _depLockers = [];
+  // ─── YISHUV + COMPANY SELECTION ──────────────────────────
+  var _communities = []; // [{community_id, community_name, lockers:[{id,tier}], companies:[{id,name}]}]
+
   function depLoadLockers() {
     _apiGet('/api/courier/lockers').then(function(data) {
-      var loadEl  = document.getElementById('dep-locker-loading');
-      var selEl   = document.getElementById('dep-locker-select');
-      var emptyEl = document.getElementById('dep-locker-empty');
-      var qrEl    = document.getElementById('dep-qr-section');
+      var loadEl  = document.getElementById('yishuv-loading');
+      var formEl  = document.getElementById('yishuv-form');
+      var emptyEl = document.getElementById('yishuv-empty');
+      var selEl   = document.getElementById('yishuv-select');
       if (loadEl) loadEl.style.display = 'none';
       if (!data || !data.length) {
-        if (emptyEl) emptyEl.style.display = 'block';
+        if (formEl)  formEl.style.display  = '';
+        if (emptyEl) emptyEl.style.display = '';
         return;
       }
-      _depLockers = data;
+      _communities = data;
       if (selEl) {
         selEl.innerHTML = '<option value="">— בחר ישוב —</option>';
-        data.forEach(function(l) {
+        data.forEach(function(c, i) {
           var opt = document.createElement('option');
-          opt.value = l.id;
-          opt.textContent = l.community_name || l.id;
+          opt.value = i;
+          opt.textContent = c.community_name;
           selEl.appendChild(opt);
         });
-        selEl.style.display = '';
+        // בחירה אוטומטית כשיש ישוב יחיד
+        if (data.length === 1) {
+          selEl.value = '0';
+          onYishuvChange('0');
+        }
       }
-      if (qrEl) qrEl.style.display = '';
+      if (formEl) formEl.style.display = '';
+    }).catch(function() {
+      var loadEl = document.getElementById('yishuv-loading');
+      if (loadEl) loadEl.textContent = 'שגיאה בטעינת ישובים — נסה לרענן';
     });
   }
 
-  function depSelectLockerFromDropdown(id) {
-    if (!id) return;
-    var locker = _depLockers.find(function(l) { return l.id === id; });
-    if (!locker) { showToast('לוקר לא מורשה', 'var(--red)'); return; }
-    _dep.lockerId = id;
-    var badge = document.getElementById('dep-locker-badge');
-    if (badge) badge.textContent = locker.community_name || id;
-    depStep('resident');
+  function onYishuvChange(val) {
+    var compSection = document.getElementById('company-section');
+    var compSel     = document.getElementById('company-select');
+    var startBtn    = document.getElementById('start-deposit-btn');
+    // אפס בחירת חברה
+    if (compSection) compSection.style.display = 'none';
+    if (compSel)     compSel.innerHTML = '<option value="">— בחר חברה —</option>';
+    if (startBtn)    startBtn.style.display = 'none';
+
+    if (val === '' || val === null || val === undefined) return;
+    var idx = parseInt(val, 10);
+    var c = _communities[idx];
+    if (!c) return;
+
+    var companies = c.companies || [];
+    if (companies.length === 1) {
+      // חברה יחידה — אין צורך בבחירה, הצג כפתור התחלה
+      if (startBtn) startBtn.style.display = '';
+    } else if (companies.length > 1) {
+      // מספר חברות — הצג dropdown חברה
+      if (compSel) {
+        companies.forEach(function(comp, j) {
+          var opt = document.createElement('option');
+          opt.value = j;
+          opt.textContent = comp.name;
+          compSel.appendChild(opt);
+        });
+        compSel.onchange = function() {
+          if (startBtn) startBtn.style.display = this.value !== '' ? '' : 'none';
+        };
+      }
+      if (compSection) compSection.style.display = '';
+    }
+  }
+
+  function startDepositFromForm() {
+    var yishuvSel  = document.getElementById('yishuv-select');
+    var companySel = document.getElementById('company-select');
+    var compSection = document.getElementById('company-section');
+
+    var yishuvIdx = yishuvSel ? parseInt(yishuvSel.value, 10) : NaN;
+    if (isNaN(yishuvIdx) || yishuvIdx < 0) { showToast('בחר ישוב', 'var(--yellow)'); return; }
+    var c = _communities[yishuvIdx];
+    if (!c) return;
+
+    var companies = c.companies || [];
+    var companyId   = null;
+    var companyName = null;
+    var companyAutoSelected = false;
+
+    if (companies.length === 1) {
+      companyId          = companies[0].id;
+      companyName        = companies[0].name;
+      companyAutoSelected = true;
+    } else {
+      var compIdx = companySel ? parseInt(companySel.value, 10) : NaN;
+      if (isNaN(compIdx) || compIdx < 0 || !companies[compIdx]) {
+        showToast('בחר חברת שילוח', 'var(--yellow)');
+        return;
+      }
+      companyId   = companies[compIdx].id;
+      companyName = companies[compIdx].name;
+    }
+
+    // שמור בחירה ב-_dep
+    _dep.communityIdx      = yishuvIdx;
+    _dep.communityId       = c.community_id;
+    _dep.communityName     = c.community_name;
+    _dep.communityLockers  = c.lockers || [];
+    _dep.companyId         = companyId;
+    _dep.companyName       = companyName;
+    _dep.companyAutoSelected = companyAutoSelected;
+    _startDepositFlow();
+  }
+
+  function _startDepositFlow() {
+    // אפס state הפקדה (שמור ישוב+חברה)
+    var savedCid   = _dep.communityId;
+    var savedCname = _dep.communityName;
+    var savedLockers = _dep.communityLockers;
+    var savedCompanyId   = _dep.companyId;
+    var savedCompanyName = _dep.companyName;
+    var savedAutoSel     = _dep.companyAutoSelected;
+    var savedIdx         = _dep.communityIdx;
+    _dep = { lockerId: null, residentId: null, residentPhone: null, cellNumber: null, cellVolume: null, barcodes: [],
+             lockCode: null, tier: null,
+             communityId: savedCid, communityName: savedCname, communityLockers: savedLockers,
+             companyId: savedCompanyId, companyName: savedCompanyName,
+             companyAutoSelected: savedAutoSel, communityIdx: savedIdx };
+
+    showScreen('deposit');
+
+    if (savedLockers && savedLockers.length === 1) {
+      // לוקר יחיד — בחירה אוטומטית, קפוץ לדייר
+      _dep.lockerId = savedLockers[0].id;
+      _dep.tier     = savedLockers[0].tier;
+      var badge = document.getElementById('dep-resident-community-badge');
+      if (badge) badge.textContent = savedCname;
+      depStep('resident');
+    } else {
+      // מספר לוקרים — הצג סריקת QR לזיהוי לוקר ספציפי
+      var nameEl = document.getElementById('dep-locker-community-name');
+      if (nameEl) nameEl.textContent = savedCname;
+      depStep('locker');
+    }
+  }
+
+  function depGoBackFromLocker() {
+    if (_dep.companyAutoSelected) {
+      showScreen('yishuv');
+    } else {
+      showScreen('company');
+    }
+  }
+
+  function depGoBackFromResident() {
+    if (_dep.communityLockers && _dep.communityLockers.length > 1) {
+      depStep('locker');
+    } else {
+      showScreen('yishuv');
+    }
   }
 
   // QR scan result → validate against authorized list
   function depConfirmLockerFromQr(id) {
     id = (id || '').trim();
     if (!id) return;
-    var locker = _depLockers.find(function(l) { return l.id === id; });
+    // חפש לוקר בישוב הנוכחי
+    var lockers = _dep.communityLockers || [];
+    var locker  = lockers.find(function(l) { return l.id === id; });
+    if (!locker) {
+      // נסה גם בכל הישובים
+      for (var i = 0; i < _communities.length; i++) {
+        var found = (_communities[i].lockers || []).find(function(l) { return l.id === id; });
+        if (found) { locker = found; break; }
+      }
+    }
     if (!locker) { showToast('לוקר ' + id + ' אינו ברשימת הלוקרים המורשים שלך', 'var(--red)'); return; }
     _dep.lockerId = id;
-    var selEl = document.getElementById('dep-locker-select');
-    if (selEl) selEl.value = id;
+    _dep.tier     = locker.tier;
     var badge = document.getElementById('dep-locker-badge');
-    if (badge) badge.textContent = locker.community_name || id;
+    if (badge) badge.textContent = _dep.communityName || id;
     depStep('resident');
   }
 
@@ -2174,7 +2333,7 @@
   // שלב 3: הקצאת תא
   function depAssignCell() {
     depSetCellQuestion('...');
-    _apiPost('/api/deposit/start', { locker_id: _dep.lockerId, resident_id: _dep.residentId })
+    _apiPost('/api/deposit/start', { locker_id: _dep.lockerId, resident_id: _dep.residentId, company_id: _dep.companyId || null })
       .then(function(data) {
         if (!data) return;
         if (data.no_cells) { depStep('nocells'); document.getElementById('dep-nocells-phone').textContent = _dep.residentPhone || ''; return; }
