@@ -322,11 +322,18 @@
     </div>
     <div class="login-field">
       <label>סיסמה</label>
-      <input type="password" id="login-pass" placeholder="הזן סיסמה" onkeydown="if(event.key==='Enter')doLogin()">
+      <div style="position:relative">
+        <input type="password" id="login-pass" placeholder="סיסמה"
+          autocomplete="current-password"
+          onkeydown="if(event.key==='Enter')doLogin()"
+          style="width:100%;padding-left:42px">
+        <button type="button" onclick="togglePassVis('login-pass',this)"
+          style="position:absolute;left:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:4px;line-height:1"
+          title="הצג/הסתר סיסמה">👁</button>
+      </div>
     </div>
     <button class="login-btn" onclick="doLogin()">כניסה</button>
     <div class="login-error" id="login-error">שם משתמש או סיסמה שגויים</div>
-    <div style="font-size:11px;color:var(--muted);margin-top:16px;background:var(--surface2);border-radius:8px;padding:10px;text-align:right;line-height:1.8">📋 <strong>דוגמאות לכניסה:</strong><br>דואר ישראל: <code>512345678</code> / <code>1234</code><br>Amazon: <code>500234567</code> / <code>1234</code></div>
   </div>
 </div>
 
@@ -912,21 +919,22 @@
     .then(function(data) {
       if (btn) { btn.disabled = false; btn.textContent = 'כניסה'; }
       if (data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
-      var role = data.user ? data.user.role : '';
+      // API מחזיר role ישירות (לא בתוך user{})
+      var role = data.role || (data.user && data.user.role) || '';
       if (!['courier','courier_manager'].includes(role)) {
         errEl.textContent = 'אין גישה — השתמש בפורטל הניהול';
         errEl.style.display = 'block';
         return;
       }
       sessionStorage.setItem('courier_token', data.token);
-      sessionStorage.setItem('courier_user', JSON.stringify(data.user));
+      sessionStorage.setItem('courier_user', JSON.stringify(data));
       jwtToken = data.token;
       if (data.must_change_password) {
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('change-pass-screen').style.display = 'flex';
         return;
       }
-      enterApp(data.user.company_name || data.user.name || user);
+      enterApp(data.company_name || data.name || user);
       applyRoleUI(role);
       depLoadLockers();
     })
@@ -935,6 +943,13 @@
       errEl.textContent = 'שגיאת חיבור — נסה שוב';
       errEl.style.display = 'block';
     });
+  }
+
+  function togglePassVis(inputId, btn) {
+    var inp = document.getElementById(inputId);
+    if (!inp) return;
+    inp.type = (inp.type === 'password') ? 'text' : 'password';
+    btn.textContent = (inp.type === 'password') ? '👁' : '🙈';
   }
 
   function enterApp(companyName, mustChangePassword) {
