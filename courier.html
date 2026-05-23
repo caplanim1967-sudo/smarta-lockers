@@ -796,15 +796,20 @@
         ✅ אשר ברקוד
       </button>
 
-      <!-- סריקת מצלמה — אופציונלי -->
-      <div id="dep-barcode-reader" style="width:100%;border-radius:12px;overflow:hidden;background:var(--surface2);min-height:120px;display:flex;align-items:center;justify-content:center;margin-bottom:10px">
-        <div style="text-align:center;color:var(--muted);font-size:12px;padding:12px">
-          <div style="font-size:24px;margin-bottom:6px">📷</div>
-          <div>לחץ להפעלת מצלמה</div>
+      <!-- סריקת מצלמה -->
+      <div id="dep-barcode-reader" style="width:100%;border-radius:12px;overflow:hidden;background:var(--surface2);position:relative;margin-bottom:10px">
+        <div id="dep-bc-placeholder" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:120px;color:var(--muted);font-size:12px;padding:16px">
+          <div style="font-size:28px;margin-bottom:8px">📷</div>
+          <div>לחץ כדי לסרוק ברקוד</div>
+        </div>
+        <video id="dep-bc-video" style="width:100%;display:none;border-radius:12px" autoplay playsinline muted></video>
+        <canvas id="dep-bc-canvas" style="display:none"></canvas>
+        <div id="dep-bc-aim" style="display:none;position:absolute;inset:0;pointer-events:none">
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80%;height:2px;background:rgba(79,142,247,0.7);box-shadow:0 0 8px var(--accent)"></div>
         </div>
       </div>
-      <button onclick="depStartBarcode()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:Heebo,sans-serif;color:var(--muted)">
-        📷 סרוק עם מצלמה
+      <button id="dep-bc-btn" onclick="depStartBarcode()" style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif;margin-bottom:4px">
+        📷 סרוק ברקוד עם מצלמה
       </button>
     </div>
 
@@ -1874,6 +1879,13 @@
       var el = document.getElementById('dep-step-' + s);
       if (el) el.style.display = s === name ? '' : 'none';
     });
+    // כשיוצאים משלב הברקוד — עצור מצלמה
+    if (name !== 'barcode') depStopBarcode();
+    // כשנכנסים לשלב הברקוד — פנה שדה ותן focus
+    if (name === 'barcode') {
+      var inp = document.getElementById('dep-barcode-input');
+      if (inp) { inp.value = ''; setTimeout(function(){ inp.focus(); }, 300); }
+    }
   }
 
   function depGoToLock() {
@@ -2118,8 +2130,9 @@
 
   function depCellFits() {
     var q = document.getElementById('dep-cell-question');
-    if (q) q.innerHTML = 'פותח את התא שנבחר...';
-    setTimeout(function() { depStep('barcode'); }, 600);
+    var msg = (_dep.tier === 'premium') ? 'פותח את התא...' : 'מכין תא...';
+    if (q) q.innerHTML = msg;
+    setTimeout(function() { depStep('barcode'); }, 400);
   }
 
   function depCellTooSmall() {
@@ -2142,8 +2155,96 @@
   }
 
   // שלב 4: ברקוד חבילה
+  var _bcStream = null;
+  var _bcAnimFrame = null;
+  var _bcDetector = null;
+
   function depStartBarcode() {
-    alert('סריקת ברקוד תתמך בגרסה הבאה. השתמש בהזנה ידנית.');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showToast('מצלמה לא נתמכת — הזן ידנית', 'var(--yellow)');
+      document.getElementById('dep-barcode-input').focus();
+      return;
+    }
+    var btn = document.getElementById('dep-bc-btn');
+    if (btn) { btn.textContent = '⏹ עצור מצלמה'; btn.onclick = depStopBarcode; }
+    document.getElementById('dep-bc-placeholder').style.display = 'none';
+    document.getElementById('dep-bc-aim').style.display = '';
+    var video = document.getElementById('dep-bc-video');
+    video.style.display = 'block';
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } } })
+      .then(function(stream) {
+        _bcStream = stream;
+        video.srcObject = stream;
+        video.play().then(function() {
+          // נסה BarcodeDetector (Android Chrome) → fallback jsQR (QR only)
+          if (window.BarcodeDetector) {
+            _bcDetector = new BarcodeDetector({ formats: ['ean_13','ean_8','code_128','code_39','qr_code','upc_a','upc_e','itf','data_matrix','pdf417'] });
+            _bcScanNative();
+          } else {
+            _bcScanJsQr();
+          }
+        });
+      })
+      .catch(function(err) {
+        depStopBarcode();
+        showToast('שגיאת מצלמה: ' + err.message, 'var(--red)');
+        document.getElementById('dep-barcode-input').focus();
+      });
+  }
+
+  function _bcScanNative() {
+    var video = document.getElementById('dep-bc-video');
+    if (!video || !_bcStream || !_bcDetector) return;
+    _bcDetector.detect(video).then(function(codes) {
+      if (codes && codes.length > 0) {
+        var val = codes[0].rawValue;
+        depStopBarcode();
+        document.getElementById('dep-barcode-input').value = val;
+        depConfirmBarcode(val);
+        return;
+      }
+      _bcAnimFrame = setTimeout(_bcScanNative, 200);
+    }).catch(function() {
+      _bcAnimFrame = setTimeout(_bcScanNative, 300);
+    });
+  }
+
+  function _bcScanJsQr() {
+    var video  = document.getElementById('dep-bc-video');
+    var canvas = document.getElementById('dep-bc-canvas');
+    if (!video || !canvas || !_bcStream) return;
+    if (video.readyState < 2) { _bcAnimFrame = requestAnimationFrame(_bcScanJsQr); return; }
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    var code = (typeof jsQR !== 'undefined')
+      ? jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'dontInvert' })
+      : null;
+    if (code && code.data) {
+      var val = code.data;
+      depStopBarcode();
+      document.getElementById('dep-barcode-input').value = val;
+      depConfirmBarcode(val);
+      return;
+    }
+    _bcAnimFrame = requestAnimationFrame(_bcScanJsQr);
+  }
+
+  function depStopBarcode() {
+    if (_bcAnimFrame) { try { cancelAnimationFrame(_bcAnimFrame); clearTimeout(_bcAnimFrame); } catch(e){} _bcAnimFrame = null; }
+    if (_bcStream) { _bcStream.getTracks().forEach(function(t){ t.stop(); }); _bcStream = null; }
+    _bcDetector = null;
+    var video = document.getElementById('dep-bc-video');
+    if (video) { video.srcObject = null; video.style.display = 'none'; }
+    var ph = document.getElementById('dep-bc-placeholder');
+    if (ph) { ph.style.display = 'flex'; }
+    var aim = document.getElementById('dep-bc-aim');
+    if (aim) aim.style.display = 'none';
+    var btn = document.getElementById('dep-bc-btn');
+    if (btn) { btn.textContent = '📷 סרוק ברקוד עם מצלמה'; btn.onclick = depStartBarcode; }
   }
 
   function depConfirmBarcode(barcode) {
