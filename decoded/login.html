@@ -390,29 +390,62 @@ function hashPassword(pass) {
   }
 }
 
+function _showSmsReset(username, errBox, btn) {
+  // מציג הודעה + כפתור לשליחת קוד SMS
+  errBox.innerHTML = 'שם משתמש לא נמצא במכשיר זה. <button onclick="_triggerSmsReset()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif;margin-right:6px">שלח לי קוד לנייד</button>';
+  errBox.style.display = 'block';
+  btn.disabled = false; btn.textContent = 'כניסה למערכת';
+  window._smsResetIdentifier = username;
+}
+
+function _triggerSmsReset() {
+  var id = window._smsResetIdentifier || '';
+  if (!id) return;
+  // מעביר לזרימת שכחתי-סיסמה עם הזהות מולאת מראש
+  document.getElementById('forgot-input').value = id;
+  _forgotIdentifier = id;
+  var panel = document.getElementById('forgot-panel');
+  if (panel && !panel.classList.contains('open')) panel.classList.add('open');
+  sendForgot();
+}
+
 function tryLocalLogin(username, password, errBox, btn) {
   try {
+    // שליח (מספר טלפון) — שגיאה ישירה בלי אפשרות SMS
+    var isPhoneLike = /^\d{9,10}$/.test(username.replace(/\D/g,''));
     var users = JSON.parse(localStorage.getItem('smarta_users') || '[]');
     var u = users.find(function(x) { return (x.username||'').toLowerCase().trim() === username.toLowerCase().trim(); });
     if (!u) {
-      errBox.textContent = 'שם משתמש לא נמצא — פנה למנהל Smarta';
-      errBox.style.display = 'block';
-      btn.disabled = false; btn.textContent = 'כניסה למערכת';
+      if (isPhoneLike) {
+        errBox.textContent = 'שם משתמש לא נמצא — פנה למנהל השילוח';
+        errBox.style.display = 'block';
+        btn.disabled = false; btn.textContent = 'כניסה למערכת';
+      } else {
+        _showSmsReset(username, errBox, btn);
+      }
       return;
     }
     if (!u.passwordHash) {
-      errBox.textContent = 'המשתמש לא הוגדר כראוי — בקש ממנהל Smarta ליצור מחדש';
-      errBox.style.display = 'block';
-      btn.disabled = false; btn.textContent = 'כניסה למערכת';
+      if (isPhoneLike) {
+        errBox.textContent = 'המשתמש לא הוגדר כראוי — פנה למנהל השילוח';
+        errBox.style.display = 'block';
+        btn.disabled = false; btn.textContent = 'כניסה למערכת';
+      } else {
+        _showSmsReset(username, errBox, btn);
+      }
       return;
     }
     var fallbackHash = 'fallback:' + btoa(unescape(encodeURIComponent(password)));
     hashPassword(password).then(function(hash) {
       var match = (hash === u.passwordHash) || (fallbackHash === u.passwordHash);
       if (!match) {
-        errBox.textContent = 'סיסמה שגויה';
-        errBox.style.display = 'block';
-        btn.disabled = false; btn.textContent = 'כניסה למערכת';
+        if (isPhoneLike) {
+          errBox.textContent = 'סיסמה שגויה — פנה למנהל השילוח';
+          errBox.style.display = 'block';
+          btn.disabled = false; btn.textContent = 'כניסה למערכת';
+        } else {
+          _showSmsReset(username, errBox, btn);
+        }
         return;
       }
       // ✅ Local login success
