@@ -304,6 +304,17 @@ body {
   </div>
 </div>
 
+<!-- כרטיס בחירת חברת שילוח (מרובה חברות) -->
+<div id="company-select-card" style="display:none;position:relative;z-index:10;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:44px 48px;width:400px;max-width:95vw;box-shadow:0 24px 64px rgba(0,0,0,0.5)">
+  <div style="text-align:center;margin-bottom:24px">
+    <div style="font-size:40px;margin-bottom:8px">🚚</div>
+    <div style="font-size:18px;font-weight:800;color:var(--text);margin-bottom:4px" id="cs-courier-name">שם השליח</div>
+    <div style="font-size:13px;color:var(--muted)">בחר את חברת השילוח שעבורה אתה עובד היום</div>
+  </div>
+  <div id="cs-companies-list" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px"></div>
+  <button onclick="csBack()" style="width:100%;background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;font-family:Heebo,sans-serif;padding:8px">← חזור להתחברות</button>
+</div>
+
 <script>
 var API_BASE = 'https://smarta-api.smarta-api.workers.dev';
 
@@ -579,6 +590,29 @@ function doLogin() {
         btn.disabled = false; btn.textContent = 'כניסה למערכת';
         return;
       }
+      // שליח עם מספר חברות — הצג מסך בחירת חברה
+      if (data.needs_company_select && data.companies && data.companies.length > 0) {
+        btn.disabled = false; btn.textContent = 'כניסה למערכת';
+        window._csCompanies = data.companies;
+        var nameEl = document.getElementById('cs-courier-name');
+        if (nameEl) nameEl.textContent = [data.first_name, data.last_name].filter(Boolean).join(' ') || '';
+        var list = document.getElementById('cs-companies-list');
+        if (list) {
+          list.innerHTML = '';
+          data.companies.forEach(function(c, i) {
+            var b = document.createElement('button');
+            b.textContent = c.company_name || ('חברה ' + (i+1));
+            b.setAttribute('onclick', 'csSelectCompany(' + i + ')');
+            b.style.cssText = 'width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;color:var(--text);font-size:15px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif;transition:background 0.15s';
+            b.onmouseover = function(){ this.style.background='rgba(79,142,247,0.15)'; this.style.borderColor='var(--accent)'; };
+            b.onmouseout  = function(){ this.style.background='var(--surface2)'; this.style.borderColor='var(--border)'; };
+            list.appendChild(b);
+          });
+        }
+        document.querySelector('.card').style.display = 'none';
+        document.getElementById('company-select-card').style.display = '';
+        return;
+      }
       // אחרת — נסה fallback מקומי (community_manager ב-localStorage)
       tryLocalLogin(username, password, errBox, btn);
       return;
@@ -684,6 +718,61 @@ function continueSession() {
 function clearSession() {
   sessionStorage.clear();
   document.getElementById('session-banner').style.display = 'none';
+  document.getElementById('username').focus();
+}
+
+// ── Multi-company courier select ──────────────────────────────
+function csSelectCompany(idx) {
+  var c = window._csCompanies && window._csCompanies[idx];
+  if (!c) return;
+  // חזרה לכרטיס ראשי (הסתרה)
+  document.getElementById('company-select-card').style.display = 'none';
+  document.querySelector('.card').style.display = '';
+
+  var role = c.role || 'courier';
+  var user = {
+    full_name:            [c.first_name, c.last_name].filter(Boolean).join(' '),
+    username:             c.first_name + ' ' + c.last_name,
+    role:                 role,
+    courier_company_id:   c.company_id || null,
+    community_name:       c.company_name || '',
+    must_change_password: c.must_change_password || false
+  };
+
+  if (c.must_change_password) {
+    // שמור token לשינוי סיסמה
+    var errBox2 = document.getElementById('err-box');
+    errBox2.style.display = 'none';
+    var btn2 = document.getElementById('btn-login');
+    btn2.disabled = false; btn2.textContent = 'כניסה למערכת';
+    window._mustChangeToken = c.token;
+    window._mustChangeRole  = role;
+    window._mustChangeUser  = user;
+    sessionStorage.clear();
+    sessionStorage.setItem('smarta_token',   c.token);
+    sessionStorage.setItem('smarta_role',    role);
+    sessionStorage.setItem('smarta_user',    JSON.stringify(user));
+    sessionStorage.setItem('smarta_tabs',    JSON.stringify(ROLE_TABS[role] || ['courier']));
+    sessionStorage.setItem('courier_token',  c.token);
+    sessionStorage.setItem('courier_user',   JSON.stringify(user));
+    document.getElementById('must-change-panel').style.display = '';
+    document.getElementById('mcp-pass1').focus();
+    return;
+  }
+
+  sessionStorage.clear();
+  sessionStorage.setItem('smarta_token',   c.token);
+  sessionStorage.setItem('smarta_role',    role);
+  sessionStorage.setItem('smarta_user',    JSON.stringify(user));
+  sessionStorage.setItem('smarta_tabs',    JSON.stringify(ROLE_TABS[role] || ['courier']));
+  sessionStorage.setItem('courier_token',  c.token);
+  sessionStorage.setItem('courier_user',   JSON.stringify(user));
+  window.location.href = './smarta-all-v2.html#courier';
+}
+
+function csBack() {
+  document.getElementById('company-select-card').style.display = 'none';
+  document.querySelector('.card').style.display = '';
   document.getElementById('username').focus();
 }
 </script>
