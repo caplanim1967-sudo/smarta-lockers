@@ -651,7 +651,26 @@
   .bottom-nav-btn.active { color: var(--accent); }
   .bottom-nav-btn .bn-icon { font-size: 12px; line-height: 1; }
 
-  </style>
+  
+  .btn-logout{background:none;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);font-size:12px;font-family:inherit;border-radius:7px;padding:5px 12px;cursor:pointer;}
+  .btn-logout:hover{border-color:var(--red,#ef4444);color:var(--red,#ef4444);}
+  .back-btn {
+    background: var(--accent, #4f8ef7);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 8px 20px;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .back-btn:hover { opacity: 0.85; }
+</style>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
 </head>
@@ -668,6 +687,7 @@
     <button class="nav-tab" onclick="showScreen('new-package')">חבילה חדשה</button>
     <button class="nav-tab" onclick="showScreen('history')">היסטוריה</button>
   </div>
+  <button class="back-btn" onclick="goBack()">&#8592; חזרה</button>
   <div class="user-badge">
     <span>מיכל לוי</span>
     <div class="avatar">מ</div>
@@ -713,6 +733,9 @@
   <!-- NEW PACKAGE -->
   <div class="screen" id="screen-new-package">
     <div class="card">
+      <div style="margin-bottom:16px">
+        <button onclick="showScreen('dashboard')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;font-family:inherit;padding:0;display:flex;align-items:center;gap:4px">← חזור ללוח הבקרה</button>
+      </div>
       <div class="section-title" style="margin-bottom:20px">📦 רישום חבילה חדשה</div>
       <div class="form-grid">
         <div class="form-group" style="position:relative">
@@ -2877,7 +2900,15 @@ window.addEventListener('message', function(e) {
   }
 });
 
-</script>
+
+  function goBack() {
+    try { window.parent.postMessage({ type: 'smarta-logout' }, '*'); } catch(e) {}
+    setTimeout(function() {
+      try { window.parent.location.href = './login.html'; } catch(e) {}
+    }, 150);
+  }
+
+  </script>
 
 <!-- BARCODE SCANNER MODAL -->
 <div id="barcode-scanner-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9998;align-items:center;justify-content:center">

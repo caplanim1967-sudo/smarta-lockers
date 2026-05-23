@@ -186,14 +186,26 @@ function buildArrivalSms(settings, tier, firstName, count, cellId, lockCode, not
       : (settings.msg_arrival_premium       || 'היי {שם}! הגיעה לך חבילה בלוקר. התקשר לאיסוף. תודה!');
   }
 
-  return template
+  // אם notes ריק — הסר שורות שכוללות רק {הערה} ותווי פיסוק
+  let tpl = notes
+    ? template
+    : template.replace(/[^\S\n]*\{הערה\}[^\S\n]*[.,:;!?]?[^\S\n]*\n?/g, '');
+
+  let result = tpl
     .replace(/\{שם\}/g,     firstName  || '')
     .replace(/\{כמות\}/g,   String(count))
     .replace(/\{תא\}/g,     String(cellId  || ''))
     .replace(/\{קוד\}/g,    String(lockCode || ''))
     .replace(/\{ימים\}/g,   '0')
     .replace(/\{הערה\}/g,   notes ? String(notes) : '')
+    .replace(/\n{2,}/g, '\n')   // כפול newline → אחד
     .replace(/ {2,}/g, ' ').trim();
+
+  // בייסיק: אם הטמפלייט לא כלל {קוד}, נוסיף את הקוד בסוף
+  if (isBasic && lockCode && !tpl.includes('{קוד}')) {
+    result += '\nקוד נעילה: ' + lockCode;
+  }
+  return result;
 }
 
 // ─── AUTH MIDDLEWARE ──────────────────────────────────────────────────────────
@@ -342,47 +354,131 @@ async function handleSetup(request, env) {
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
 
+// עוזר: בנה payload + token לuser+company ספציפיים
+async function _buildCourierToken(u, cc, env) {
+  const mustChange = u.password_changed_at === null;
+  const payload = {
+    sub:                u.id,
+    role:               u.role,
+    courier_company_id: cc.id,
+    name:               `${u.first_name} ${u.last_name}`,
+    first_name:         u.first_name,
+    last_name:          u.last_name,
+    company_name:       cc.name,
+    must_change_password: mustChange,
+    exp:                nowSec() + 60 * 60 * 24 * 30,
+  };
+  const token = await jwtSign(payload, env.JWT_SECRET);
+  return { token, payload, mustChange };
+}
+
+// עוזר: בנה token אחד עם כל חברות השילוח של השליח
+async function _buildMultiCourierToken(u, companiesList, env) {
+  const mustChange = u.password_changed_at === null;
+  const payload = {
+    sub:                  u.id,
+    role:                 u.role,
+    courier_company_ids:  companiesList.map(c => c.company_id),
+    name:                 `${u.first_name} ${u.last_name}`,
+    first_name:           u.first_name,
+    last_name:            u.last_name,
+    must_change_password: mustChange,
+    exp:                  nowSec() + 60 * 60 * 24 * 30,
+  };
+  const token = await jwtSign(payload, env.JWT_SECRET);
+  return { token, mustChange };
+}
+
 async function handleLogin(request, env) {
   const b = await request.json().catch(() => ({}));
   const { username, password } = b;
   if (!username || !password) return err('חסרים שדות');
 
-  const user = await env.smarta_db
-    .prepare('SELECT * FROM users WHERE username = ? AND active = 1')
-    .bind(username)
-    .first();
+  const db = env.smarta_db;
+
+  // חיפוש לפי username קודם, אחר כך לפי phone
+  let user = await db.prepare('SELECT * FROM users WHERE username = ? AND active = 1').bind(username).first();
+  if (!user) user = await db.prepare('SELECT * FROM users WHERE phone = ? AND active = 1').bind(username).first();
 
   if (!user) return json({ error: 'שם משתמש או סיסמה שגויים' }, 401);
 
   const hash = await sha256hex(password);
   if (hash !== user.password_hash) return json({ error: 'שם משתמש או סיסמה שגויים' }, 401);
 
+  // ── שליח / מנהל שילוח: בדוק אם שייך למספר חברות ──────────────
+  const isCourierRole = user.role === 'courier' || user.role === 'courier_manager';
+  if (isCourierRole && user.phone) {
+    const { results: allAccounts } = await db.prepare(
+      `SELECT * FROM users WHERE phone = ? AND active = 1 AND role IN ('courier','courier_manager')`
+    ).bind(user.phone).all();
+
+    if (allAccounts.length > 1) {
+      // שליח רשום בכמה חברות — החזר רשימת חברות לבחירה
+      const companies = [];
+      for (const u of allAccounts) {
+        if (!u.courier_company_id) continue;
+        const cc = await db.prepare('SELECT id, name, active FROM courier_companies WHERE id = ?').bind(u.courier_company_id).first();
+        if (!cc || !cc.active) continue;
+        const { token, mustChange } = await _buildCourierToken(u, cc, env);
+        companies.push({
+          company_id:   cc.id,
+          company_name: cc.name,
+          token,
+          role:         u.role,
+          first_name:   u.first_name,
+          last_name:    u.last_name,
+          must_change_password: mustChange,
+        });
+      }
+      if (companies.length > 1) {
+        // שליח עם מספר חברות — JWT אחד עם כל החברות, בחירה תהיה בממשק ההפקדה
+        const { token: multiToken, mustChange: multiMustChange } = await _buildMultiCourierToken(user, companies, env);
+        return ok({
+          token:                multiToken,
+          role:                 user.role,
+          first_name:           user.first_name,
+          last_name:            user.last_name,
+          name:                 `${user.first_name} ${user.last_name}`,
+          must_change_password: multiMustChange,
+          courier_company_ids:  companies.map(c => c.company_id),
+          companies:            companies.map(c => ({ id: c.company_id, name: c.company_name })),
+        });
+      }
+      // רק חברה אחת פעילה — המשך רגיל עם אותו user
+      if (companies.length === 1) {
+        const c = companies[0];
+        return json({
+          token:               c.token,
+          role:                c.role,
+          first_name:          c.first_name,
+          last_name:           c.last_name,
+          name:                `${c.first_name} ${c.last_name}`,
+          courier_company_id:  c.company_id,
+          company_name:        c.company_name,
+          must_change_password: c.must_change_password,
+        });
+      }
+    }
+  }
+
+  // ── כניסה רגילה (משתמש יחיד / לא שליח) ────────────────────────
   let communityName = '';
   let companyName   = '';
   let companyId     = null;
   let features = {};
 
-  // שליח / מנהל שילוח — שייך לחברת שילוח
   if (user.courier_company_id) {
-    const cc = await env.smarta_db
-      .prepare('SELECT id, name, active FROM courier_companies WHERE id = ?')
-      .bind(user.courier_company_id).first();
+    const cc = await db.prepare('SELECT id, name, active FROM courier_companies WHERE id = ?').bind(user.courier_company_id).first();
     if (cc && !cc.active) return json({ error: 'חברת השילוח חסומה. פנה למנהל הישוב.' }, 403);
     companyName = cc?.name || '';
     companyId   = cc?.id   || null;
   }
 
   if (user.community_id) {
-    const s = await env.smarta_db
-      .prepare('SELECT name, status, features_json FROM settlements WHERE id = ?')
-      .bind(user.community_id)
-      .first();
-
-    // יישוב חסום — מונעים כניסה לכל המשתמשים של אותו יישוב
+    const s = await db.prepare('SELECT name, status, features_json FROM settlements WHERE id = ?').bind(user.community_id).first();
     if (s?.status && s.status !== 'active') {
       return json({ error: 'הגישה ליישוב זה חסומה. לפרטים צרו קשר עם מנהל סמרתא.' }, 403);
     }
-
     communityName = s?.name || '';
     try { features = JSON.parse(s?.features_json || '{}'); } catch(e) { features = {}; }
   }
@@ -394,24 +490,28 @@ async function handleLogin(request, env) {
     role:                 user.role,
     community_id:         user.community_id || null,
     courier_company_id:   companyId,
+    first_name:           user.first_name,
+    last_name:            user.last_name,
     name:                 `${user.first_name} ${user.last_name}`,
     community_name:       companyName || communityName,
     company_name:         companyName || null,
     features,
     must_change_password: mustChangePassword,
-    exp:                  nowSec() + 60 * 60 * 24 * 30,  // 30 days
+    exp:                  nowSec() + 60 * 60 * 24 * 30,
   };
 
   const token = await jwtSign(payload, env.JWT_SECRET);
 
-  // Login returns flat (no "data" wrapper) — login.html checks data.token directly
   return json({
     token,
     role:                 user.role,
+    first_name:           user.first_name,
+    last_name:            user.last_name,
     name:                 payload.name,
     community_name:       communityName,
     community_id:         user.community_id || null,
     courier_company_id:   companyId || null,
+    company_name:         companyName || null,
     must_change_password: mustChangePassword,
   });
 }
@@ -1509,19 +1609,26 @@ async function handleCommunity(path, method, request, env, user, url) {
       locker = await db.prepare(
         'SELECT * FROM locker_configs WHERE id = ? AND community_id = ?'
       ).bind(b.locker_id, communityId).first();
-    } else if (user.courier_company_id) {
-      // שליח חברה: בדוק שהלוקר שייך לישוב שהחברה מורשית לשרת
-      const lockerRow = await db.prepare('SELECT * FROM locker_configs WHERE id = ?').bind(b.locker_id).first();
-      if (lockerRow) {
-        const access = await db.prepare(
-          'SELECT id FROM courier_company_access WHERE company_id = ? AND community_id = ?'
-        ).bind(user.courier_company_id, lockerRow.community_id).first();
-        if (access) locker = lockerRow;
+    } else {
+      // שליח חברה: קבע company_id — מהגוף (רב-חברות) או מהטוקן (חד-חברה)
+      let effectiveCompanyId = user.courier_company_id || null;
+      if (!effectiveCompanyId && Array.isArray(user.courier_company_ids)) {
+        const bodyCompanyId = b.company_id || null;
+        if (bodyCompanyId && user.courier_company_ids.includes(bodyCompanyId)) {
+          effectiveCompanyId = bodyCompanyId;
+        }
+      }
+      if (effectiveCompanyId) {
+        const lockerRow = await db.prepare('SELECT * FROM locker_configs WHERE id = ?').bind(b.locker_id).first();
+        if (lockerRow) {
+          const access = await db.prepare(
+            'SELECT id FROM courier_company_access WHERE company_id = ? AND community_id = ?'
+          ).bind(effectiveCompanyId, lockerRow.community_id).first();
+          if (access) locker = lockerRow;
+        }
       }
     }
     if (!locker)                    return notFound();
-    if (locker.tier !== 'premium') return err('הפקדת חבילה דרך שליח זמינה רק ללוקר פרמיום');
-    if (!locker.esp_id)             return err('הלוקר אינו מוגדר עם ESP');
 
     const targetCommunityId = locker.community_id;
     const columns   = JSON.parse(locker.columns_json || '[]');
@@ -1533,11 +1640,21 @@ async function handleCommunity(path, method, request, env, user, url) {
     available.sort((a, b2) => a.volume - b2.volume);
     const chosen = available[0];
 
-    await db.prepare(
-      'INSERT INTO esp_commands (id, esp_id, community_id, cell_number, created_at) VALUES (?, ?, ?, ?, ?)'
-    ).bind(newId(), locker.esp_id, targetCommunityId, chosen.cellNumber, nowSec()).run();
+    const isBasic = locker.tier !== 'premium';
+    let lockCode = null;
 
-    return ok({ cell_number: chosen.cellNumber, volume: chosen.volume, no_cells: false, community_id: targetCommunityId });
+    if (isBasic) {
+      // בייסיק: קוד נעילה פיזי אקראי — אין ESP
+      lockCode = String(Math.floor(1000 + Math.random() * 9000));
+    } else {
+      // פרמיום: ESP פותח את התא
+      if (!locker.esp_id) return err('הלוקר אינו מוגדר עם ESP');
+      await db.prepare(
+        'INSERT INTO esp_commands (id, esp_id, community_id, cell_number, created_at) VALUES (?, ?, ?, ?, ?)'
+      ).bind(newId(), locker.esp_id, targetCommunityId, chosen.cellNumber, nowSec()).run();
+    }
+
+    return ok({ cell_number: chosen.cellNumber, volume: chosen.volume, no_cells: false, community_id: targetCommunityId, lock_code: lockCode, tier: locker.tier });
   }
 
   // ── שלב 1ב: תא קטן — מצא תא גדול יותר ──────────────────
@@ -1556,7 +1673,6 @@ async function handleCommunity(path, method, request, env, user, url) {
       locker = await db.prepare('SELECT * FROM locker_configs WHERE id = ?').bind(b.locker_id).first();
     }
     if (!locker)        return notFound();
-    if (!locker.esp_id) return err('הלוקר אינו מוגדר עם ESP');
 
     const targetCommunityId = locker.community_id;
     const columns  = JSON.parse(locker.columns_json || '[]');
@@ -1573,11 +1689,18 @@ async function handleCommunity(path, method, request, env, user, url) {
     available.sort((a, b2) => a.volume - b2.volume);
     const chosen = available[0];
 
-    await db.prepare(
-      'INSERT INTO esp_commands (id, esp_id, community_id, cell_number, created_at) VALUES (?, ?, ?, ?, ?)'
-    ).bind(newId(), locker.esp_id, targetCommunityId, chosen.cellNumber, nowSec()).run();
+    const isBasic2 = locker.tier !== 'premium';
+    let lockCode2 = null;
+    if (isBasic2) {
+      lockCode2 = String(Math.floor(1000 + Math.random() * 9000));
+    } else {
+      if (!locker.esp_id) return err('הלוקר אינו מוגדר עם ESP');
+      await db.prepare(
+        'INSERT INTO esp_commands (id, esp_id, community_id, cell_number, created_at) VALUES (?, ?, ?, ?, ?)'
+      ).bind(newId(), locker.esp_id, targetCommunityId, chosen.cellNumber, nowSec()).run();
+    }
 
-    return ok({ cell_number: chosen.cellNumber, volume: chosen.volume, no_cells: false });
+    return ok({ cell_number: chosen.cellNumber, volume: chosen.volume, no_cells: false, lock_code: lockCode2, tier: locker.tier });
   }
 
   // ── שלב 2: אישור נעילה + שמירת חבילות + SMS אחד ───────────
@@ -1655,34 +1778,50 @@ async function handleCommunity(path, method, request, env, user, url) {
     if (!['courier','courier_manager','community_manager'].includes(user.role)) return forbidden();
 
     if (user.role === 'courier' && !isImpersonated) {
-      // שליח חברת שילוח — גישה לפי courier_company_access
-      if (user.courier_company_id) {
-        const { results: access } = await db.prepare(
-          'SELECT community_id FROM courier_company_access WHERE company_id = ?'
-        ).bind(user.courier_company_id).all();
-        if (!access.length) return ok([]);
-        const rows = [];
-        for (const acc of access) {
-          const cid = acc.community_id;
-          const { results: lcs } = await db.prepare(
-            'SELECT id FROM locker_configs WHERE community_id = ? AND tier = ?'
-          ).bind(cid, 'premium').all();
-          if (!lcs.length) continue;
-          const sett = await db.prepare('SELECT name FROM settlements WHERE id = ?').bind(cid).first();
-          for (const lc of lcs) {
-            rows.push({ id: lc.id, community_name: sett?.name || cid, community_id: cid });
+      // שליח — תמיכה ב-courier_company_id (יחיד) וב-courier_company_ids (מערך)
+      const companyIds = Array.isArray(user.courier_company_ids)
+        ? user.courier_company_ids
+        : (user.courier_company_id ? [user.courier_company_id] : []);
+
+      if (companyIds.length) {
+        // בנה מפה של ישובים → חברות + לוקרים (מקובץ לפי ישוב)
+        const communityMap = {};
+        for (const cid_company of companyIds) {
+          const cc = await db.prepare('SELECT id, name, active FROM courier_companies WHERE id = ?').bind(cid_company).first();
+          if (!cc || !cc.active) continue;
+          const { results: access } = await db.prepare(
+            'SELECT community_id FROM courier_company_access WHERE company_id = ?'
+          ).bind(cid_company).all();
+          for (const acc of access) {
+            const cid = acc.community_id;
+            if (!communityMap[cid]) {
+              const sett = await db.prepare('SELECT name FROM settlements WHERE id = ?').bind(cid).first();
+              const { results: lcs } = await db.prepare(
+                'SELECT id, tier FROM locker_configs WHERE community_id = ?'
+              ).bind(cid).all();
+              communityMap[cid] = {
+                community_id:   cid,
+                community_name: sett?.name || cid,
+                lockers:        lcs.map(l => ({ id: l.id, tier: l.tier })),
+                companies:      [],
+              };
+            }
+            if (!communityMap[cid].companies.find(c => c.id === cid_company)) {
+              communityMap[cid].companies.push({ id: cc.id, name: cc.name });
+            }
           }
         }
-        return ok(rows);
+        const grouped = Object.values(communityMap).filter(c => c.lockers.length > 0);
+        return ok(grouped);
       }
       // שליח עם community_id בJWT — לוקרים של הישוב שלו
       if (communityId) {
         const { results: lcs } = await db.prepare(
-          'SELECT id FROM locker_configs WHERE community_id = ? AND tier = ?'
-        ).bind(communityId, 'premium').all();
+          'SELECT id, tier FROM locker_configs WHERE community_id = ?'
+        ).bind(communityId).all();
         if (!lcs.length) return ok([]);
         const sett = await db.prepare('SELECT name FROM settlements WHERE id = ?').bind(communityId).first();
-        return ok(lcs.map(lc => ({ id: lc.id, community_name: sett?.name || communityId })));
+        return ok(lcs.map(lc => ({ id: lc.id, community_name: sett?.name || communityId, tier: lc.tier })));
       }
       // שליח ללא community_id — לפי delivery_zones בטבלת couriers
       const courierRow = await db.prepare(
@@ -1693,10 +1832,10 @@ async function handleCommunity(path, method, request, env, user, url) {
       if (!lockerIds.length) return ok([]);
       const rows = [];
       for (const lid of lockerIds) {
-        const lc = await db.prepare('SELECT id, community_id FROM locker_configs WHERE id = ? AND tier = ?').bind(lid, 'premium').first();
+        const lc = await db.prepare('SELECT id, community_id, tier FROM locker_configs WHERE id = ?').bind(lid).first();
         if (!lc) continue;
         const sett = await db.prepare('SELECT name FROM settlements WHERE id = ?').bind(lc.community_id).first();
-        rows.push({ id: lc.id, community_name: sett?.name || lc.community_id });
+        rows.push({ id: lc.id, community_name: sett?.name || lc.community_id, tier: lc.tier });
       }
       return ok(rows);
     } else {
@@ -1783,6 +1922,25 @@ async function handleCommunity(path, method, request, env, user, url) {
     console.log(`[OPEN] ${resident.first_name} ${resident.last_name} ← תאים: [${cells.join(',')}] בלוקר ${lockerId}`);
 
     return ok({ cells, resident_name: resident.first_name + ' ' + resident.last_name });
+  }
+
+  // ── SMS נכנס: דייר מאשר איסוף ─────────────────────────────
+  // InforUMobile שולח POST עם PhoneNumber + Message
+  if (path === '/api/sms/inbound' && method === 'POST') {
+    let b;
+    try { b = await request.json(); } catch { b = Object.fromEntries(new URL(request.url).searchParams); }
+    const rawPhone = b.PhoneNumber || b.phone || '';
+    const msg = (b.Message || b.message || '').trim();
+    if (msg !== '1') return ok({ ignored: true });
+    const phone = rawPhone.replace(/\D/g, '').replace(/^972/, '0');
+    const resident = await db.prepare(
+      'SELECT id FROM residents WHERE phone = ? LIMIT 1'
+    ).bind(phone).first();
+    if (!resident) return ok({ ignored: true });
+    await db.prepare(
+      "UPDATE packages SET status='collected', collected_at=? WHERE resident_id=? AND status='waiting'"
+    ).bind(nowSec(), resident.id).run();
+    return ok({ collected: true });
   }
 
   return notFound();
