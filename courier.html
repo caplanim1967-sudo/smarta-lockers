@@ -775,41 +775,38 @@
       <div style="margin-bottom:12px">
         <button onclick="depStep('cell')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;font-family:Heebo,sans-serif;padding:0;display:flex;align-items:center;gap:4px">← חזור לתא</button>
       </div>
-      <div style="text-align:center;padding:4px 0 16px">
-        <div style="font-size:48px;margin-bottom:10px">📦</div>
+      <div style="text-align:center;padding:4px 0 12px">
+        <div style="font-size:40px;margin-bottom:8px">📦</div>
         <div style="font-size:16px;font-weight:700;margin-bottom:4px">ברקוד חבילה</div>
-        <div style="font-size:13px;color:var(--muted);margin-bottom:20px">סרוק ברקוד או הקלד ידנית</div>
+        <div style="font-size:13px;color:var(--muted)">הקלד מספר ברקוד או סרוק עם המצלמה</div>
       </div>
 
-      <!-- קלט ידני — בולט ונוח -->
-      <div style="margin-bottom:14px">
-        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;text-align:right">מספר ברקוד</label>
+      <!-- קלט ידני — ראשי ובולט -->
+      <div style="margin-bottom:12px">
+        <label style="font-size:13px;color:var(--muted);display:block;margin-bottom:8px;text-align:right;font-weight:600">מספר ברקוד</label>
         <input id="dep-barcode-input" type="text"
           inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-          placeholder="הקלד מספר ברקוד..."
-          style="width:100%;background:var(--surface2);border:2px solid var(--border);border-radius:12px;padding:16px 14px;color:var(--text);font-size:18px;font-family:Heebo,sans-serif;outline:none;direction:ltr;text-align:left;letter-spacing:0.05em"
+          placeholder="הקלד כאן..."
+          onclick="this.focus()"
+          style="width:100%;background:var(--surface2);border:2px solid var(--accent);border-radius:12px;padding:18px 16px;color:var(--text);font-size:20px;font-family:Heebo,sans-serif;outline:none;direction:ltr;text-align:left;letter-spacing:0.05em;-webkit-tap-highlight-color:transparent"
           onkeydown="if(event.key==='Enter'){depConfirmBarcode(this.value)}"
-          onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+          onblur="this.style.borderColor='var(--border)'" onfocus="this.style.borderColor='var(--accent)'">
       </div>
       <button onclick="depConfirmBarcode(document.getElementById('dep-barcode-input').value)"
-        style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif;margin-bottom:14px">
+        style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif;margin-bottom:16px">
         ✅ אשר ברקוד
       </button>
 
-      <!-- סריקת מצלמה -->
-      <div id="dep-barcode-reader" style="width:100%;border-radius:12px;overflow:hidden;background:var(--surface2);position:relative;margin-bottom:10px">
-        <div id="dep-bc-placeholder" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:120px;color:var(--muted);font-size:12px;padding:16px">
-          <div style="font-size:28px;margin-bottom:8px">📷</div>
-          <div>לחץ כדי לסרוק ברקוד</div>
-        </div>
-        <video id="dep-bc-video" style="width:100%;display:none;border-radius:12px" autoplay playsinline muted></video>
+      <!-- סריקת מצלמה — משני, מתחת לקלט -->
+      <div id="dep-barcode-reader" style="display:none;width:100%;border-radius:12px;overflow:hidden;background:#000;position:relative;margin-bottom:10px">
+        <video id="dep-bc-video" style="width:100%;display:block;border-radius:12px" autoplay playsinline muted></video>
         <canvas id="dep-bc-canvas" style="display:none"></canvas>
-        <div id="dep-bc-aim" style="display:none;position:absolute;inset:0;pointer-events:none">
+        <div id="dep-bc-aim" style="position:absolute;inset:0;pointer-events:none">
           <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80%;height:2px;background:rgba(79,142,247,0.7);box-shadow:0 0 8px var(--accent)"></div>
         </div>
       </div>
-      <button id="dep-bc-btn" onclick="depStartBarcode()" style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif;margin-bottom:4px">
-        📷 סרוק ברקוד עם מצלמה
+      <button id="dep-bc-btn" onclick="depStartBarcode()" style="width:100%;background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:Heebo,sans-serif;margin-bottom:4px">
+        📷 סרוק עם מצלמה
       </button>
     </div>
 
@@ -1880,11 +1877,16 @@
       if (el) el.style.display = s === name ? '' : 'none';
     });
     // כשיוצאים משלב הברקוד — עצור מצלמה
-    if (name !== 'barcode') depStopBarcode();
-    // כשנכנסים לשלב הברקוד — פנה שדה ותן focus
+    if (name !== 'barcode' && typeof depStopBarcode === 'function') depStopBarcode();
+    // כשנכנסים לשלב הברקוד — נקה שדה, focus מיידי ואז גם דיליי
     if (name === 'barcode') {
       var inp = document.getElementById('dep-barcode-input');
-      if (inp) { inp.value = ''; setTimeout(function(){ inp.focus(); }, 300); }
+      if (inp) {
+        inp.value = '';
+        inp.style.borderColor = 'var(--accent)';
+        inp.focus();
+        setTimeout(function(){ inp.focus(); inp.click(); }, 400);
+      }
     }
   }
 
@@ -2161,16 +2163,14 @@
 
   function depStartBarcode() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      showToast('מצלמה לא נתמכת — הזן ידנית', 'var(--yellow)');
-      document.getElementById('dep-barcode-input').focus();
+      showToast('מצלמה לא נתמכת — הקלד ידנית', 'var(--yellow)');
       return;
     }
     var btn = document.getElementById('dep-bc-btn');
     if (btn) { btn.textContent = '⏹ עצור מצלמה'; btn.onclick = depStopBarcode; }
-    document.getElementById('dep-bc-placeholder').style.display = 'none';
-    document.getElementById('dep-bc-aim').style.display = '';
+    var reader = document.getElementById('dep-barcode-reader');
+    if (reader) reader.style.display = '';
     var video = document.getElementById('dep-bc-video');
-    video.style.display = 'block';
 
     navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } } })
       .then(function(stream) {
@@ -2188,8 +2188,10 @@
       })
       .catch(function(err) {
         depStopBarcode();
-        showToast('שגיאת מצלמה: ' + err.message, 'var(--red)');
-        document.getElementById('dep-barcode-input').focus();
+        var msg = (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError')
+          ? 'מצלמה לא נמצאה — הקלד ידנית'
+          : ('שגיאת מצלמה: ' + (err.message || err.name));
+        showToast(msg, 'var(--red)');
       });
   }
 
@@ -2238,13 +2240,11 @@
     if (_bcStream) { _bcStream.getTracks().forEach(function(t){ t.stop(); }); _bcStream = null; }
     _bcDetector = null;
     var video = document.getElementById('dep-bc-video');
-    if (video) { video.srcObject = null; video.style.display = 'none'; }
-    var ph = document.getElementById('dep-bc-placeholder');
-    if (ph) { ph.style.display = 'flex'; }
-    var aim = document.getElementById('dep-bc-aim');
-    if (aim) aim.style.display = 'none';
+    if (video) { try { video.pause(); } catch(e){} video.srcObject = null; }
+    var reader = document.getElementById('dep-barcode-reader');
+    if (reader) reader.style.display = 'none';
     var btn = document.getElementById('dep-bc-btn');
-    if (btn) { btn.textContent = '📷 סרוק ברקוד עם מצלמה'; btn.onclick = depStartBarcode; }
+    if (btn) { btn.textContent = '📷 סרוק עם מצלמה'; btn.onclick = depStartBarcode; }
   }
 
   function depConfirmBarcode(barcode) {
