@@ -719,17 +719,14 @@
       </div>
       <!-- סריקת QR -->
       <div id="dep-qr-section" style="display:none">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;text-align:center">או סרוק QR על הלוקר</div>
-        <div id="dep-qr-reader" style="width:100%;border-radius:12px;overflow:hidden;background:var(--surface2);min-height:180px;display:flex;align-items:center;justify-content:center;margin-bottom:10px;position:relative">
-          <div id="dep-qr-placeholder" style="text-align:center;color:var(--muted)">
-            <div style="font-size:28px;margin-bottom:6px">📸</div>
-            <div style="font-size:12px">לחץ להפעלת מצלמה</div>
-          </div>
-          <video id="dep-qr-video" style="width:100%;display:none;border-radius:12px" autoplay playsinline muted></video>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;text-align:center">— או —</div>
+        <!-- reader מוצג רק כשמצלמה פעילה -->
+        <div id="dep-qr-reader" style="display:none;width:100%;border-radius:12px;overflow:hidden;background:#000;margin-bottom:10px;position:relative">
+          <video id="dep-qr-video" style="width:100%;display:block;border-radius:12px" autoplay playsinline muted></video>
           <canvas id="dep-qr-canvas" style="display:none"></canvas>
         </div>
         <button id="dep-qr-btn" onclick="depStartQr()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:Heebo,sans-serif;color:var(--text)">
-          📷 סרוק QR
+          📷 סרוק QR על הלוקר
         </button>
       </div>
       <div id="dep-locker-badge" style="font-size:12px;color:var(--muted);margin-top:8px;text-align:center"></div>
@@ -737,8 +734,8 @@
 
     <!-- שלב 2: חיפוש דייר -->
     <div id="dep-step-resident" style="display:none">
-      <div style="margin-bottom:20px">
-        <button onclick="depGoBack('locker')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;font-family:Heebo,sans-serif;padding:0;display:flex;align-items:center;gap:4px">← חזור</button>
+      <div style="margin-bottom:16px">
+        <button onclick="depGoBack('locker')" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 16px;color:var(--text);cursor:pointer;font-size:14px;font-weight:600;font-family:Heebo,sans-serif">‹ חזור לישוב</button>
       </div>
       <div style="font-size:16px;font-weight:700;margin-bottom:4px">חיפוש דייר</div>
       <div id="dep-locker-badge" style="font-size:12px;color:var(--muted);margin-bottom:20px"></div>
@@ -753,8 +750,8 @@
 
     <!-- שלב 3: אישור תא -->
     <div id="dep-step-cell" style="display:none">
-      <div style="margin-bottom:20px">
-        <button onclick="depGoBack('resident')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;font-family:Heebo,sans-serif;padding:0;display:flex;align-items:center;gap:4px">← חזור</button>
+      <div style="margin-bottom:16px">
+        <button onclick="depGoBack('resident')" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 16px;color:var(--text);cursor:pointer;font-size:14px;font-weight:600;font-family:Heebo,sans-serif">‹ חזור לדייר</button>
       </div>
       <div style="text-align:center;padding:24px 0">
         <div style="font-size:48px;margin-bottom:16px">🗄️</div>
@@ -772,8 +769,8 @@
 
     <!-- שלב 4: סריקת ברקוד חבילה -->
     <div id="dep-step-barcode" style="display:none">
-      <div style="margin-bottom:12px">
-        <button onclick="depStep('cell')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;font-family:Heebo,sans-serif;padding:0;display:flex;align-items:center;gap:4px">← חזור לתא</button>
+      <div style="margin-bottom:16px">
+        <button onclick="depStep('cell')" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 16px;color:var(--text);cursor:pointer;font-size:14px;font-weight:600;font-family:Heebo,sans-serif">‹ חזור לתא</button>
       </div>
       <div style="text-align:center;padding:4px 0 12px">
         <div style="font-size:40px;margin-bottom:8px">📦</div>
@@ -812,8 +809,8 @@
 
     <!-- שלב 5b: עוד חבילה לאותו נמען? -->
     <div id="dep-step-more" style="display:none">
-      <div style="margin-bottom:12px">
-        <button onclick="depStep('barcode')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;font-family:Heebo,sans-serif;padding:0;display:flex;align-items:center;gap:4px">← חזור לסריקה</button>
+      <div style="margin-bottom:16px">
+        <button onclick="depStep('barcode')" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 16px;color:var(--text);cursor:pointer;font-size:14px;font-weight:600;font-family:Heebo,sans-serif">‹ חזור לסריקה</button>
       </div>
       <div style="text-align:center;padding:24px 0">
         <div style="font-size:48px;margin-bottom:16px">📦</div>
@@ -832,8 +829,8 @@
     </div>
 
     <div id="dep-step-lock" style="display:none">
-      <div style="margin-bottom:12px">
-        <button onclick="depStep('more')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;font-family:Heebo,sans-serif;padding:0;display:flex;align-items:center;gap:4px">← חזור</button>
+      <div style="margin-bottom:16px">
+        <button onclick="depStep('more')" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 16px;color:var(--text);cursor:pointer;font-size:14px;font-weight:600;font-family:Heebo,sans-serif">‹ חזור</button>
       </div>
       <div style="text-align:center;padding:4px 0 24px">
         <div style="font-size:48px;margin-bottom:12px">🔒</div>
@@ -1878,14 +1875,13 @@
     });
     // כשיוצאים משלב הברקוד — עצור מצלמה
     if (name !== 'barcode' && typeof depStopBarcode === 'function') depStopBarcode();
-    // כשנכנסים לשלב הברקוד — נקה שדה, focus מיידי ואז גם דיליי
+    // כשנכנסים לשלב הברקוד — נקה שדה ותן focus
     if (name === 'barcode') {
       var inp = document.getElementById('dep-barcode-input');
       if (inp) {
         inp.value = '';
         inp.style.borderColor = 'var(--accent)';
-        inp.focus();
-        setTimeout(function(){ inp.focus(); inp.click(); }, 400);
+        setTimeout(function(){ try { inp.focus(); } catch(e){} }, 200);
       }
     }
   }
@@ -1963,14 +1959,14 @@
 
   function depStartQr() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      alert('המצלמה אינה נתמכת בדפדפן זה. השתמש בהזנה ידנית.');
+      showToast('מצלמה לא נתמכת — בחר ישוב מהרשימה', 'var(--yellow)');
       return;
     }
     var btn = document.getElementById('dep-qr-btn');
     if (btn) { btn.textContent = '⏹ עצור מצלמה'; btn.onclick = depStopQr; }
-    document.getElementById('dep-qr-placeholder').style.display = 'none';
+    var reader = document.getElementById('dep-qr-reader');
+    if (reader) reader.style.display = '';
     var video = document.getElementById('dep-qr-video');
-    video.style.display = 'block';
 
     navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } })
       .then(function(stream) {
@@ -1980,9 +1976,10 @@
       })
       .catch(function(err) {
         depStopQr();
-        var ph = document.getElementById('dep-qr-placeholder');
-        ph.innerHTML = '<div style="color:var(--red);font-size:12px;padding:12px">שגיאת מצלמה: ' + err.message + '</div>';
-        ph.style.display = 'block';
+        var msg = (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError')
+          ? 'מצלמה לא נמצאה — בחר ישוב מהרשימה'
+          : ('שגיאת מצלמה: ' + (err.message || err.name));
+        showToast(msg, 'var(--red)');
       });
   }
 
@@ -2014,11 +2011,11 @@
     if (_qrAnimFrame) { cancelAnimationFrame(_qrAnimFrame); _qrAnimFrame = null; }
     if (_qrStream) { _qrStream.getTracks().forEach(function(t) { t.stop(); }); _qrStream = null; }
     var video = document.getElementById('dep-qr-video');
-    if (video) { video.srcObject = null; video.style.display = 'none'; }
-    var ph = document.getElementById('dep-qr-placeholder');
-    if (ph) { ph.innerHTML = '<div style="font-size:32px;margin-bottom:8px">📸</div><div style="font-size:12px">לחץ להפעלת מצלמה</div>'; ph.style.display = 'block'; }
+    if (video) { try { video.pause(); } catch(e){} video.srcObject = null; }
+    var reader = document.getElementById('dep-qr-reader');
+    if (reader) reader.style.display = 'none';
     var btn = document.getElementById('dep-qr-btn');
-    if (btn) { btn.textContent = '📷 פתח מצלמה'; btn.onclick = depStartQr; }
+    if (btn) { btn.textContent = '📷 סרוק QR על הלוקר'; btn.onclick = depStartQr; }
   }
 
   // טעינת רשימת לוקרים מורשים
