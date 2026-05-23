@@ -47,9 +47,16 @@ print(f'\n[2] Syncing root shell from bundle...')
 sync_script = os.path.join(SCRIPTS, 'sync-root-bundle.py')
 run(f'python "{sync_script}"')
 
+# ── 2b. Sync standalone file if page has one (e.g. courier.html) ─────────────
+standalone = os.path.join(ROOT, f'{page}.html')
+decoded    = os.path.join(ROOT, 'decoded', f'{page}.html')
+if os.path.exists(standalone) and os.path.exists(decoded):
+    shutil.copy2(decoded, standalone)
+    print(f'  {page}.html (root) <- decoded/{page}.html synced')
+
 # ── 3. Git commit & push ──────────────────────────────────────────────────────
 print(f'\n[3] Git commit & push...')
-run(f'git add bundle/smarta-all-v2.html smarta-all-v2.html index.html')
+run(f'git add bundle/smarta-all-v2.html smarta-all-v2.html index.html {page}.html')
 run(f'git commit -m "{page}: {msg}"')
 run(f'git push origin main')
 
