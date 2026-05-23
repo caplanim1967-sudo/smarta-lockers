@@ -855,7 +855,10 @@ async function handleCommunity(path, method, request, env, user, url) {
   const db          = env.smarta_db;
   const communityId = user.community_id;
   // smarta_admin אין לו community_id — אבל שליח חברת שילוח יכול לעבוד ללא community_id
-  const isCourierCompanyUser = !communityId && user.courier_company_id;
+  const isCourierCompanyUser = !communityId && (
+    user.courier_company_id ||
+    (Array.isArray(user.courier_company_ids) && user.courier_company_ids.length > 0)
+  );
   if (!communityId && !isCourierCompanyUser) return forbidden();
 
   // ── Residents ────────────────────────────────────────────
