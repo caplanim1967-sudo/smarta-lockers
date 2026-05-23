@@ -1976,10 +1976,16 @@
       })
       .catch(function(err) {
         depStopQr();
-        var msg = (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError')
-          ? 'מצלמה לא נמצאה — בחר ישוב מהרשימה'
-          : ('שגיאת מצלמה: ' + (err.message || err.name));
-        showToast(msg, 'var(--red)');
+        var n = err.name || '';
+        var msg;
+        if (n === 'NotAllowedError' || n === 'PermissionDeniedError') {
+          msg = 'הרשאת מצלמה נדחתה — אפשר בהגדרות הדפדפן';
+        } else if (n === 'NotFoundError' || n === 'DevicesNotFoundError') {
+          msg = 'מצלמה לא נמצאה — בחר ישוב מהרשימה';
+        } else {
+          msg = 'מצלמה לא זמינה — בחר ישוב מהרשימה';
+        }
+        showToast(msg, 'var(--yellow)');
       });
   }
 
@@ -2185,10 +2191,18 @@
       })
       .catch(function(err) {
         depStopBarcode();
-        var msg = (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError')
-          ? 'מצלמה לא נמצאה — הקלד ידנית'
-          : ('שגיאת מצלמה: ' + (err.message || err.name));
-        showToast(msg, 'var(--red)');
+        var n = err.name || '';
+        var msg;
+        if (n === 'NotAllowedError' || n === 'PermissionDeniedError') {
+          msg = 'הרשאת מצלמה נדחתה — אפשר בהגדרות הדפדפן או הקלד ידנית';
+        } else if (n === 'NotFoundError' || n === 'DevicesNotFoundError') {
+          msg = 'מצלמה לא נמצאה — הקלד ידנית';
+        } else if (n === 'NotReadableError' || n === 'TrackStartError') {
+          msg = 'המצלמה בשימוש — סגור אפליקציה אחרת או הקלד ידנית';
+        } else {
+          msg = 'מצלמה לא זמינה — הקלד ידנית';
+        }
+        showToast(msg, 'var(--yellow)');
       });
   }
 
