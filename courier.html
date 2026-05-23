@@ -1892,7 +1892,7 @@
     if (name === 'couriers') loadCouriers();
     if (name === 'managers') loadManagers();
     if (name === 'packages') loadPackagesReport();
-    if (name === 'deposit')  depReset();
+    // deposit: אין reset אוטומטי — _startDepositFlow מכין את ה-state לפני showScreen
   };
 
   // ─── ROLE-BASED UI ────────────────────────────────────────
