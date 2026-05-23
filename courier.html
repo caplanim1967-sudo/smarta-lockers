@@ -365,23 +365,23 @@
       <div class="stats-row">
         <div class="stat-card blue">
           <div class="stat-label">חבילות החודש</div>
-          <div class="stat-value">0</div>
-          <div class="stat-sub">בכל הישובים</div>
+          <div class="stat-value" id="dash-stat-total">—</div>
+          <div class="stat-sub" id="dash-stat-total-sub">בכל הישובים</div>
         </div>
         <div class="stat-card green">
           <div class="stat-label">נמסרו בהצלחה</div>
-          <div class="stat-value">0</div>
-          <div class="stat-sub">89% מסירה</div>
+          <div class="stat-value" id="dash-stat-collected">—</div>
+          <div class="stat-sub" id="dash-stat-pct">—</div>
         </div>
         <div class="stat-card yellow">
           <div class="stat-label">ממתינות לאיסוף</div>
-          <div class="stat-value">0</div>
+          <div class="stat-value" id="dash-stat-waiting">—</div>
           <div class="stat-sub">מעל 24 שעות</div>
         </div>
         <div class="stat-card red">
           <div class="stat-label">קנסות פתוחים</div>
-          <div class="stat-value">0</div>
-          <div class="stat-sub">₪0 סה"כ</div>
+          <div class="stat-value" id="dash-stat-fines">—</div>
+          <div class="stat-sub" id="dash-stat-fines-sub">₪0 סה"כ</div>
         </div>
       </div>
 
@@ -390,9 +390,7 @@
         <div class="card-title">🏘️ פילוח לפי ישוב — <span id="dash-month-label">מרץ 2026</span>
           <span class="sub" style="margin-right:auto"></span>
           <select id="dash-month" onchange="updateDashMonth()" style="font-size:12px;padding:5px 10px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;font-family:Heebo,sans-serif">
-            <option value="3">מרץ 2026</option>
-            <option value="2">פברואר 2026</option>
-            <option value="1">ינואר 2026</option>
+            <option>טוען...</option>
           </select>
         </div>
         <div class="table-wrap">
@@ -478,7 +476,7 @@
           <span>📋 דוח חודשי מסכם</span>
           <div style="display:flex;gap:8px;align-items:center">
             <select id="report-month" style="font-size:12px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;font-family:Heebo,sans-serif">
-              <option>מרץ 2026</option><option>פברואר 2026</option><option>ינואר 2026</option>
+              <option>טוען...</option>
             </select>
             <select id="report-village" style="font-size:12px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;font-family:Heebo,sans-serif">
               <option value="">כל הישובים</option>
@@ -540,8 +538,8 @@
           ⚠️ קנס מוטל על חבילות שלא נאספו תוך 5 ימי עסקים. מחיר קנס: ₪70 לחבילה.
         </div>
         <div class="filter-row">
-          <select>
-            <option>מרץ 2026</option><option>פברואר 2026</option><option>ינואר 2026</option>
+          <select id="fines-month">
+            <option>טוען...</option>
           </select>
           <select>
             <option value="">כל הישובים</option>
@@ -1030,6 +1028,30 @@
     document.getElementById('pkg-count').textContent = 'מציג ' + count + ' רשומות';
   }
 
+  // שמות חודשים בעברית
+  var _HE_MONTHS = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+
+  function initMonthSelectors() {
+    var now = new Date();
+    var options = [];
+    for (var i = 0; i < 9; i++) {
+      var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      var label = _HE_MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+      var val   = (d.getMonth() + 1) + '-' + d.getFullYear(); // "5-2026"
+      options.push({ label: label, val: val, selected: i === 0 });
+    }
+    ['dash-month', 'report-month', 'fines-month'].forEach(function(id) {
+      var sel = document.getElementById(id);
+      if (!sel) return;
+      sel.innerHTML = options.map(function(o) {
+        return '<option value="' + o.val + '"' + (o.selected ? ' selected' : '') + '>' + o.label + '</option>';
+      }).join('');
+    });
+    // עדכן כותרת דשבורד
+    var dashLabel = document.getElementById('dash-month-label');
+    if (dashLabel && options.length) dashLabel.textContent = options[0].label;
+  }
+
   function updateDashMonth() {
     const m = document.getElementById('dash-month');
     document.getElementById('dash-month-label').textContent = m.options[m.selectedIndex].text;
@@ -1254,6 +1276,7 @@
   }
 
   // ======= AUTO-INIT (when logged in via sessionStorage) =======
+  initMonthSelectors(); // תמיד — חודשים דינמיים מחודש נוכחי
   if (jwtToken) {
     var _user = JSON.parse(sessionStorage.getItem('courier_user') || sessionStorage.getItem('smarta_user') || 'null');
     if (_user && _user.must_change_password) {
@@ -1710,9 +1733,74 @@
   }
 
   // טעינה בכניסה לטאב
+  function loadDashboard() {
+    var now = new Date();
+    var curMonthKey = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+    var companyId = _myCompanyId();
+    var url = companyId
+      ? '/api/packages?company_id=' + companyId
+      : '/api/packages';
+    _apiGet(url).then(function(data) {
+      var pkgs = (Array.isArray(data) ? data : (data && Array.isArray(data.packages) ? data.packages : []));
+      // סנן לחודש נוכחי
+      var thisMonth = pkgs.filter(function(p) {
+        var ts = p.assigned_at || p.placed_at || 0;
+        if (!ts) return false;
+        var d = new Date(ts * 1000);
+        return (d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0')) === curMonthKey;
+      });
+      var total     = thisMonth.length;
+      var collected = thisMonth.filter(function(p){ return p.status === 'collected'; }).length;
+      var waiting   = thisMonth.filter(function(p){ return p.status === 'waiting'; }).length;
+      var pct = total ? Math.round(collected / total * 100) : 0;
+
+      var setEl = function(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; };
+      setEl('dash-stat-total',     total);
+      setEl('dash-stat-total-sub', 'בכל הישובים');
+      setEl('dash-stat-collected', collected);
+      setEl('dash-stat-pct',       pct + '% מסירה');
+      setEl('dash-stat-waiting',   waiting);
+      setEl('dash-stat-fines',     0);
+
+      // פילוח לפי ישוב
+      var byVillage = {};
+      thisMonth.forEach(function(p) {
+        var v = p.community_name || p.community_id || '—';
+        if (!byVillage[v]) byVillage[v] = { total:0, collected:0, waiting:0 };
+        byVillage[v].total++;
+        if (p.status === 'collected') byVillage[v].collected++;
+        if (p.status === 'waiting')   byVillage[v].waiting++;
+      });
+      var tbody = document.getElementById('dash-village-table');
+      if (tbody) {
+        var keys = Object.keys(byVillage);
+        if (!keys.length) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">אין נתונים לחודש זה</td></tr>';
+        } else {
+          tbody.innerHTML = keys.map(function(v) {
+            var r = byVillage[v];
+            var pctV = r.total ? Math.round(r.collected/r.total*100) : 0;
+            var badge = pctV >= 80
+              ? '<span class="badge badge-green">' + pctV + '%</span>'
+              : pctV >= 50
+                ? '<span class="badge badge-yellow">' + pctV + '%</span>'
+                : '<span class="badge badge-red">' + pctV + '%</span>';
+            return '<tr><td>' + _esc(v) + '</td><td style="text-align:center">' + r.total +
+              '</td><td style="text-align:center;color:var(--green)">' + r.collected +
+              '</td><td style="text-align:center;color:var(--yellow)">' + r.waiting +
+              '</td><td style="text-align:center">0</td><td style="text-align:center">' + badge + '</td></tr>';
+          }).join('');
+        }
+      }
+    }).catch(function() {
+      ['dash-stat-total','dash-stat-collected','dash-stat-waiting','dash-stat-fines'].forEach(function(id){ setEl(id,'?'); });
+    });
+  }
+
   var _origShowScreen = showScreen;
   showScreen = function(name, el) {
     _origShowScreen(name, el);
+    if (name === 'dashboard') loadDashboard();
     if (name === 'couriers') loadCouriers();
     if (name === 'managers') loadManagers();
     if (name === 'packages') loadPackagesReport();
@@ -1720,28 +1808,38 @@
   };
 
   // ─── ROLE-BASED UI ────────────────────────────────────────
+  // standalone = courier.html נטען ישירות (לא כ-iframe ב-smarta-all-v2)
+  var _isStandalone = (window.parent === window);
+
   function applyRoleUI(role) {
-    // בדוק אם זה smarta_admin שמנהל ישוב דרך impersonation
+    // במצב standalone — courier.html = הפקדה בלבד, ללא nav, לכל role
+    if (_isStandalone) {
+      document.querySelectorAll('.manager-only').forEach(function(el) { el.style.display = 'none'; });
+      document.querySelectorAll('.courier-only').forEach(function(el) { el.style.display = 'none'; });
+      var navEl = document.querySelector('nav');
+      if (navEl) navEl.style.display = 'none';
+      document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+      var depScreen = document.getElementById('screen-deposit');
+      if (depScreen) depScreen.classList.add('active');
+      return;
+    }
+
+    // iframe בתוך smarta-all-v2 — תפקידים כרגיל
     var _u = JSON.parse(sessionStorage.getItem('courier_user') || sessionStorage.getItem('smarta_user') || 'null');
     var isImpersonatedAdmin = _u && _u.impersonated_by === 'smarta_admin';
 
     if (role === 'courier') {
-      // שליח בשטח — ממשק מינימלי: הפקדה בלבד, ללא nav
       document.querySelectorAll('.manager-only').forEach(function(el) { el.style.display = 'none'; });
       document.querySelectorAll('.courier-only').forEach(function(el) { el.style.display = 'none'; });
-      // הסתר לגמרי את ה-nav — שליח לא צריך ניווט
-      var navEl = document.querySelector('nav');
-      if (navEl) navEl.style.display = 'none';
-      // הצג מסך הפקדה כברירת מחדל
+      var navEl2 = document.querySelector('nav');
+      if (navEl2) navEl2.style.display = 'none';
       document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
-      var depScreen = document.getElementById('screen-deposit');
-      if (depScreen) depScreen.classList.add('active');
+      var depScreen2 = document.getElementById('screen-deposit');
+      if (depScreen2) depScreen2.classList.add('active');
     } else if (role === 'courier_manager' || isImpersonatedAdmin) {
-      // חברת שילוח / smarta_admin שנכנס דרך "נהל" — כל הטאבים כולל הפקדה
       document.querySelectorAll('.manager-only').forEach(function(el) { el.style.display = 'block'; });
       document.querySelectorAll('.courier-only').forEach(function(el) { el.style.display = 'block'; });
     } else {
-      // community_manager — ניהול בלבד, ללא הפקדה
       document.querySelectorAll('.manager-only').forEach(function(el) { el.style.display = 'block'; });
       document.querySelectorAll('.courier-only').forEach(function(el) { el.style.display = 'none'; });
     }
@@ -1755,6 +1853,10 @@
     }
     // טעינת רשימת לוקרים מורשים (רק אם יש session)
     if (_user) depLoadLockers();
+    // טעינת דשבורד בעת כניסה (רק אם courier_manager)
+    if (_user && _user.role === 'courier_manager' && !_isStandalone) {
+      loadDashboard();
+    }
   })();
 
   // ─── DEPOSIT FLOW ─────────────────────────────────────────
