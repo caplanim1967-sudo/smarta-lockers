@@ -851,6 +851,15 @@
       <button id="dep-bc-btn" onclick="depStartBarcode()" style="width:100%;background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:Heebo,sans-serif;margin-bottom:4px">
         📷 סרוק עם מצלמה
       </button>
+      <!-- אישור סריקה — מוצג אחרי זיהוי ברקוד -->
+      <div id="dep-bc-preview" style="display:none;margin-top:12px;background:var(--surface2);border:2px solid var(--accent);border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px">ברקוד שנסרק:</div>
+        <div id="dep-bc-preview-code" style="font-size:20px;font-weight:700;color:var(--text);letter-spacing:0.05em;direction:ltr;margin-bottom:14px"></div>
+        <div style="display:flex;gap:10px">
+          <button type="button" onclick="depConfirmScannedBarcode()" style="flex:1;background:var(--green);color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif">✅ אשר</button>
+          <button type="button" onclick="depRescanBarcode()" style="flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif">🔄 סרוק שוב</button>
+        </div>
+      </div>
     </div>
 
     <!-- שלב 5b: עוד חבילה לאותו נמען? -->
@@ -955,7 +964,9 @@
       document.getElementById('change-pass-screen').style.display = 'flex';
       return;
     }
-    enterApp(data.company_name || data.name || fallbackName || '');
+    // שליח: company_name ריק — אל תציג שם פרטי כ"חברה" בheader
+    var _compLabel = data.company_name || (role === 'courier' ? '' : (data.name || fallbackName || ''));
+    enterApp(_compLabel);
     var _cName = [data.first_name, data.last_name].filter(Boolean).join(' ') || fallbackName || '';
     var _cEl = document.getElementById('header-courier-name');
     if (_cEl && _cName) _cEl.textContent = 'שלום, ' + _cName;
@@ -2452,8 +2463,7 @@
           var code = result && result.codeResult && result.codeResult.code;
           if (!code) return;
           depStopBarcode();
-          document.getElementById('dep-barcode-input').value = code;
-          depConfirmBarcode(code);
+          depPreviewBarcode(code);
         });
       });
 
@@ -2470,8 +2480,7 @@
       if (codes && codes.length > 0) {
         var val = codes[0].rawValue;
         depStopBarcode();
-        document.getElementById('dep-barcode-input').value = val;
-        depConfirmBarcode(val);
+        depPreviewBarcode(val);
         return;
       }
       _bcAnimFrame = setTimeout(_bcScanNative, 200);
@@ -2504,6 +2513,32 @@
       inp.scrollIntoView({ behavior: 'smooth', block: 'center' });
       setTimeout(function(){ try { inp.focus(); } catch(e){} }, 350);
     }
+  }
+
+  var _depScannedBarcode = null;
+
+  function depPreviewBarcode(code) {
+    _depScannedBarcode = (code || '').trim();
+    document.getElementById('dep-barcode-input').value = _depScannedBarcode;
+    var preview = document.getElementById('dep-bc-preview');
+    var display = document.getElementById('dep-bc-preview-code');
+    if (display) display.textContent = _depScannedBarcode;
+    if (preview) preview.style.display = '';
+  }
+
+  function depConfirmScannedBarcode() {
+    var preview = document.getElementById('dep-bc-preview');
+    if (preview) preview.style.display = 'none';
+    depConfirmBarcode(_depScannedBarcode);
+    _depScannedBarcode = null;
+  }
+
+  function depRescanBarcode() {
+    var preview = document.getElementById('dep-bc-preview');
+    if (preview) preview.style.display = 'none';
+    document.getElementById('dep-barcode-input').value = '';
+    _depScannedBarcode = null;
+    depStartBarcode();
   }
 
   function depConfirmBarcode(barcode) {
