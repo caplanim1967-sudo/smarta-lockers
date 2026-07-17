@@ -1,6 +1,6 @@
 # CLAUDE.md — Smarta Lockers
 > קובץ זה נקרא אוטומטית בכל פתיחת שיחה. מעדכן אותו בסוף כל שיחה.
-> עדכון אחרון: 2026-05-08
+> עדכון אחרון: 2026-05-23 (סיום שיחה)
 
 ---
 
@@ -84,9 +84,10 @@ lockCode = randPart + cellPart   →   4 ספרות סה"כ
 
 ### SMS / WhatsApp
 ספק: **InforUMobile** (ישראלי — נבחר על Twilio בגלל מספרים ישראליים).
-עדיין לא מחובר — `sendMessage()` = mock (console.log בלבד).
+**סטטוס: ✅ פעיל** — `sendMessage()` קורא לInforUMobile API אמיתי. SMS אושר ב-0522497446.
 **ערוץ:** SMS או WhatsApp — לפי בחירת הדייר, מוגדר ע"י מנהל הישוב.
-**הצעד הבא:** פתיחת חשבון InforUMobile → החלפת mock ב-API אמיתי.
+**אישור איסוף:** `POST /api/sms/inbound` — דייר שולח "1" → `packages.status=collected`.
+עדיין חסר: מספר וירטואלי + Webhook URL מInforUMobile (צור קשר 03-9415550).
 
 ### זרימת SMS אישור איסוף (רעיון חדש — טרם מומש)
 ```
@@ -120,7 +121,7 @@ smarta-all-v2.html  ← bundle עם iframe לכל דף (base64)
 ```
 
 **API:** `https://smarta-api.smarta-api.workers.dev` (Cloudflare Workers)
-**סטטוס API:** ✅ פעיל — D1 + JWT. כל endpoints עובדים.
+**סטטוס API:** ✅ פעיל — D1 + JWT + InforUMobile SMS. כל endpoints עובדים.
 **D1:** `smarta-db` (1e9ab32c-c6fb-4001-aaca-a2c21913dc36)
 
 **GitHub Pages:** `caplanim1967-sudo.github.io/smarta-lockers/smarta-all-v2.html`
@@ -348,7 +349,10 @@ ESP32 מפעיל ממסר תא 5 → סולנואיד נפתח
   - hashPassword SHA-256 + fallback btoa
   - משווה hash עם smarta_users
 - אייקון עין (הצג/הסתר סיסמה)
-- שכחתי סיסמה (UI בלבד — צריך SMS)
+- **שכחתי סיסמה ✅** — OTP דרך InforUMobile SMS → מסך הזנת OTP → מסך סיסמה חדשה
+- **חובת שינוי סיסמה ✅** — must_change_password=true → מסך שינוי סיסמה (change-pass-screen)
+- **הפרדת הודעות שגיאה:** שליח (username=טלפון) → "פנה למנהל השילוח" (אין OTP); שאר → כפתור SMS
+- **רב-חברות:** שליח עם כמה חברות → JWT אחד עם courier_company_ids[], בחירת חברה עוברת לממשק ההפקדה
 
 ### app.html (אחראי דואר) ✅ פעיל
 - לוח בקרה: גריד לוקר ממלא מסך, יחסי לפי config
@@ -363,12 +367,13 @@ ESP32 מפעיל ממסר תא 5 → סולנואיד נפתח
 - **קוד מנעול מכאני** נוצר אוטומטית בעת שיוך
 - כפתור "🧹 פנה תפוסים" — מרוקן כל תאים תפוסים בלחיצה
 
-### manager.html ⚠️ חלקי
+### manager.html ✅ כמעט שלם
 - דשבורד ✅ — כולל stat-free / stat-occ מ-/api/cells, fmtDate תוקן
 - דיירים CRUD ✅ מול API (כולל ייבוא אקסל)
 - חבילות ✅ מול API (ממתינות + היסטוריה)
 - תאים / לוקר ✅ קריאה בלבד — מנהל ישוב רואה סטטוס, לא יכול לדווח/לנקות תקלה
-- בעלי תפקידים ✅ CRUD מול API
+- בעלי תפקידים ✅ CRUD מול API — כולל dropdown חברת שילוח כש-role=courier_manager
+- **חברות שילוח ✅** — טאב חדש: CRUD מלא, יצירת חברה + מנהל ראשי בצעד אחד, הסרת חברה מהישוב, הוספת מנהלי שילוח נוספים
 - תזכורות ✅ — מחובר ל-API ונשמר ל-D1
 
 ### כללי shell (smarta-all-v2.html) ✅
@@ -376,24 +381,30 @@ ESP32 מפעיל ממסר תא 5 → סולנואיד נפתח
 - activateCommunity: smarta_admin מתחזה לישוב — כל 4 טאבים מקבלים token חדש
 - community banner: מציג ישוב פעיל + כפתור "חזור לניהול Smarta"
 
-### courier.html ✅ זרימה בסיסית עובדת
+### courier.html ✅ זרימה מלאה עובדת (פרמיום + בייסיק)
 - תפקיד `courier_manager` (חברת שילוח) — רואה את כל הטאבים + הפקדה
 - תפקיד `courier` (שליח בשטח) — רואה רק טאב הפקדה
 - **טאבים:** סקירה / חבילות / דוח חודשי / קנסות / שליחים / הפקדת חבילה
 - **שליחים:** CRUD + כפתור "צור חשבון" — יוצר user עם role=courier, username=טלפון, סיסמה=ת"ז, must_change_password=true
 - **שינוי סיסמה בכניסה ראשונה:** מסך מיוחד (change-pass-screen), API `POST /api/auth/change-password`
+- **שליח רב-חברות:** JWT עם `courier_company_ids: []` array — שליח מורשה בכמה חברות
+- **מסך yishuv:** כרטיסיות ישוב אחרי כניסה — שליח רואה רק ישוביו
+- **מסך company:** בחירת חברה לפי ישוב — מוצג רק אם יש >1 חברה לישוב
 - **זרימת הפקדה (7 שלבים):**
-  1. dropdown לוקרים מורשים (+ QR משני)
+  1. dropdown/QR לוקרים מורשים — לוקר יחיד מדלג אוטומטית
   2. חיפוש דייר — מסונן לקהילת הלוקר הנבחר
   3. הקצאת תא (קטן ביותר) + פתיחת דלת (← כפתור חזרה לדייר)
-  4. סריקת ברקוד + הזנה ידנית (← כפתור חזרה לתא)
+  4. סריקת ברקוד (מצלמה → אישור → הקלדה ידנית כמשנית) (← חזרה לתא)
   5. "האם יש חבילה נוספת?" — לולאת ברקודים, מונה חבילות
-  6. נעילה + SMS אחד לכל הברקודים (← כפתור חזרה ל-5)
+  6. נעילה + קוד בולט לבייסיק + SMS אחד לכל הברקודים (← חזרה ל-5)
   7. הצלחה / אין תאים
 - **חבילות מרובות לאותו תא:** `_dep.barcodes[]` — array, SMS אחד בסוף
 - **Backend deposit:** `POST /api/deposit/start`, `POST /api/deposit/too-small`, `POST /api/deposit/confirm`
+- **תמיכת בייסיק:** deposit/start מחזיר `lock_code` (4 ספרות) במקום esp_command
+- **קוד נעילה בייסיק:** dep-step-lock מציג קוד בולט לשליח להגדרה על המנעול הפיזי
 - **דוח חבילות:** `loadPackagesReport()` — מביא waiting + collected, מציג סטטוס צבעוני
 - **ESP32:** polling `GET /api/esp/commands?esp_id=X` (ללא JWT), מחיקה אטומית אחרי שליפה
+- **ברקוד:** מצלמה ראשונה (Quagga) → preview + אשר/סרוק שוב → הקלדה ידנית (כפתור "⌨️ הקלד ידנית")
 
 ### finance.html
 - לא נבדק/עודכן בסשנים האחרונים
@@ -407,7 +418,18 @@ ESP32 מפעיל ממסר תא 5 → סולנואיד נפתח
 | smarta_admin | Smarta2026! | smarta_admin | API — D1 |
 | mgr_nir | Manager123! | community_manager | NIR-01 — קיבוץ נירעד |
 | nir_doa | NirDoa2026! | mail_manager | NIR-01 — אחראי דואר |
-| nir_courier | (ידוע למשתמש) | courier_manager | NIR-01 — שלמה סיקס, חברת שילוח — עודכן מ-courier ל-courier_manager |
+| nir_courier | Courier2026! | courier_manager | NIR-01 — שלמה סיקס, חברת שילוח מגבית שירות |
+| 0521111222 | Courier2026! | courier | שליח — מורשה בשתי חברות: מגבית שירות + ציטה |
+| mgr_mpl_p | Manager2026! | community_manager | MPL-P — מפלסים פרמיום |
+| mail_mpl_p | Mail2026! | mail_manager | MPL-P — אחראית דואר |
+| curmgr_mpl_p | Courier2026! | courier_manager | MPL-P — מנהל שילוח, ESP-MPL-P |
+| 0521111222_p | Courier2026! | courier | MPL-P — שליח פרמיום |
+
+### שליח 0521111222 — רב חברות
+| חברה | ID |
+|---|---|
+| מגבית שירות | `6a7b6b28-...` |
+| ציטה | `5c10fefb-...` (רשומה נוספת: `0521111222_z`) |
 
 **חשוב:** שנה סיסמת smarta_admin ו-mgr_nir אחרי הפרסום לייצור!
 
@@ -431,22 +453,24 @@ wrangler d1 execute smarta-db --remote --command="UPDATE users SET password_hash
 ### קריטי
 - [ ] **Feature flags** — הוספת שדה `features` לD1 + הרחבת JWT + UI בadmin להפעלה/כיבוי פר ישוב
 - [ ] תזכורות ב-manager.html לא נשמרות (צריך endpoint + D1 + UI מחובר)
-- [ ] **courier.html — בדיקת זרימה מלאה:** יש להיכנס ישירות כ-`nir_courier` (לא דרך shell של smarta_admin) — הסיבה: shell מייצר טוקן עם role=courier ו-sub=smarta_admin_001, מה שגורם לסינון שגוי של שליחים
-- [ ] **שליחים לא מופיעים ברשימה** — כשנכנסים דרך shell של smarta_admin, הסינון `company_id=smarta_admin_001` לא מחזיר תוצאות. הפתרון: כניסה ישירה כ-nir_courier
+- [x] ~~courier.html — בדיקת זרימה מלאה~~ — נבדקה ואושרה (פרמיום MPL-P + בייסיק NIR-01)
+- [x] ~~שליחים לא מופיעים ברשימה~~ — תוקן (isCourierCompanyUser תומך ב-courier_company_ids array)
 - [x] ~~תאי לוקר ב-manager.html לא עובדים~~ — תוקן
 - [x] ~~saveLocker לא שמר ל-D1~~ — תוקן
 - [x] ~~לוקר לא מוצג ב-app.html~~ — תוקן
 - [x] ~~courier.html — שכתוב מאפס~~ — בוצע (זרימת הפקדה מלאה, QR scanner, role-based UI, שינוי סיסמה)
 
 ### בינוני
-- [ ] SMS/WhatsApp לא מחובר — ממתין לחשבון InforUMobile (sendMessage() = mock) ← פאזה 2
+- [ ] **InforUMobile: מספר וירטואלי + Webhook** — צור קשר 03-9415550, בקש Webhook POST → `https://smarta-api.smarta-api.workers.dev/api/sms/inbound`
+- [ ] **בדיקת אישור איסוף:** דייר שולח "1" → `packages.status=collected` (endpoint קיים, לא נבדק)
 - [ ] כרטיסי תחזוקה לא מומשו
 - [ ] smarta_admin — password_changed_at לא נשמר בD1 (אין עמודה, צריך ALTER TABLE)
-- [ ] ב-admin.html: password reminder SMS — עדיין mock ("Twilio pending")
+- [x] ~~SMS/WhatsApp לא מחובר~~ — InforUMobile פעיל ✅
 
 ### קוסמטי
 - [ ] ESP32 ID לא מיוצר אוטומטית
 - [ ] מחירים בדף תשלומים hardcoded
+- [ ] `depGoBackFromLocker` קורא `showScreen('company')` שלא קיים — צריך `showScreen('yishuv')`
 
 ---
 
@@ -461,6 +485,80 @@ wrangler d1 execute smarta-db --remote --command="UPDATE users SET password_hash
 ---
 
 ## היסטוריה של הפרויקט
+
+### סשן 23 מאי 2026 — ממשק שליחים, בייסיק, תיקוני UX
+
+**שינויי Worker:**
+- `/api/deposit/start`: הסרת חסימת premium — תומך גם בבייסיק, מחזיר `lock_code` (4 ספרות) במקום esp_command
+- `/api/courier/lockers`: הוסר `AND tier='premium'` — מחזיר גם ישובי בייסיק; מבנה מקובץ לפי community עם `lockers[]` + `companies[]`
+- `handleLogin`: שליח רב-חברות → JWT אחד עם `courier_company_ids: []` (ולא `needs_company_select`)
+- `isCourierCompanyUser`: תוקן לתמוך ב-`courier_company_ids` array (הפתרון לבאג Forbidden)
+- `/api/deposit/start`: מקבל `company_id` מגוף הבקשה לשליח רב-חברות
+- **endpoint חדש:** `POST /api/sms/inbound` — InforUMobile Webhook, דייר שולח "1" → `packages.status=collected`
+
+**שינויי courier.html:**
+- מסך `screen-yishuv`: כרטיסיות ישוב אחרי כניסה
+- מסך `screen-company`: בחירת חברה לפי ישוב (רק אם >1 חברה)
+- `dep-step-lock`: מציג קוד נעילה בולט לבייסיק
+- **תיקון קריטי (depReset loop):** `showScreen('deposit')` קרא `depReset()` שקרא `showScreen('yishuv')` → כפתור "התחל הפקדה" לא עשה כלום. תוקן: הוסר `if (name==='deposit') depReset()` מה-override
+- **תיקון header כפול:** שם שליח הופיע פעמיים — ב-`enterApp()` וב-`header-courier-name`. תוקן: `company_name` ריק לשליח רגיל לא מוצג ב-header הראשי
+- **ברקוד — אישור סריקה:** Quagga מציג preview + כפתורי "אשר" / "סרוק שוב" במקום לסגור מיד
+- **ברקוד — מצלמה ראשונה:** קלט ידני מוסתר כברירת מחדל; "⌨️ הקלד ידנית" מציג אותו ועוצר מצלמה
+- תיקון: כפתורים דינמיים חייבים `type="button"` (ברירת מחדל submit גרמה לרענון דף)
+
+**שינויי login.html:**
+- הסרת בחירת חברה מלוגין — עוברת לממשק ההפקדה
+- הפרדת שגיאות: שליח (username=טלפון) → "פנה למנהל השילוח"; שאר → כפתור SMS חידוש
+
+**DB:**
+- `INSERT locker_config` ל-NIR-01 (basic, esp_id=null) — ישוב בייסיק מחובר לשליחים
+
+**בדיקות:**
+- בדיקה מלאה NIR-01 + MPL-P — ✅ (commit 56fd55d, 8c289ec, 0b6d439)
+- אימות: `notified_at` מוגדר לחבילות MPL-P → InforUMobile שלח SMS אמיתי לדייר
+
+---
+
+### סשן מאי 2026 — חברות שילוח + OTP + תיקוני שליחים
+
+**manager.html — חברות שילוח (טאב חדש):**
+- טבלה מלאה של חברות שילוח
+- יצירת חברה + מנהל ראשי בצעד אחד
+- הסרת חברה מהישוב
+- הגדרת מנהל לחברות קיימות (דרך עריכה)
+- מנהלי שילוח נוספים — ניהול מתוך טאב חברת שילוח
+- Dropdown חברת שילוח ב"הוסף בעל תפקיד" כש-role=courier_manager
+
+**login.html — שכחתי סיסמה:**
+- OTP דרך InforUMobile SMS → כניסת OTP → איפוס סיסמה
+- DB migration: עמודות `reset_otp`, `reset_otp_expires` ב-users
+
+**Worker:**
+- `POST /api/users`: מקבל `courier_company_id` ביצירת משתמש
+- `PATCH /api/users/:id`: מקבל `courier_company_id` בעדכון
+
+**app.html:**
+- תיקון `_fillCell` — מספר תא חסר בpreview "שלח לכולם"
+
+**בדיקות NIR-01 (17.05.2026):**
+
+| משתמש | תוצאה |
+|---|---|
+| nir_doa | ✅ |
+| mgr_nir | ✅ |
+| nir_courier | ✅ (courier_company_id תוקן בDB) |
+| 0521111222 (שליח) | ✅ סיסמה שונתה ל-Courier2026! |
+
+**בדיקות MPL-P פרמיום (18.05.2026):**
+
+| משתמש | תוצאה |
+|---|---|
+| mail_mpl_p | ✅ סיסמה שונתה ל-Mail2026! |
+| mgr_mpl_p | ✅ סיסמה שונתה ל-Manager2026! |
+| curmgr_mpl_p | ✅ הפקדה → ESP תא 15 |
+| 0521111222_p (שליח) | ✅ הפקדה → ESP תא 16 |
+
+---
 
 ### סשן 8 מאי 2026 — זרימת שליח מלאה
 

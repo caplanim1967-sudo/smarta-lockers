@@ -189,6 +189,23 @@ tr:hover td { background:rgba(255,255,255,0.015); }
   main { padding:16px; }
   aside { display:none; }
 }
+
+  .back-btn {
+    background: var(--accent, #4f8ef7);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 8px 20px;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .back-btn:hover { opacity: 0.85; }
 </style>
 </head>
 <body>
@@ -200,7 +217,7 @@ tr:hover td { background:rgba(255,255,255,0.015); }
   <div class="logo">Smarta</div>
   <div class="nav-center">ישוב: <strong id="nav-settlement">—</strong></div>
   <div class="nav-right">
-    <button class="btn-logout" onclick="doLogout()">יציאה</button>
+    <button class="back-btn" onclick="goBack()">&#8592; חזרה</button>
     <div class="avatar" id="nav-avatar">?</div>
   </div>
 </nav>
@@ -632,7 +649,15 @@ var allResidents = [];
 var editingResidentId = null;
 
 // ─── AUTH ───────────────────────────────────────────────
-function doLogout() {
+
+  function goBack() {
+    try { window.parent.postMessage({ type: 'smarta-logout' }, '*'); } catch(e) {}
+    setTimeout(function() {
+      try { window.parent.location.href = './login.html'; } catch(e) {}
+    }, 150);
+  }
+
+  function doLogout() {
   sessionStorage.clear();
   try { window.parent.postMessage({ type: 'smarta-logout' }, '*'); } catch(e) { window.location.href = './login.html'; }
 }
@@ -1807,8 +1832,7 @@ showPage = function(name, el) {
     </div>
     <style>
       #ec-active:checked + span { background: var(--green); }
-      #ec-active:checked + span + span { right: auto; left: 3px; }
-    </style>
+      #ec-active:checked + span + span { right: auto; left: 3px; }</style>
     <!-- סטטוס מנהל ראשי -->
     <div id="ec-manager-section" style="border-top:1px solid var(--border);margin-top:14px;padding-top:14px">
       <div id="ec-manager-status" style="font-size:12px;color:var(--muted);margin-bottom:10px">בודק מנהל...</div>

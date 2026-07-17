@@ -178,6 +178,22 @@ textarea{resize:vertical;min-height:80px;}
 .plan-price{font-size:22px;font-weight:900;color:var(--accent);}
 .plan-features{margin-top:10px;}
 .plan-feature{font-size:12px;color:var(--muted);padding:3px 0;}
+  .back-btn {
+    background: var(--accent, #4f8ef7);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 8px 20px;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .back-btn:hover { opacity: 0.85; }
 </style>
 </head>
 <body>
@@ -188,7 +204,7 @@ textarea{resize:vertical;min-height:80px;}
     <div class="role-badge">מנהל-על</div>
     <span id="nav-admin-name" style="font-size:13px;color:var(--muted)"></span>
     <div class="avatar" id="nav-avatar">S</div>
-    <button class="btn-logout" onclick="doLogout()">יציאה</button>
+    <button class="back-btn" onclick="goBack()">&#8592; חזרה</button>
   </div>
 </nav>
 
@@ -802,7 +818,15 @@ var allUsers         = [];   // beit-tafkidim cache
   initAdmin();
 })();
 
-function doLogout() {
+
+  function goBack() {
+    try { window.parent.postMessage({ type: 'smarta-logout' }, '*'); } catch(e) {}
+    setTimeout(function() {
+      try { window.parent.location.href = './login.html'; } catch(e) {}
+    }, 150);
+  }
+
+  function doLogout() {
   ['admin_token','smarta_token','smarta_user','admin_user','smarta_role'].forEach(function(k) { sessionStorage.removeItem(k); });
   try { window.parent.postMessage({ type: 'smarta-logout' }, '*'); } catch(e) { window.location.href = './login.html'; }
 }
