@@ -302,6 +302,55 @@ export default {
         return ok({ cell_number: cmd.cell_number, community_id: cmd.community_id });
       }
 
+      // ── ESP32 ring detection — public, no JWT ──────────────
+      // ESP32 מזהה עצמו ע"י esp_id; תומך גם ב-locker_id לגיבוי
+      if (path === '/api/locker/open' && method === 'POST') {
+        const b = await request.json();
+        const rawCaller = b.caller || '';
+        if (!rawCaller) return err('caller חובה');
+
+        let lockerRow;
+        if (b.esp_id) {
+          lockerRow = await env.smarta_db.prepare(
+            'SELECT id, community_id FROM locker_configs WHERE esp_id = ?'
+          ).bind(b.esp_id).first();
+        } else if (b.locker_id) {
+          lockerRow = await env.smarta_db.prepare(
+            'SELECT id, community_id FROM locker_configs WHERE id = ?'
+          ).bind(b.locker_id).first();
+        } else {
+          return err('esp_id או locker_id חובה');
+        }
+        if (!lockerRow) return err('לוקר לא נמצא');
+
+        const lockerId = lockerRow.id;
+        const cid = lockerRow.community_id;
+        const callerPhone = rawCaller.replace(/^\+?972/, '0').replace(/[^\d]/g, '');
+
+        const resident = await env.smarta_db.prepare(
+          'SELECT id, first_name, last_name FROM residents WHERE community_id = ? AND phone = ?'
+        ).bind(cid, callerPhone).first();
+        if (!resident) {
+          console.warn(`[OPEN] שיחה ממספר לא מזוהה: ${callerPhone} ← לוקר ${lockerId}`);
+          return ok({ cells: [], reason: 'resident_not_found' });
+        }
+
+        const { results: pkgs } = await env.smarta_db.prepare(`
+          SELECT id, cell_id FROM packages
+          WHERE community_id = ? AND resident_id = ? AND status = 'waiting'
+          ORDER BY assigned_at ASC
+        `).bind(cid, resident.id).all();
+
+        if (!pkgs.length) {
+          console.log(`[OPEN] אין חבילות ממתינות לדייר ${resident.first_name} בלוקר ${lockerId}`);
+          return ok({ cells: [], reason: 'no_packages' });
+        }
+
+        const cells = pkgs.map(p => parseInt(p.cell_id)).filter(Boolean);
+        console.log(`[OPEN] ${resident.first_name} ${resident.last_name} ← תאים: [${cells.join(',')}] בלוקר ${lockerId}`);
+        return ok({ cells, resident_name: `${resident.first_name} ${resident.last_name}` });
+      }
+
       // First-run setup (only if zero users exist)
       if (path === '/api/setup' && method === 'POST') {
         return handleSetup(request, env);
@@ -582,7 +631,10 @@ async function handleAdmin(path, method, request, env, user, url) {
       const { results } = await db.prepare(
         'SELECT * FROM locker_configs ORDER BY created_at DESC'
       ).all();
-      return ok(results.map(r => ({ ...r, columns: JSON.parse(r.columns_json || '[]') })));
+      return ok(results.map(r => {
+        const { numbering, cols } = parseLockerColumns(r.columns_json);
+        return { ...r, columns: cols, numbering };
+      }));
     }
     if (method === 'POST') {
       const b = await request.json();
@@ -594,7 +646,7 @@ async function handleAdmin(path, method, request, env, user, url) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(id, b.community_id, b.maxWidth || 120, b.maxHeight || 200,
         b.legHeight || 20, b.tier || 'basic', b.esp_id || null,
-        JSON.stringify(b.columns || []), nowSec(), nowSec()).run();
+        serializeLockerColumns(b.columns, b.numbering), nowSec(), nowSec()).run();
       return ok({ id });
     }
   }
@@ -605,7 +657,8 @@ async function handleAdmin(path, method, request, env, user, url) {
     if (method === 'GET') {
       const row = await db.prepare('SELECT * FROM locker_configs WHERE id = ?').bind(id).first();
       if (!row) return notFound();
-      return ok({ ...row, columns: JSON.parse(row.columns_json || '[]') });
+      const { numbering, cols } = parseLockerColumns(row.columns_json);
+      return ok({ ...row, columns: cols, numbering });
     }
     if (method === 'DELETE') {
       await db.prepare('DELETE FROM locker_configs WHERE id = ?').bind(id).run();
@@ -619,7 +672,7 @@ async function handleAdmin(path, method, request, env, user, url) {
         WHERE id=?
       `).bind(b.maxWidth || 120, b.maxHeight || 200, b.legHeight || 20,
         b.tier || 'basic', b.esp_id || null,
-        JSON.stringify(b.columns || []), nowSec(), id).run();
+        serializeLockerColumns(b.columns, b.numbering), nowSec(), id).run();
       return ok({ id });
     }
   }
@@ -801,7 +854,7 @@ async function handleOnboarding(request, env, db) {
     `).bind(settId, settId,
       lk.maxWidth || 120, lk.maxHeight || 200, lk.legHeight || 20,
       plan, lk.esp_id || null,
-      JSON.stringify(lk.columns || []), nowSec(), nowSec()).run();
+      serializeLockerColumns(lk.columns, lk.numbering), nowSec(), nowSec()).run();
   }
 
   // Step 3: Create community manager
@@ -822,15 +875,43 @@ async function handleOnboarding(request, env, db) {
 
 // ─── DEPOSIT HELPERS ──────────────────────────────────────────────────────────
 
-// Build flat list of cells with volumes from locker columns_json
-function buildCellList(columns) {
+// Parse columns_json string → { numbering, cols }
+// Supports legacy array format (column_bottom_up) and new object format
+function parseLockerColumns(columns_json_str) {
+  const raw = JSON.parse(columns_json_str || '[]');
+  if (Array.isArray(raw)) return { numbering: 'column_bottom_up', cols: raw };
+  return { numbering: raw.numbering || 'column_bottom_up', cols: raw.cols || [] };
+}
+
+// Serialize cols + numbering back to columns_json string
+function serializeLockerColumns(cols, numbering) {
+  if (!numbering || numbering === 'column_bottom_up') return JSON.stringify(cols || []);
+  return JSON.stringify({ numbering, cols: cols || [] });
+}
+
+// Build flat list of cells with volumes — supports column_bottom_up and row_top_down
+function buildCellList(cols, numbering) {
+  if (numbering === 'row_top_down') {
+    const maxRows = cols.reduce((m, c) => Math.max(m, c.cells || 0), 0);
+    const list = [];
+    let num = 0;
+    for (let row = 0; row < maxRows; row++) {
+      for (const col of cols) {
+        if (row >= (col.cells || 0)) continue;
+        const h = (col.cellHeights || [])[row] || 1;
+        num++;
+        list.push({ cellNumber: num, volume: (col.width || 40) * (col.depth || 30) * h });
+      }
+    }
+    return list;
+  }
+  // column_bottom_up (default)
   const list = [];
   let num = 0;
-  for (const col of columns) {
-    const heights = col.cellHeights || [];
+  for (const col of cols) {
     for (let j = 0; j < (col.cells || 0); j++) {
       num++;
-      const h = heights[j] || 1;
+      const h = (col.cellHeights || [])[j] || 1;
       list.push({ cellNumber: num, volume: (col.width || 40) * (col.depth || 30) * h });
     }
   }
@@ -1259,7 +1340,7 @@ async function handleCommunity(path, method, request, env, user, url) {
       ? await db.prepare('SELECT columns_json FROM locker_configs WHERE community_id = ?').bind(communityId).first()
       : null;
     if (!lockerRow) return ok([]);
-    const columns = JSON.parse(lockerRow.columns_json || '[]');
+    const { cols: columns } = parseLockerColumns(lockerRow.columns_json);
     const totalCells = columns.reduce((s, c) => s + (c.cells || 0), 0);
     if (!totalCells) return ok([]);
 
@@ -1634,8 +1715,8 @@ async function handleCommunity(path, method, request, env, user, url) {
     if (!locker)                    return notFound();
 
     const targetCommunityId = locker.community_id;
-    const columns   = JSON.parse(locker.columns_json || '[]');
-    const cellList  = buildCellList(columns);
+    const { numbering: ln1, cols: lc1 } = parseLockerColumns(locker.columns_json);
+    const cellList  = buildCellList(lc1, ln1);
     const occupied  = await getUnavailableNums(db, targetCommunityId);
     const available = cellList.filter(c => !occupied.has(c.cellNumber));
     if (!available.length) return ok({ no_cells: true });
@@ -1678,8 +1759,8 @@ async function handleCommunity(path, method, request, env, user, url) {
     if (!locker)        return notFound();
 
     const targetCommunityId = locker.community_id;
-    const columns  = JSON.parse(locker.columns_json || '[]');
-    const cellList = buildCellList(columns);
+    const { numbering: ln2, cols: lc2 } = parseLockerColumns(locker.columns_json);
+    const cellList = buildCellList(lc2, ln2);
     const occupied = await getUnavailableNums(db, targetCommunityId);
     // שחרר את התא הנוכחי (לא נתפוס אותו שוב)
     occupied.delete(parseInt(b.current_cell_number || 0));
@@ -1871,60 +1952,8 @@ async function handleCommunity(path, method, request, env, user, url) {
       ? await db.prepare('SELECT * FROM locker_configs WHERE community_id = ?').bind(communityId).first()
       : null;
     if (!row) return notFound();
-    return ok({ ...row, columns: JSON.parse(row.columns_json || '[]') });
-  }
-
-  // ── Premium: ESP32 פותח תא לפי שיחת דייר ────────────────
-  // ללא JWT — ESP32 מזהה עצמו ע"י locker_id בלבד
-  if (path === '/api/locker/open' && method === 'POST') {
-    const b = await request.json();
-    const lockerId = b.locker_id;
-    const rawCaller = b.caller || '';
-    if (!lockerId || !rawCaller) return err('locker_id ו-caller חובה');
-
-    // נרמול מספר: +9725XXXXXXX / 9725XXXXXXX / 05XXXXXXX → 05XXXXXXX
-    const callerPhone = rawCaller.replace(/^\+?972/, '0').replace(/[^\d]/g, '');
-
-    // מצא את הישוב של הלוקר
-    const lockerRow = await db.prepare(
-      'SELECT community_id FROM locker_configs WHERE id = ?'
-    ).bind(lockerId).first();
-    if (!lockerRow) return err('לוקר לא נמצא');
-    const cid = lockerRow.community_id;
-
-    // מצא דייר לפי טלפון בישוב זה
-    const resident = await db.prepare(
-      'SELECT id, first_name, last_name FROM residents WHERE community_id = ? AND phone = ?'
-    ).bind(cid, callerPhone).first();
-    if (!resident) {
-      console.warn(`[OPEN] שיחה ממספר לא מזוהה: ${callerPhone} ← לוקר ${lockerId}`);
-      return ok({ cells: [], reason: 'resident_not_found' });
-    }
-
-    // מצא את כל החבילות הממתינות של הדייר בלוקר זה — מהישנה לחדשה
-    const { results: pkgs } = await db.prepare(`
-      SELECT id, cell_id FROM packages
-      WHERE community_id = ? AND resident_id = ? AND status = 'waiting'
-      ORDER BY assigned_at ASC
-    `).bind(cid, resident.id).all();
-
-    if (!pkgs.length) {
-      console.log(`[OPEN] אין חבילות ממתינות לדייר ${resident.first_name} בלוקר ${lockerId}`);
-      return ok({ cells: [], reason: 'no_packages' });
-    }
-
-    // סמן כל החבילות כנאספו
-    const ts = nowSec();
-    for (const pkg of pkgs) {
-      await db.prepare(
-        "UPDATE packages SET status = 'collected', collected_at = ? WHERE id = ?"
-      ).bind(ts, pkg.id).run();
-    }
-
-    const cells = pkgs.map(p => parseInt(p.cell_id)).filter(Boolean);
-    console.log(`[OPEN] ${resident.first_name} ${resident.last_name} ← תאים: [${cells.join(',')}] בלוקר ${lockerId}`);
-
-    return ok({ cells, resident_name: resident.first_name + ' ' + resident.last_name });
+    const { numbering: rn, cols: rc } = parseLockerColumns(row.columns_json);
+    return ok({ ...row, columns: rc, numbering: rn });
   }
 
   // ── SMS נכנס: דייר מאשר איסוף ─────────────────────────────
