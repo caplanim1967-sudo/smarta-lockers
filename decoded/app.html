@@ -1979,6 +1979,8 @@ function buildLockerGrid() {
     setS('stat-occupied', statOccupied); setS('stat-free', statFree);
     setS('stat-late', statLate); setS('stat-loading', statLoading); setS('stat-faulty', statFaulty);
 
+    container.style.alignItems = (config.numbering === 'row_top_down') ? 'flex-start' : 'flex-end';
+
     config.layout.forEach((col, ci) => {
       const colEl = document.createElement('div');
       colEl.style.cssText = 'display:flex;flex-direction:column;gap:' + CELL_GAP + 'px;';
