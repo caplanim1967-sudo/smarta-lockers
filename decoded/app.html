@@ -1155,13 +1155,11 @@
       });
 
       // הסר תאים ישנים — אבל שמור loading ו-faulty מקומי שטרם סונכרן
-      if (Object.keys(fresh).length > 0) {
-        Object.keys(packageData).forEach(function(k) {
-          if (!fresh[k] && packageData[k].status !== 'loading' && packageData[k].status !== 'faulty') {
-            delete packageData[k];
-          }
-        });
-      }
+      Object.keys(packageData).forEach(function(k) {
+        if (!fresh[k] && packageData[k].status !== 'loading' && packageData[k].status !== 'faulty') {
+          delete packageData[k];
+        }
+      });
 
       savePackageData();
       buildLockerGrid();
