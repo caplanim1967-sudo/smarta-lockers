@@ -947,7 +947,7 @@
     // iframe (smarta-all-v2): redirect ל-login.html
     var isIframe = (window.parent !== window);
     if (isIframe) {
-      try { window.parent.location.href = "./login.html"; } catch(e) { window.location.href = "./login.html"; }
+      window.parent.postMessage({ type: 'smarta-logout' }, '*');
     } else {
       document.getElementById('login-screen').style.display = 'flex';
       document.getElementById('app-screen').style.display  = 'none';
@@ -1086,14 +1086,13 @@
   function goBack() {
     try { window.parent.postMessage({ type: 'smarta-logout' }, '*'); } catch(e) {}
     setTimeout(function() {
-      try { window.parent.location.href = './login.html'; } catch(e) {}
+      try { window.parent.postMessage({ type: 'smarta-logout' }, '*'); } catch(e) {}
     }, 150);
   }
 
   function doLogout() {
     sessionStorage.clear();
-    try { window.parent.postMessage({ type: 'smarta-logout' }, '*'); }
-    catch(e) { window.location.href = './login.html'; }
+    window.parent.postMessage({ type: 'smarta-logout' }, '*');
   }
 
   function showScreen(name, el) {
@@ -2018,9 +2017,14 @@
   }
 
   function depNewResident() {
-    // שומר את הלוקר, מאפס דייר/תא/ברקודים וחוזר לבחירת דייר
-    var savedLockerId = _dep.lockerId;
-    _dep = { lockerId: savedLockerId, residentId: null, residentPhone: null, cellNumber: null, cellVolume: null, barcodes: [] };
+    // שומר את הלוקר והחברה, מאפס דייר/תא/ברקודים וחוזר לבחירת דייר
+    _dep = {
+      lockerId: _dep.lockerId, communityId: _dep.communityId, communityName: _dep.communityName,
+      communityLockers: _dep.communityLockers, communityIdx: _dep.communityIdx,
+      companyId: _dep.companyId, companyName: _dep.companyName, companyAutoSelected: _dep.companyAutoSelected,
+      tier: _dep.tier,
+      residentId: null, residentPhone: null, cellNumber: null, cellVolume: null, barcodes: [], lockCode: null
+    };
     document.getElementById('dep-phone-input').value = '';
     document.getElementById('dep-resident-results').style.display = 'none';
     document.getElementById('dep-barcode-input').value = '';

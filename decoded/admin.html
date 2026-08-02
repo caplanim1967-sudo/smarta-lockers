@@ -807,7 +807,7 @@ var allUsers         = [];   // beit-tafkidim cache
 (function() {
   var role = sessionStorage.getItem('smarta_role') || (adminUser && adminUser.role) || '';
   if (!adminToken || role !== 'smarta_admin') {
-    try { window.parent.location.href = './login.html'; } catch(e) { window.location.href = './login.html'; }
+    window.parent.postMessage({ type: 'smarta-logout' }, '*');
     return;
   }
   if (adminUser) {
@@ -822,7 +822,7 @@ var allUsers         = [];   // beit-tafkidim cache
   function goBack() {
     try { window.parent.postMessage({ type: 'smarta-logout' }, '*'); } catch(e) {}
     setTimeout(function() {
-      try { window.parent.location.href = './login.html'; } catch(e) {}
+      try { window.parent.postMessage({ type: 'smarta-logout' }, '*'); } catch(e) {}
     }, 150);
   }
 

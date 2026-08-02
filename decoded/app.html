@@ -1024,7 +1024,7 @@
 <script>
   var jwtToken = sessionStorage.getItem('app_token') || sessionStorage.getItem('smarta_token') || '';
   if (!jwtToken) {
-    try { window.parent.location.href = './login.html'; } catch(e) { window.location.href = './login.html'; }
+    window.parent.postMessage({ type: 'smarta-logout' }, '*');
   }
 
   // פענח JWT לזיהוי תפקיד (ללא אימות חתימה — רק ל-UI)
@@ -2941,7 +2941,7 @@ window.addEventListener('message', function(e) {
   function goBack() {
     try { window.parent.postMessage({ type: 'smarta-logout' }, '*'); } catch(e) {}
     setTimeout(function() {
-      try { window.parent.location.href = './login.html'; } catch(e) {}
+      try { window.parent.postMessage({ type: 'smarta-logout' }, '*'); } catch(e) {}
     }, 150);
   }
 
