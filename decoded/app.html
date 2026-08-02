@@ -1815,23 +1815,40 @@
   }
 
 function builderConfigToLayout(cfg) {
-    // ממיר פורמט admin-builder (columns:[]) לפורמט app (layout:[[]])
-    // כמו admin.html: תא 1 = תחתית העמודה, תא N = קורה (מלמטה למעלה)
     if (!cfg.columns || !cfg.columns.length) return null;
     var effectiveH = (cfg.maxHeight || 200) - (cfg.legHeight || 20);
-    var base = 1;
-    var layout = cfg.columns.map(function(col) {
-      var n = col.cells || 5;
-      var heights = col.cellHeights || [];
-      var cells = [];
-      // i=n-1 → קורה (מספר גבוה), i=0 → תחתית (מספר נמוך)
-      for (var i = n - 1; i >= 0; i--) {
-        cells.push({ num: base + i, height: heights[i] || Math.round(effectiveH / n), width: col.width || 40 });
+    var numbering = cfg.numbering || 'column_bottom_up';
+    var layout;
+    if (numbering === 'row_top_down') {
+      var maxRows = cfg.columns.reduce(function(m,c){return Math.max(m,c.cells||0);},0);
+      var cellNum = 1;
+      var cellMap = cfg.columns.map(function(){return [];});
+      for (var row = 0; row < maxRows; row++) {
+        for (var ci = 0; ci < cfg.columns.length; ci++) {
+          if (row < (cfg.columns[ci].cells||0)) cellMap[ci][row] = cellNum++;
+        }
       }
-      base += n;
-      return cells;
-    });
-    return { lockerId: cfg.lockerId || '', numCols: cfg.columns.length, totalHeight: effectiveH, layout: layout };
+      layout = cfg.columns.map(function(col, ci) {
+        var cells = [];
+        for (var ri = 0; ri < (col.cells||0); ri++) {
+          cells.push({ num: cellMap[ci][ri], height: (col.cellHeights||[])[ri] || Math.round(effectiveH/(col.cells||1)), width: col.width||40 });
+        }
+        return cells;
+      });
+    } else {
+      var base = 1;
+      layout = cfg.columns.map(function(col) {
+        var n = col.cells || 5;
+        var heights = col.cellHeights || [];
+        var cells = [];
+        for (var i = n - 1; i >= 0; i--) {
+          cells.push({ num: base + i, height: heights[i] || Math.round(effectiveH / n), width: col.width || 40 });
+        }
+        base += n;
+        return cells;
+      });
+    }
+    return { lockerId: cfg.lockerId || '', numCols: cfg.columns.length, totalHeight: effectiveH, layout: layout, numbering: numbering };
   }
 
 function buildLockerGrid() {
@@ -2858,23 +2875,43 @@ function fetchAndCacheLockerConfig(callback) {
   .then(function(cfg) {
     if (!cfg || cfg.error || !cfg.columns || !cfg.columns.length) { callback(); return; }
     var effectiveH = (cfg.max_height || 200) - (cfg.leg_height || 20);
-    // כמו admin.html: תא 1 = תחתית העמודה, תא N = קורה (מלמטה למעלה)
-    var base = 1;
-    var layout = cfg.columns.map(function(col) {
-      var heights = col.cellHeights || [];
-      var n = col.cells || 5;
-      var cells = [];
-      for (var i = n - 1; i >= 0; i--) {
-        cells.push({ num: base + i, height: heights[i] || Math.round(effectiveH / n), width: col.width || 40 });
+    var numbering = cfg.numbering || 'column_bottom_up';
+    var layout;
+    if (numbering === 'row_top_down') {
+      var maxRows = cfg.columns.reduce(function(m,c){return Math.max(m,c.cells||0);},0);
+      var cellNum = 1;
+      var cellMap = cfg.columns.map(function(){return [];});
+      for (var row = 0; row < maxRows; row++) {
+        for (var ci = 0; ci < cfg.columns.length; ci++) {
+          if (row < (cfg.columns[ci].cells||0)) cellMap[ci][row] = cellNum++;
+        }
       }
-      base += n;
-      return cells;
-    });
+      layout = cfg.columns.map(function(col, ci) {
+        var cells = [];
+        for (var ri = 0; ri < (col.cells||0); ri++) {
+          cells.push({ num: cellMap[ci][ri], height: (col.cellHeights||[])[ri] || Math.round(effectiveH/(col.cells||1)), width: col.width||40 });
+        }
+        return cells;
+      });
+    } else {
+      var base = 1;
+      layout = cfg.columns.map(function(col) {
+        var heights = col.cellHeights || [];
+        var n = col.cells || 5;
+        var cells = [];
+        for (var i = n - 1; i >= 0; i--) {
+          cells.push({ num: base + i, height: heights[i] || Math.round(effectiveH / n), width: col.width || 40 });
+        }
+        base += n;
+        return cells;
+      });
+    }
     var lockerConfig = {
       lockerId: cfg.community_id || cfg.id || '',
       numCols: cfg.columns.length,
       totalHeight: effectiveH,
-      layout: layout
+      layout: layout,
+      numbering: numbering
     };
     try { localStorage.setItem('smarta_locker_config_v2', JSON.stringify(lockerConfig)); } catch(e) {}
     callback();
