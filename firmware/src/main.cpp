@@ -33,7 +33,7 @@
 // ────────────────────────────────────────────────────────────────────
 //  טיימינג
 // ────────────────────────────────────────────────────────────────────
-#define SOLENOID_OPEN_MS   3000
+#define SOLENOID_OPEN_MS   1500
 #define POLL_INTERVAL_MS   10000   // 10 שניות
 #define RECONNECT_MS      30000
 
@@ -54,15 +54,24 @@ String        pendingCaller   = "";
 // ────────────────────────────────────────────────────────────────────
 //  RS485 — פתיחת תא
 // ────────────────────────────────────────────────────────────────────
-void openCell(uint8_t board, uint8_t channel) {
-  uint8_t cmd[5] = { 0x8A, board, channel, 0x11, 0 };
+void sendRS485(uint8_t board, uint8_t channel, uint8_t cmd_byte) {
+  uint8_t cmd[5] = { 0x8A, board, channel, cmd_byte, 0 };
   cmd[4] = cmd[0] ^ cmd[1] ^ cmd[2] ^ cmd[3];
   digitalWrite(RS485_DE, HIGH);
   rs485Serial.write(cmd, 5);
   rs485Serial.flush();
   delay(10);
   digitalWrite(RS485_DE, LOW);
-  Serial.printf("[RS485] board=%d ch=%d\n", board, channel);
+}
+
+void openCell(uint8_t board, uint8_t channel) {
+  sendRS485(board, channel, 0x11);
+  Serial.printf("[RS485] OPEN board=%d ch=%d\n", board, channel);
+}
+
+void closeCell(uint8_t board, uint8_t channel) {
+  sendRS485(board, channel, 0x00);
+  Serial.printf("[RS485] CLOSE board=%d ch=%d\n", board, channel);
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -109,7 +118,8 @@ void processCells(const String& json) {
     if (cell <= 0) continue;
     Serial.printf("[OPEN] פותח תא %d\n", cell);
     openCell(1, (uint8_t)cell);
-    delay(SOLENOID_OPEN_MS + 500);
+    delay(SOLENOID_OPEN_MS);
+    closeCell(1, (uint8_t)cell);
   }
 }
 
