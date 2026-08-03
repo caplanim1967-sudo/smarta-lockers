@@ -973,7 +973,7 @@ function refreshDashboard() {
 // ─── RESIDENTS ───────────────────────────────────────────
 function loadResidents() {
   apiGet('/api/residents').then(function(data) {
-    if (!data) return;
+    if (!data || !Array.isArray(data)) return;
     allResidents = data;
     renderResidents();
     document.getElementById('badge-residents').textContent = data.length;
