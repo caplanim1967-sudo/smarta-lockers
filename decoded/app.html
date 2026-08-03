@@ -689,8 +689,8 @@
   </div>
   <button class="back-btn" onclick="goBack()">&#8592; חזרה</button>
   <div class="user-badge">
-    <span>מיכל לוי</span>
-    <div class="avatar">מ</div>
+    <span id="nav-user-name"></span>
+    <div class="avatar" id="nav-user-avatar"></div>
   </div>
 </nav>
 
@@ -1037,6 +1037,13 @@
     } catch(e) { return {}; }
   })();
   var _isSuperAdmin = !_jwtPayload.community_id; // אמת גם למנהל-על ללא הקשר ישוב
+  (function() {
+    var n = _jwtPayload.name || '';
+    var el = document.getElementById('nav-user-name');
+    var av = document.getElementById('nav-user-avatar');
+    if (el) el.textContent = n;
+    if (av) av.textContent = n.charAt(0) || '?';
+  })();
 
   // ===== API =====
   var API_BASE = 'https://smarta-api.smarta-api.workers.dev';
