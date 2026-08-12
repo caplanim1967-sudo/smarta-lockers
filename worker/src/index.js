@@ -294,12 +294,38 @@ export default {
       if (path === '/api/esp/commands' && method === 'GET') {
         const espId = url.searchParams.get('esp_id');
         if (!espId) return err('esp_id חובה');
+
+        // שליפת פקודת שליח ממתינה
         const cmd = await env.smarta_db.prepare(
           'SELECT * FROM esp_commands WHERE esp_id = ? ORDER BY created_at ASC LIMIT 1'
         ).bind(espId).first();
-        if (!cmd) return ok({ no_command: true });
-        await env.smarta_db.prepare('DELETE FROM esp_commands WHERE id = ?').bind(cmd.id).run();
-        return ok({ cell_number: cmd.cell_number, community_id: cmd.community_id });
+        if (cmd) {
+          await env.smarta_db.prepare('DELETE FROM esp_commands WHERE id = ?').bind(cmd.id).run();
+        }
+
+        // שליפת דיירים עם חבילות ממתינות → cache מקומי בלוח לפתיחה מיידית
+        const { results: callerRows } = await env.smarta_db.prepare(`
+          SELECT r.phone, p.cell_id
+          FROM packages p
+          JOIN residents r ON p.resident_id = r.id
+          JOIN locker_configs lc ON lc.community_id = p.community_id
+          WHERE lc.esp_id = ? AND p.status = 'waiting'
+          ORDER BY r.phone, p.assigned_at ASC
+        `).bind(espId).all();
+
+        // קיבוץ לפי טלפון
+        const callerMap = {};
+        for (const row of callerRows) {
+          const phone = (row.phone || '').replace(/^\+?972/, '0').replace(/[^\d]/g, '');
+          if (!phone) continue;
+          if (!callerMap[phone]) callerMap[phone] = [];
+          const cell = parseInt(row.cell_id);
+          if (cell > 0 && !callerMap[phone].includes(cell)) callerMap[phone].push(cell);
+        }
+        const authorizedCallers = Object.entries(callerMap).map(([phone, cells]) => ({ phone, cells }));
+
+        if (!cmd) return ok({ no_command: true, authorized_callers: authorizedCallers });
+        return ok({ cell_number: cmd.cell_number, community_id: cmd.community_id, authorized_callers: authorizedCallers });
       }
 
       // ── ESP32 ring detection — public, no JWT ──────────────
@@ -919,6 +945,21 @@ function buildCellList(cols, numbering) {
 }
 
 // Get set of occupied + faulty cell numbers for a community
+// ── package_audit_log — יומן שינויים לצמיתות (הוספה/עריכה) ──────────────
+async function ensurePackageAuditTable(db) {
+  await db.prepare(`CREATE TABLE IF NOT EXISTS package_audit_log (
+    id TEXT PRIMARY KEY,
+    package_id TEXT NOT NULL,
+    community_id TEXT,
+    action TEXT NOT NULL,
+    field_changed TEXT,
+    old_value TEXT,
+    new_value TEXT,
+    changed_by TEXT,
+    created_at INTEGER DEFAULT (unixepoch())
+  )`).run();
+}
+
 async function getUnavailableNums(db, communityId) {
   const [{ results: pkgs }, { results: faults }] = await Promise.all([
     db.prepare(`SELECT cell_id FROM packages WHERE community_id = ? AND status != 'collected'`).bind(communityId).all(),
@@ -1125,6 +1166,7 @@ async function handleCommunity(path, method, request, env, user, url) {
   if (path === '/api/packages') {
     if (method === 'GET') {
       const status = url.searchParams.get('status') || 'waiting';
+      const cellId  = url.searchParams.get('cell_id');
       const pkgSelect = `
         SELECT p.*,
           p.assigned_at as placed_at,
@@ -1134,9 +1176,11 @@ async function handleCommunity(path, method, request, env, user, url) {
         FROM packages p
           LEFT JOIN residents r ON p.resident_id = r.id
           LEFT JOIN settlements s ON p.community_id = s.id`;
-      const { results } = communityId
-        ? await db.prepare(pkgSelect + ` WHERE p.community_id = ? AND p.status = ? ORDER BY p.assigned_at DESC`).bind(communityId, status).all()
-        : await db.prepare(pkgSelect + ` WHERE p.status = ? ORDER BY p.assigned_at DESC`).bind(status).all();
+      let where = ' WHERE p.status = ?';
+      const params = [status];
+      if (communityId) { where += ' AND p.community_id = ?'; params.push(communityId); }
+      if (cellId)       { where += ' AND p.cell_id = ?'; params.push(String(cellId)); }
+      const { results } = await db.prepare(pkgSelect + where + ' ORDER BY p.assigned_at DESC').bind(...params).all();
       return ok(results);
     }
     if (method === 'POST') {
@@ -1149,6 +1193,12 @@ async function handleCommunity(path, method, request, env, user, url) {
       `).bind(id, communityId, b.resident_id || null, b.cell_id,
         b.barcode || null, b.courier || 'דואר ישראל',
         b.lock_code || null, b.notes || null, nowSec()).run();
+
+      await ensurePackageAuditTable(db);
+      await db.prepare(`
+        INSERT INTO package_audit_log (id, package_id, community_id, action, field_changed, old_value, new_value, changed_by, created_at)
+        VALUES (?, ?, ?, 'created', 'cell_id', NULL, ?, ?, ?)
+      `).bind(newId(), id, communityId, String(b.cell_id), user.name || user.sub || 'לא ידוע', nowSec()).run();
 
       // SMS נשלח מה-UI בלבד (send modal) — לא כאן, כדי למנוע כפילות
       return ok({ id });
@@ -1183,6 +1233,57 @@ async function handleCommunity(path, method, request, env, user, url) {
     await db.prepare(`DELETE FROM packages WHERE id = ? AND community_id = ?`)
       .bind(id, communityId).run();
     return ok({ deleted: id });
+  }
+
+  // ── עריכת חבילה קיימת (resident/courier/barcode/notes) — עם audit log ──
+  const patchPackageMatch = path.match(/^\/api\/packages\/([^/]+)$/);
+  if (patchPackageMatch && method === 'PATCH') {
+    const id = patchPackageMatch[1];
+    const b = await request.json();
+
+    await ensurePackageAuditTable(db);
+
+    const current = await db.prepare(
+      `SELECT * FROM packages WHERE id = ? AND community_id = ?`
+    ).bind(id, communityId).first();
+    if (!current) return err('חבילה לא נמצאה', 404);
+
+    const editable = ['resident_id', 'courier', 'barcode', 'notes', 'cell_id'];
+    const changedBy = user.name || user.sub || 'לא ידוע';
+    const ts = nowSec();
+    const sets = [];
+    const vals = [];
+
+    for (const field of editable) {
+      if (!(field in b)) continue;
+      const newVal = b[field] === '' ? null : b[field];
+      const oldVal = current[field];
+      if (String(oldVal ?? '') === String(newVal ?? '')) continue; // אין שינוי בפועל
+      sets.push(`${field} = ?`);
+      vals.push(newVal);
+      await db.prepare(`
+        INSERT INTO package_audit_log (id, package_id, community_id, action, field_changed, old_value, new_value, changed_by, created_at)
+        VALUES (?, ?, ?, 'edited', ?, ?, ?, ?, ?)
+      `).bind(newId(), id, communityId, field, oldVal === null ? null : String(oldVal), newVal === null ? null : String(newVal), changedBy, ts).run();
+    }
+
+    if (sets.length === 0) return ok({ id, changed: false });
+
+    vals.push(id, communityId);
+    await db.prepare(`UPDATE packages SET ${sets.join(', ')} WHERE id = ? AND community_id = ?`).bind(...vals).run();
+
+    return ok({ id, changed: true, fields: editable.filter(f => f in b) });
+  }
+
+  // ── audit log לחבילה בודדת ──
+  const packageAuditMatch = path.match(/^\/api\/packages\/([^/]+)\/audit$/);
+  if (packageAuditMatch && method === 'GET') {
+    const id = packageAuditMatch[1];
+    await ensurePackageAuditTable(db);
+    const { results } = await db.prepare(
+      `SELECT * FROM package_audit_log WHERE package_id = ? ORDER BY created_at DESC`
+    ).bind(id).all();
+    return ok(results);
   }
 
   // ── Send messages ────────────────────────────────────────
