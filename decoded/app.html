@@ -883,6 +883,9 @@
         <button class="modal-btn" style="flex:1;background:rgba(139,92,246,0.15);color:#8b5cf6;border:1px solid rgba(139,92,246,0.3);font-size:13px;padding:10px" onclick="addAnotherPackage()">➕ הוסף חבילה נוספת לתא זה</button>
       </div>
       <div style="display:flex;gap:8px">
+        <button class="modal-btn" style="flex:1;background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);font-size:13px;padding:10px" onclick="openEditLoadModal()">✏️ עריכת הטעינה</button>
+      </div>
+      <div style="display:flex;gap:8px">
         <button class="modal-btn" style="flex:1;background:rgba(34,197,94,0.15);color:var(--green);border:1px solid rgba(34,197,94,0.3);font-size:13px;padding:10px" onclick="markCellEmpty()">✅ סמן כריק — חבילה נמשכה</button>
       </div>
       <div style="display:flex;gap:8px">
@@ -895,6 +898,24 @@
       </div>
       <button class="modal-btn cancel" onclick="saveCellSelection();closeModal('modal')">שמור וסגור</button>
     </div>
+  </div>
+</div>
+
+<!-- EDIT LOAD MODAL — עריכת כל החבילות בתא + הוספת חבילה חדשה -->
+<div class="modal-overlay" id="edit-load-modal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-title">✏️ עריכת הטעינה — תא <span id="edit-load-cell-num"></span></div>
+    <div class="modal-sub">כל החבילות בתא הזה</div>
+    <div id="edit-load-list" style="display:flex;flex-direction:column;gap:10px;margin:14px 0;max-height:320px;overflow-y:auto"></div>
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:6px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--muted)">➕ הוספת חבילה חדשה לתא זה</div>
+      <input type="text" id="edit-load-new-resident" placeholder="שם דייר" style="width:100%;margin-bottom:6px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:inherit">
+      <input type="text" id="edit-load-new-phone" placeholder="טלפון" style="width:100%;margin-bottom:6px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:inherit">
+      <input type="text" id="edit-load-new-barcode" placeholder="ברקוד (אופציונלי)" style="width:100%;margin-bottom:6px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:inherit">
+      <input type="text" id="edit-load-new-notes" placeholder="הערות (אופציונלי)" style="width:100%;margin-bottom:8px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:inherit">
+      <button class="modal-btn confirm" style="width:100%" onclick="addPackageInLoadModal()">➕ הוסף חבילה לתא</button>
+    </div>
+    <button class="modal-btn cancel" style="margin-top:10px" onclick="closeModal('edit-load-modal')">סגור</button>
   </div>
 </div>
 
@@ -1061,6 +1082,15 @@
   async function apiPost(path, body) {
     var r = await fetch(API_BASE + path, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwtToken },
+      body: JSON.stringify(body)
+    });
+    return r.json();
+  }
+
+  async function apiPatch(path, body) {
+    var r = await fetch(API_BASE + path, {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwtToken },
       body: JSON.stringify(body)
     });
@@ -2465,6 +2495,130 @@ function buildLockerGrid() {
     closeModal('modal');
     window._preCell = num;
     showScreen('new-package');
+  }
+
+  // ── עריכת הטעינה — כל החבילות בתא, עריכה בשורה + הוספה ──────────
+  var _editLoadEditingIdx = null;
+
+  function openEditLoadModal() {
+    var num = _currentCellNum;
+    closeModal('modal');
+    document.getElementById('edit-load-cell-num').textContent = num;
+    _editLoadEditingIdx = null;
+    renderEditLoadList();
+    openModal('edit-load-modal');
+  }
+
+  function _escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  function renderEditLoadList() {
+    var num = _currentCellNum;
+    var cell = packageData[num];
+    var list = document.getElementById('edit-load-list');
+    var pkgs = (cell && cell.packages) ? cell.packages : [];
+    if (pkgs.length === 0) {
+      list.innerHTML = '<div style="font-size:13px;color:var(--muted);text-align:center;padding:14px">אין חבילות בתא זה</div>';
+      return;
+    }
+    list.innerHTML = pkgs.map(function(pkg, idx) {
+      var pkgId = (cell._ids && cell._ids[idx]) || '';
+      if (_editLoadEditingIdx === idx) {
+        return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px">' +
+          '<div style="font-size:12px;color:var(--muted);margin-bottom:6px">' + _escapeHtml(pkg.resident || '') + '</div>' +
+          '<input type="text" id="edit-row-courier-' + idx + '" value="' + _escapeHtml(pkg.courier || '') + '" placeholder="חברת שילוח" style="width:100%;margin-bottom:6px;padding:7px 9px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:inherit;font-size:13px">' +
+          '<input type="text" id="edit-row-barcode-' + idx + '" value="' + _escapeHtml(pkg.barcode || '') + '" placeholder="ברקוד" style="width:100%;margin-bottom:6px;padding:7px 9px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:inherit;font-size:13px">' +
+          '<input type="text" id="edit-row-notes-' + idx + '" value="' + _escapeHtml(pkg.notes || '') + '" placeholder="הערות" style="width:100%;margin-bottom:8px;padding:7px 9px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:inherit;font-size:13px">' +
+          '<div style="display:flex;gap:6px">' +
+            '<button class="modal-btn confirm" style="flex:1;font-size:12px;padding:7px" onclick="savePackageRow(' + idx + ', \'' + pkgId + '\')">✓ שמור</button>' +
+            '<button class="modal-btn cancel" style="flex:1;font-size:12px;padding:7px" onclick="_editLoadEditingIdx=null;renderEditLoadList()">ביטול</button>' +
+          '</div>' +
+        '</div>';
+      }
+      return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+          '<div>' +
+            '<div style="font-weight:700">' + _escapeHtml(pkg.resident || '') + '</div>' +
+            '<div style="color:var(--muted);font-size:12px;margin-top:2px">' + _escapeHtml(pkg.courier || '—') +
+              (pkg.barcode ? ' · ברקוד: ' + _escapeHtml(pkg.barcode) : '') +
+              (pkg.time ? ' · ' + _escapeHtml(pkg.time) : '') + '</div>' +
+            (pkg.notes ? '<div style="color:var(--muted);font-size:12px;margin-top:2px">📝 ' + _escapeHtml(pkg.notes) + '</div>' : '') +
+          '</div>' +
+          '<button class="modal-btn" style="font-size:12px;padding:6px 10px;background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.3)" onclick="_editLoadEditingIdx=' + idx + ';renderEditLoadList()">ערוך</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function savePackageRow(idx, pkgId) {
+    var num = _currentCellNum;
+    var cell = packageData[num];
+    if (!cell || !cell.packages || !cell.packages[idx]) return;
+    var courier = document.getElementById('edit-row-courier-' + idx).value.trim();
+    var barcode = document.getElementById('edit-row-barcode-' + idx).value.trim();
+    var notes   = document.getElementById('edit-row-notes-' + idx).value.trim();
+
+    cell.packages[idx].courier = courier;
+    cell.packages[idx].barcode = barcode;
+    cell.packages[idx].notes   = notes;
+    savePackageData();
+    _editLoadEditingIdx = null;
+    renderEditLoadList();
+    buildLockerGrid();
+
+    if (pkgId) {
+      apiPatch('/api/packages/' + pkgId, { courier: courier, barcode: barcode, notes: notes })
+        .then(function() { showToast('✓ עודכן', 'var(--green)'); })
+        .catch(function() { showToast('שמירה מקומית בלבד — שגיאת רשת', 'var(--red)'); });
+    }
+  }
+
+  function addPackageInLoadModal() {
+    var num = _currentCellNum;
+    var residentName = document.getElementById('edit-load-new-resident').value.trim();
+    var phone = document.getElementById('edit-load-new-phone').value.trim();
+    var barcode = document.getElementById('edit-load-new-barcode').value.trim();
+    var notes = document.getElementById('edit-load-new-notes').value.trim();
+    if (!residentName) { showToast('יש להזין שם דייר', 'var(--red)'); return; }
+
+    var timeStr = 'היום ' + new Date().toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'});
+    if (!packageData[num]) packageData[num] = { packages: [], status: 'loading', _ids: [] };
+    if (!packageData[num]._ids) packageData[num]._ids = [];
+    packageData[num].packages.push({ resident: residentName, phone: phone, courier: 'דואר ישראל', barcode: barcode, notes: notes, time: timeStr });
+    packageData[num].status = 'occupied';
+    packageData[num].resident = residentName;
+    packageData[num].time = timeStr;
+    if (!packageData[num].code) {
+      var randPart = String(Math.floor(Math.random() * 90) + 10);
+      packageData[num].code = randPart + String(num).padStart(2, '0');
+    }
+    savePackageData();
+    renderEditLoadList();
+    buildLockerGrid();
+
+    document.getElementById('edit-load-new-resident').value = '';
+    document.getElementById('edit-load-new-phone').value = '';
+    document.getElementById('edit-load-new-barcode').value = '';
+    document.getElementById('edit-load-new-notes').value = '';
+    showToast('✓ חבילה נוספה לתא ' + num, 'var(--purple)');
+
+    var resObj = _residentsCache.find(function(r) { return r.name === residentName; }) || {};
+    apiPost('/api/packages', {
+      cell_id: String(num),
+      resident_id: resObj.id || null,
+      barcode: barcode || null,
+      courier: 'דואר ישראל',
+      lock_code: packageData[num].code,
+      notes: notes || null
+    }).then(function(res) {
+      if (res && res.id) {
+        packageData[num]._ids.push(res.id);
+        savePackageData();
+      }
+    }).catch(function(e) { console.warn('addPackageInLoadModal API save failed', e); });
   }
 
   function markCellEmpty(cellNum) {
