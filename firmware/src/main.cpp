@@ -12,11 +12,14 @@
 //  v1.11: תיקון resetHttpState — secureClient.stop() לפני CIPCLOSE
 //         (מנקה write_error של SSLClient, מונע SSL_CLIENT_CONNECT_FAIL)
 //         אחרי 2 resets רצופים → GPRS reconnect (IP חדש, TCP stack טרי)
+//  v1.14: הגדרת שעה מרשת סלולרית (AT+CCLK?) לפני SSL
+//         BearSSL מחייב שעה נכונה לאימות תעודות — ללא זה: "Certificate not yet valid"
 // ════════════════════════════════════════════════════════════════════
 
 #define TINY_GSM_MODEM_SIM7600
 #define TINY_GSM_USE_GPRS true
 #include <esp_task_wdt.h>
+#include <sys/time.h>   // [v1.14] settimeofday()
 #include <TinyGsmClient.h>
 #include <SSLClient.h>
 #include <ArduinoHttpClient.h>
@@ -379,7 +382,7 @@ void atDiag(const char* cmd) {
 void setup() {
   Serial.begin(115200);
   delay(200);
-  Serial.println("\n[BOOT] Smarta Lockers v1.13 — " ESP_ID);
+  Serial.println("\n[BOOT] Smarta Lockers v1.14 — " ESP_ID);
 
   pinMode(RS485_DE, OUTPUT);
   digitalWrite(RS485_DE, LOW);
@@ -451,6 +454,61 @@ void setup() {
   Serial.println("[MODEM] GPRS מחובר — מייצב 5 שניות...");
   delay(5000);
   Serial.println("[MODEM] מחובר");
+
+  // [v1.14] הגדרת שעה ל-BearSSL — setVerificationTime(days, secs)
+  // BearSSL סופר ימים מ-שנת 0000 (לא מ-1970, לא מ-2000)
+  // נוסחה: br_days = (unix_utc_epoch / 86400) + 719528
+  // 719528 = קבוע: ימים מ-0000-01-01 עד 1970-01-01 (גרגוריאני)
+  {
+    while (modemSerial.available()) modemSerial.read();
+    modemSerial.print("AT+CCLK?\r\n");
+    delay(1000);
+    String clkResp = "";
+    unsigned long tw = millis();
+    while (millis() - tw < 1500) {
+      while (modemSerial.available()) clkResp += (char)modemSerial.read();
+    }
+    Serial.printf("[TIME] CCLK raw: %s\n", clkResp.substring(0, 60).c_str());
+    int q1 = clkResp.indexOf('"');
+    int q2 = clkResp.indexOf('"', q1 + 1);
+    bool timeSet = false;
+    if (q1 >= 0 && q2 > q1) {
+      String ts = clkResp.substring(q1 + 1, q2);  // "26/08/14,09:43:43+12"
+      int yy = ts.substring(0, 2).toInt() + 2000;
+      int mo = ts.substring(3, 5).toInt();
+      int dd = ts.substring(6, 8).toInt();
+      int hh = ts.substring(9, 11).toInt();
+      int mm = ts.substring(12, 14).toInt();
+      int ss = ts.substring(15, 17).toInt();
+      if (yy > 2020 && mo >= 1 && mo <= 12) {
+        // שלב 1: ימים מ-1970-01-01 עד התאריך הנתון (Unix epoch days)
+        const int dpm[] = {31,28,31,30,31,30,31,31,30,31,30,31};
+        bool isLeap = (yy%4==0) && (yy%100!=0 || yy%400==0);
+        long epochDays = 0;
+        for (int y = 1970; y < yy; y++) {
+          bool lp = (y%4==0) && (y%100!=0 || y%400==0);
+          epochDays += lp ? 366 : 365;
+        }
+        for (int m = 1; m < mo; m++) epochDays += dpm[m-1] + (m==2&&isLeap?1:0);
+        epochDays += dd - 1;
+        // שלב 2: Unix epoch UTC (CCLK = ישראל קיץ UTC+3 → חסר 10800 שניות)
+        long epochUTC = epochDays * 86400L + (long)hh*3600 + (long)mm*60 + ss - 10800L;
+        // שלב 3: המרה ל-BearSSL (מ-שנת 0000) → +719528
+        uint32_t br_days = (uint32_t)(epochUTC / 86400L) + 719528UL;
+        uint32_t br_secs = (uint32_t)(epochUTC % 86400L);
+        secureClient.setVerificationTime(br_days, br_secs);
+        int utcH = (int)((epochUTC % 86400L) / 3600);
+        Serial.printf("[TIME] BearSSL days=%u secs=%u (%d-%02d-%02d %02d:%02d UTC)\n",
+                      br_days, br_secs, yy, mo, dd, utcH, mm);
+        timeSet = true;
+      }
+    }
+    if (!timeSet) {
+      // fallback: 2026-08-14 06:00 UTC → br_days=20679+719528=740207, br_secs=21600
+      secureClient.setVerificationTime(740207, 21600);
+      Serial.println("[TIME] fallback BearSSL: days=740207 (2026-08-14 06:00 UTC)");
+    }
+  }
 
   // SSL timeout
   secureClient.setTimeout(SSL_TIMEOUT_MS);
