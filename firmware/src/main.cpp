@@ -75,6 +75,9 @@ bool          clipReceived    = false;
 unsigned long ringPendingMs   = 0;
 String        pendingCaller   = "";
 
+// ─── Forward declarations ─────────────────────────────────────────
+void handleModemInput();
+
 // ─── [SMARTA PATCH] הגדרת statics של TinyGSM ────────────────────
 void (*TinyGsmSim7600::s_urcRingCallback)()           = nullptr;
 void (*TinyGsmSim7600::s_urcClipCallback)(const char*) = nullptr;
@@ -134,12 +137,31 @@ void closeCell(uint8_t board, uint8_t channel) {
 void resetHttpState() {
   Serial.println("[HTTP] מאפס חיבור HTTP...");
   s_resetCount++;
+  esp_task_wdt_reset();   // [v1.15] מונע WDT קריסה בזמן reset (reset#1-2 לא מתים לפה אחרת)
 
   // [v1.11/v1.12] stop() + clearWriteError() — stop() לבד לא מנקה write_error
   // (Print::write_error נשאר set אחרי stop() ב-SSLClient)
   secureClient.stop();
   secureClient.clearWriteError();   // [v1.12] חובה — בלי זה fail מיידי בניסיון הבא
   delay(300);
+
+  // [v1.15] RING שהגיע בזמן SSL — שני מנגנונים:
+  // א) handleModemInput: תופס bytes שנשארו בבאפר UART אחרי SSL נכשל
+  // ב) AT+CLCC: בודק אם השיחה עדיין פעילה (חצי צלצול → יש עוד זמן)
+  handleModemInput();
+  {
+    String clcc;
+    modem.sendAT("+CLCC");
+    if (modem.waitResponse(1000L, clcc) == 1 && clcc.indexOf("+CLCC:") >= 0) {
+      if (clcc.indexOf(",4,") >= 0) {   // status=4 = incoming call
+        if (!ringPending && !clipReceived) {
+          ringPending   = true;
+          ringPendingMs = millis();
+          Serial.println("[RING] שיחה נכנסת ← AT+CLCC (RING בזמן SSL)!");
+        }
+      }
+    }
+  }
 
   if (modem.isGprsConnected()) {
     if (s_resetCount <= 2) {
@@ -299,6 +321,7 @@ void onRingDetected(const String& caller) {
 // ────────────────────────────────────────────────────────────────────
 void pollCourierCommands() {
   String resp = httpGet("/api/esp/commands?esp_id=" ESP_ID);
+  handleModemInput();   // [v1.15] תפוס RING שהגיע בזמן HTTP
   if (resp.isEmpty()) return;
   StaticJsonDocument<256> doc;
   if (deserializeJson(doc, resp)) return;
@@ -521,6 +544,11 @@ void setup() {
   modem.waitResponse(3000L);
   modem.sendAT("+GSMBUSY=0");  // [v1.4-VOICE] אל תדחה שיחות בזמן GPRS
   modem.waitResponse(3000L);
+  // [v1.15] CNMP=2 (auto) — מאפשר קבלת שיחות ב-3G
+  // CNMP=38 (LTE only) גורם ל-busy מיידי כי 019+ לא תומכת CSFB
+  modem.sendAT("+CNMP=2");
+  modem.waitResponse(3000L);
+  Serial.println("[VOICE] CNMP=2 (auto) — שיחות קוליות ב-3G");
   modem.sendAT("+CREG?");      // לוג — CS domain registration (קול)
   modem.waitResponse(3000L);
   modem.sendAT("+CGREG?");     // לוג — PS domain registration (data)
