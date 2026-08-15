@@ -112,9 +112,10 @@ void sendRS485(uint8_t board, uint8_t channel, uint8_t cmd_byte) {
   uint8_t cmd[5] = { 0x8A, board, channel, cmd_byte, 0 };
   cmd[4] = cmd[0] ^ cmd[1] ^ cmd[2] ^ cmd[3];
   digitalWrite(RS485_DE, HIGH);
+  delayMicroseconds(200);   // [v1.15] המתן לייצוב DE לפני הביט הראשון
   rs485Serial.write(cmd, 5);
   rs485Serial.flush();
-  delay(10);
+  delayMicroseconds(1000);  // [v1.15] החזק DE עד סיום הביט האחרון
   digitalWrite(RS485_DE, LOW);
 }
 
@@ -124,7 +125,7 @@ void openCell(uint8_t board, uint8_t channel) {
 }
 
 void closeCell(uint8_t board, uint8_t channel) {
-  sendRS485(board, channel, 0x00);
+  sendRS485(board, channel, 0x22);  // [v1.15] 0x22 = CLOSE (0x00 לא סגר בפועל)
   Serial.printf("[RS485] CLOSE board=%d ch=%d\n", board, channel);
 }
 
@@ -279,6 +280,7 @@ void processCells(const String& json) {
     openCell(1, (uint8_t)cell);
     delay(SOLENOID_OPEN_MS);
     closeCell(1, (uint8_t)cell);
+    delay(100);  // [v1.15] המתן בין סגירה לפתיחה הבאה
   }
 }
 
