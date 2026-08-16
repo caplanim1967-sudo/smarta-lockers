@@ -2291,6 +2291,7 @@ function buildLockerGrid() {
       }
     } catch(e) {}
     if (!allNums.length) { showToast('לא נמצא config לוקר', 'var(--muted)'); return; }
+    allNums.sort(function(a, b) { return a - b; }); // סדר עולה 1,2,3...
     apiPost('/api/locker/open-manual', { cells: allNums })
       .then(function(res) {
         if (res && res.error) showToast('שגיאה: ' + res.error, 'var(--red)');
