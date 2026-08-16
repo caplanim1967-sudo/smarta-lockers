@@ -2274,14 +2274,27 @@ function buildLockerGrid() {
   }
 
   function openAllCells() {
-    var allNums = Object.keys(packageData).filter(function(k) {
-      return packageData[k] && packageData[k].status === 'occupied';
-    }).map(Number);
-    if (!allNums.length) { showToast('אין תאים תפוסים לפתיחה', 'var(--muted)'); return; }
+    // פתח את כל התאים הפיזיים לפי config הלוקר (כולל ריקים — לטעינה)
+    var allNums = [];
+    try {
+      var saved = localStorage.getItem('smarta_locker_config_v2');
+      if (saved) {
+        var cfg = JSON.parse(saved);
+        if (cfg && cfg.columns && !cfg.layout) cfg = builderConfigToLayout(cfg);
+        if (cfg && cfg.layout) {
+          cfg.layout.forEach(function(col) {
+            col.forEach(function(c) {
+              if (!c.disabled && c.num) allNums.push(c.num);
+            });
+          });
+        }
+      }
+    } catch(e) {}
+    if (!allNums.length) { showToast('לא נמצא config לוקר', 'var(--muted)'); return; }
     apiPost('/api/locker/open-manual', { cells: allNums })
       .then(function(res) {
         if (res && res.error) showToast('שגיאה: ' + res.error, 'var(--red)');
-        else showToast(allNums.length + ' תאים נפתחו ✓', 'var(--green)');
+        else showToast(allNums.length + ' תאים נפתחים ✓', 'var(--green)');
       })
       .catch(function() { showToast('שגיאת תקשורת', 'var(--red)'); });
   }
