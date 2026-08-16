@@ -983,6 +983,32 @@ async function handleCommunity(path, method, request, env, user, url) {
   );
   if (!communityId && !isCourierCompanyUser) return forbidden();
 
+  // ── Locker manual open (dashboard) ──────────────────────
+  if (path === '/api/locker/open-manual' && method === 'POST') {
+    if (!communityId) return err('פעולה זו דורשת community_id');
+    const b = await request.json().catch(() => ({}));
+    const cells = Array.isArray(b.cells) ? b.cells.map(Number).filter(n => n > 0 && Number.isInteger(n)) : [];
+    if (!cells.length) return err('cells חובה — מערך מספרי תאים');
+
+    // מציאת esp_id לפי community_id
+    const locker = await db.prepare(
+      'SELECT esp_id FROM locker_configs WHERE community_id = ?'
+    ).bind(communityId).first();
+    if (!locker) return err('לוקר לא נמצא לקהילה זו');
+    if (!locker.esp_id) return err('לוקר לא מחובר — esp_id חסר');
+
+    // הכנסת פקודה לכל תא ל-esp_commands
+    const now = nowSec();
+    for (const cell of cells) {
+      await db.prepare(
+        'INSERT INTO esp_commands (id, esp_id, community_id, cell_number, created_at) VALUES (?, ?, ?, ?, ?)'
+      ).bind(newId(), locker.esp_id, communityId, cell, now).run();
+    }
+
+    console.log(`[OPEN-MANUAL] user=${user.sub} community=${communityId} esp=${locker.esp_id} cells=[${cells}]`);
+    return ok({ ok: true, count: cells.length });
+  }
+
   // ── Residents ────────────────────────────────────────────
   if (path === '/api/residents') {
     if (method === 'GET') {

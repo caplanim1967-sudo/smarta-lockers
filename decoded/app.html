@@ -2274,7 +2274,16 @@ function buildLockerGrid() {
   }
 
   function openAllCells() {
-    showToast('כל התאים נפתחו ✓', 'var(--red)');
+    var allNums = Object.keys(packageData).filter(function(k) {
+      return packageData[k] && packageData[k].status === 'occupied';
+    }).map(Number);
+    if (!allNums.length) { showToast('אין תאים תפוסים לפתיחה', 'var(--muted)'); return; }
+    apiPost('/api/locker/open-manual', { cells: allNums })
+      .then(function(res) {
+        if (res && res.error) showToast('שגיאה: ' + res.error, 'var(--red)');
+        else showToast(allNums.length + ' תאים נפתחו ✓', 'var(--green)');
+      })
+      .catch(function() { showToast('שגיאת תקשורת', 'var(--red)'); });
   }
 
   function clearAllOccupied() {
@@ -2441,7 +2450,17 @@ function buildLockerGrid() {
   function openModal(id) { document.getElementById(id).classList.add('open'); }
   function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
-  function openCell() { closeModal('modal'); showToast('תא ' + _currentCellNum + ' נפתח ✓', 'var(--red)'); }
+  function openCell() {
+    closeModal('modal');
+    var num = _currentCellNum;
+    if (!num) return;
+    apiPost('/api/locker/open-manual', { cells: [num] })
+      .then(function(res) {
+        if (res && res.error) showToast('שגיאה: ' + res.error, 'var(--red)');
+        else showToast('תא ' + num + ' נפתח ✓', 'var(--green)');
+      })
+      .catch(function() { showToast('שגיאת תקשורת', 'var(--red)'); });
+  }
   function sendCellMessage() {
     var num = _currentCellNum;
     if (!num) return;
@@ -2658,9 +2677,15 @@ function buildLockerGrid() {
   }
 
   function executeOpenAll() {
-    const count = Object.values(cellSelection).filter(v => v.open).length;
+    const toOpen = Object.entries(cellSelection).filter(([,v]) => v.open).map(([num]) => Number(num));
     closeModal('open-all-modal');
-    showToast(count + ' תאים נפתחו ✓', 'var(--red)');
+    if (!toOpen.length) { showToast('אין תאים מסומנים', 'var(--muted)'); return; }
+    apiPost('/api/locker/open-manual', { cells: toOpen })
+      .then(function(res) {
+        if (res && res.error) showToast('שגיאה: ' + res.error, 'var(--red)');
+        else showToast(toOpen.length + ' תאים נפתחו ✓', 'var(--green)');
+      })
+      .catch(function() { showToast('שגיאת תקשורת', 'var(--red)'); });
   }
 
   // ── עזרים לmodal שלח לכולם (ברמת מודול כדי לגשת ל-esc) ──
