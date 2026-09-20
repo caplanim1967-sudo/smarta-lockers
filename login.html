@@ -321,7 +321,7 @@ var ROLE_TAB = {
 // Allowed tabs per role (others will be hidden in shell)
 var ROLE_TABS = {
   smarta_admin:      ['app','manager','admin','courier','finance','test'],
-  community_manager: ['manager'],
+  community_manager: ['manager','app'],
   mail_manager:      ['app'],
   courier:           ['courier'],
   courier_manager:   ['courier'],
@@ -459,6 +459,8 @@ function tryLocalLogin(username, password, errBox, btn) {
       if (role === 'community_manager') {
         sessionStorage.setItem('manager_token', fakeToken);
         sessionStorage.setItem('manager_user',  JSON.stringify(userObj));
+        sessionStorage.setItem('app_token', fakeToken);
+        sessionStorage.setItem('app_user',  JSON.stringify(userObj));
       }
       var tab = ROLE_TAB[role] || 'manager';
       window.location.href = './smarta-all-v2.html#' + tab;
@@ -643,7 +645,7 @@ function doLogin() {
       sessionStorage.setItem('smarta_user',  JSON.stringify(user));
       sessionStorage.setItem('smarta_tabs',  JSON.stringify(ROLE_TABS[role] || ['app']));
       var t2 = data.token, u2 = JSON.stringify(user);
-      if (role === 'community_manager') { sessionStorage.setItem('manager_token', t2); sessionStorage.setItem('manager_user', u2); }
+      if (role === 'community_manager') { sessionStorage.setItem('manager_token', t2); sessionStorage.setItem('manager_user', u2); sessionStorage.setItem('app_token', t2); sessionStorage.setItem('app_user', u2); }
       if (role === 'mail_manager')      { sessionStorage.setItem('app_token', t2);     sessionStorage.setItem('app_user', u2); }
       if (role === 'courier' || role === 'courier_manager') { sessionStorage.setItem('courier_token', t2); sessionStorage.setItem('courier_user', u2); }
       if (role === 'smarta_admin') { ['admin','manager','app','courier','finance'].forEach(function(k) { sessionStorage.setItem(k+'_token',t2); sessionStorage.setItem(k+'_user',u2); }); }
@@ -665,6 +667,8 @@ function doLogin() {
     if (role === 'community_manager') {
       sessionStorage.setItem('manager_token', t);
       sessionStorage.setItem('manager_user',  u);
+      sessionStorage.setItem('app_token', t);
+      sessionStorage.setItem('app_user',  u);
     }
     if (role === 'mail_manager') {
       sessionStorage.setItem('app_token', t);
