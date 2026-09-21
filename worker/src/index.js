@@ -290,17 +290,112 @@ export default {
         return ok({ changed: true });
       }
 
+      // ── ESP32 OTA — proxy binary from stored URL (no auth, ESP32 only) ──
+      // Worker מוריד מה-URL השמור ב-D1 ומעביר ל-ESP32 — אין R2 נדרש
+      if (path === '/api/esp/ota/firmware.bin' && method === 'GET') {
+        const meta = await env.smarta_db.prepare(
+          "SELECT value FROM ota_meta WHERE key = 'current'"
+        ).first().catch(() => null);
+        if (!meta) return err('OTA firmware not configured', 404);
+        const info = JSON.parse(meta.value);
+        if (!info.url) return err('OTA URL missing', 404);
+        const upstream = await fetch(info.url);
+        if (!upstream.ok) return err('OTA upstream failed', 502);
+        const headers = { 'Content-Type': 'application/octet-stream' };
+        if (info.size) headers['Content-Length'] = String(info.size);
+        return new Response(upstream.body, { headers });
+      }
+
+      // ── Admin: get current OTA status ─────────────────────────────
+      if (path === '/api/admin/ota' && method === 'GET') {
+        const authUser = await getUser(request, env);
+        if (!authUser || authUser.role !== 'smarta_admin') return unauthorized();
+        await ensureOtaTable(env.smarta_db);
+        const row = await env.smarta_db.prepare(
+          "SELECT value FROM ota_meta WHERE key = 'current'"
+        ).first().catch(() => null);
+        return ok(row ? JSON.parse(row.value) : { version: null });
+      }
+
+      // ── Admin: register new firmware release ─────────────────────
+      // body: { version, url, size, md5 }
+      // url = GitHub Release asset URL (https://github.com/.../releases/download/...)
+      if (path === '/api/admin/ota/release' && method === 'POST') {
+        const authUser = await getUser(request, env);
+        if (!authUser || authUser.role !== 'smarta_admin') return unauthorized();
+        const b = await request.json().catch(() => ({}));
+        if (!b.version || !b.url) return err('version ו-url חובה');
+        await ensureOtaTable(env.smarta_db);
+        const meta = JSON.stringify({
+          version: b.version,
+          url: b.url,
+          size: b.size || 0,
+          md5: b.md5 || '',
+          path: '/api/esp/ota/firmware.bin',
+          released_at: nowSec(),
+        });
+        await env.smarta_db.prepare(
+          "INSERT OR REPLACE INTO ota_meta (key, value) VALUES ('current', ?)"
+        ).bind(meta).run();
+        console.log(`[OTA] רשום release ${b.version} → ${b.url}`);
+        return ok({ registered: true, version: b.version });
+      }
+
+      // ── ESP32 log — public, no JWT, validated by esp_id ─────
+      if (path === '/api/esp/log' && method === 'POST') {
+        const b = await request.json().catch(() => ({}));
+        const { esp_id, level, event, detail } = b;
+        if (!esp_id || !level || !event) return err('esp_id, level, event חובה');
+        const allowed = ['info', 'warn', 'error'];
+        if (!allowed.includes(level)) return err('level חייב להיות info/warn/error');
+        await ensureDeviceLogsTable(env.smarta_db);
+        await env.smarta_db.prepare(
+          'INSERT INTO device_logs (esp_id, level, event, detail, ts) VALUES (?,?,?,?,?)'
+        ).bind(esp_id, level, event, detail || null, nowSec()).run();
+        // שמור רק 500 שורות אחרונות לכל מכשיר
+        await env.smarta_db.prepare(
+          `DELETE FROM device_logs WHERE esp_id = ? AND id NOT IN (
+             SELECT id FROM device_logs WHERE esp_id = ? ORDER BY ts DESC LIMIT 500
+           )`
+        ).bind(esp_id, esp_id).run().catch(() => {});
+        return ok({ logged: true });
+      }
+
+      // ── Admin: view device logs ───────────────────────────────
+      if (path === '/api/admin/device-logs' && method === 'GET') {
+        const authUser = await getUser(request, env);
+        if (!authUser || authUser.role !== 'smarta_admin') return unauthorized();
+        await ensureDeviceLogsTable(env.smarta_db);
+        const espId  = url.searchParams.get('esp_id') || null;
+        const limit  = Math.min(parseInt(url.searchParams.get('limit') || '100'), 500);
+        const level  = url.searchParams.get('level') || null;
+        let q = 'SELECT * FROM device_logs';
+        const params = [];
+        const where = [];
+        if (espId) { where.push('esp_id = ?'); params.push(espId); }
+        if (level) { where.push('level = ?');  params.push(level);  }
+        if (where.length) q += ' WHERE ' + where.join(' AND ');
+        q += ' ORDER BY ts DESC LIMIT ?';
+        params.push(limit);
+        const { results } = await env.smarta_db.prepare(q).bind(...params).all();
+        return ok(results);
+      }
+
       // ── ESP32 polling — public, no JWT ─────────────────────
       if (path === '/api/esp/commands' && method === 'GET') {
         const espId = url.searchParams.get('esp_id');
+        const fwVer = url.searchParams.get('fw') || '';  // [v1.35] גרסת פירמוור
         if (!espId) return err('esp_id חובה');
 
-        // שליפת פקודת שליח ממתינה
-        const cmd = await env.smarta_db.prepare(
-          'SELECT * FROM esp_commands WHERE esp_id = ? ORDER BY created_at ASC LIMIT 1'
-        ).bind(espId).first();
-        if (cmd) {
-          await env.smarta_db.prepare('DELETE FROM esp_commands WHERE id = ?').bind(cmd.id).run();
+        // שליפת כל הפקודות הממתינות — batch לפתיחה מהירה
+        const { results: cmds } = await env.smarta_db.prepare(
+          'SELECT * FROM esp_commands WHERE esp_id = ? ORDER BY created_at ASC LIMIT 20'
+        ).bind(espId).all();
+        if (cmds.length > 0) {
+          const ids = cmds.map(c => c.id);
+          await env.smarta_db.prepare(
+            `DELETE FROM esp_commands WHERE id IN (${ids.map(() => '?').join(',')})`
+          ).bind(...ids).run();
         }
 
         // שליפת דיירים עם חבילות ממתינות → cache מקומי בלוח לפתיחה מיידית
@@ -324,8 +419,22 @@ export default {
         }
         const authorizedCallers = Object.entries(callerMap).map(([phone, cells]) => ({ phone, cells }));
 
-        if (!cmd) return ok({ no_command: true, authorized_callers: authorizedCallers });
-        return ok({ cell_number: cmd.cell_number, community_id: cmd.community_id, authorized_callers: authorizedCallers });
+        // [v1.35] OTA — שלח metadata אם יש גרסה חדשה
+        let otaMeta = null;
+        if (fwVer) {
+          const otaRow = await env.smarta_db.prepare(
+            "SELECT value FROM ota_meta WHERE key = 'current'"
+          ).first().catch(() => null);
+          if (otaRow) {
+            const meta = JSON.parse(otaRow.value);
+            if (meta.version && meta.version !== fwVer) otaMeta = meta;
+          }
+        }
+
+        const base = cmds.length > 0
+          ? { cells: cmds.map(c => c.cell_number) }
+          : { no_command: true };
+        return ok({ ...base, authorized_callers: authorizedCallers, ...(otaMeta ? { ota: otaMeta } : {}) });
       }
 
       // ── ESP32 ring detection — public, no JWT ──────────────
@@ -945,6 +1054,28 @@ function buildCellList(cols, numbering) {
 }
 
 // Get set of occupied + faulty cell numbers for a community
+// ── ota_meta — metadata לגרסת פירמוור נוכחית ────────────────────────────
+async function ensureOtaTable(db) {
+  await db.prepare(`CREATE TABLE IF NOT EXISTS ota_meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  )`).run();
+}
+
+// ── device_logs — לוג אירועים ממכשירי ESP32 ──────────────────────────────
+async function ensureDeviceLogsTable(db) {
+  await db.prepare(`CREATE TABLE IF NOT EXISTS device_logs (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    esp_id  TEXT    NOT NULL,
+    level   TEXT    NOT NULL,
+    event   TEXT    NOT NULL,
+    detail  TEXT,
+    ts      INTEGER NOT NULL
+  )`).run();
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_device_logs_esp_ts
+    ON device_logs(esp_id, ts DESC)`).run().catch(() => {});
+}
+
 // ── package_audit_log — יומן שינויים לצמיתות (הוספה/עריכה) ──────────────
 async function ensurePackageAuditTable(db) {
   await db.prepare(`CREATE TABLE IF NOT EXISTS package_audit_log (
@@ -997,13 +1128,13 @@ async function handleCommunity(path, method, request, env, user, url) {
     if (!locker) return err('לוקר לא נמצא לקהילה זו');
     if (!locker.esp_id) return err('לוקר לא מחובר — esp_id חסר');
 
-    // הכנסת פקודה לכל תא ל-esp_commands
+    // הכנסת כל התאים ב-batch אטומי אחד — מונע race condition עם poll של ESP32
     const now = nowSec();
-    for (const cell of cells) {
-      await db.prepare(
-        'INSERT INTO esp_commands (id, esp_id, community_id, cell_number, created_at) VALUES (?, ?, ?, ?, ?)'
-      ).bind(newId(), locker.esp_id, communityId, cell, now).run();
-    }
+    const stmts = cells.map((cell, i) =>
+      db.prepare('INSERT INTO esp_commands (id, esp_id, community_id, cell_number, created_at) VALUES (?, ?, ?, ?, ?)')
+        .bind(newId(), locker.esp_id, communityId, cell, now + i)
+    );
+    await db.batch(stmts);
 
     console.log(`[OPEN-MANUAL] user=${user.sub} community=${communityId} esp=${locker.esp_id} cells=[${cells}]`);
     return ok({ ok: true, count: cells.length });

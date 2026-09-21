@@ -240,6 +240,9 @@ textarea{resize:vertical;min-height:80px;}
       <span class="icon">🛠️</span> תקלות
       <span class="dot dot-yellow" id="maint-dot" style="display:none"></span>
     </button>
+    <button class="sidebar-item" id="sb-firmware" onclick="showPage('firmware',this)">
+      <span class="icon">📦</span> פירמוור
+    </button>
   </aside>
 
   <main>
@@ -447,6 +450,43 @@ textarea{resize:vertical;min-height:80px;}
       </div>
       <div id="tickets-list">
         <div style="color:var(--muted);font-size:13px;text-align:center;padding:40px">אין תקלות פתוחות ✓</div>
+      </div>
+    </div>
+
+    <!-- FIRMWARE OTA -->
+    <div class="page" id="page-firmware">
+      <div class="page-header">
+        <div><div class="page-title">פירמוור</div><div class="page-sub">ניהול גרסאות OTA — כל המכשירים בשטח יתעדכנו אוטומטית</div></div>
+      </div>
+
+      <div class="card" style="max-width:560px">
+        <div class="card-title">📡 גרסה נוכחית בשטח</div>
+        <div id="fw-current" style="font-size:28px;font-weight:800;color:var(--accent);margin-bottom:4px">—</div>
+        <div id="fw-current-sub" style="font-size:12px;color:var(--muted)">טוען...</div>
+      </div>
+
+      <div class="card" style="max-width:560px">
+        <div class="card-title">🚀 פרסום גרסה חדשה</div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">מספר גרסה</label>
+            <input id="fw-version" class="inp" placeholder="למשל: 1.39" style="width:100%;box-sizing:border-box" />
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">MD5</label>
+            <input id="fw-md5" class="inp" placeholder="32 תווים hex" style="width:100%;box-sizing:border-box;font-family:monospace" />
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">גודל (bytes)</label>
+            <input id="fw-size" class="inp" placeholder="למשל: 380480" style="width:100%;box-sizing:border-box" />
+          </div>
+          <div style="background:var(--surface2,rgba(0,0,0,0.04));border-radius:8px;padding:10px 12px;font-size:12px;color:var(--muted)">
+            קבל MD5 וגודל: <code style="font-size:11px">certutil -hashfile firmware.bin MD5</code><br>
+            GitHub Release נוצר ידנית לפני הפרסום
+          </div>
+          <button class="btn btn-primary" onclick="publishFirmware()" id="fw-publish-btn">📦 פרסם גרסה</button>
+          <div id="fw-msg" style="font-size:13px;display:none"></div>
+        </div>
       </div>
     </div>
 
@@ -886,6 +926,7 @@ function showPage(name, el) {
   if (name === 'payments')   { renderPayments(); }
   if (name === 'locker-builder') { populateBuilderComm(); loadBuilderFromStorage(); buildColConfig(); buildLocker(); }
   if (name === 'couriers')      { loadCourierCompanies(); }
+  if (name === 'firmware')      { loadFirmware(); }
 }
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
@@ -2401,8 +2442,56 @@ window.addEventListener('message', function(e) {
     case 'page-users':         loadUsers(); break;
     case 'page-monitoring':    loadMonitoring(); break;
     case 'page-payments':      renderPayments(); break;
+    case 'page-firmware':      loadFirmware(); break;
   }
 });
+
+// ─── FIRMWARE OTA ─────────────────────────────────────────
+function loadFirmware() {
+  apiGet('/api/admin/ota').then(function(data) {
+    if (data && data.version) {
+      document.getElementById('fw-current').textContent = 'v' + data.version;
+      document.getElementById('fw-current-sub').textContent = 'MD5: ' + (data.md5 || '—') + ' · ' + (data.size ? (data.size/1024).toFixed(0) + ' KB' : '—');
+    } else {
+      document.getElementById('fw-current').textContent = '—';
+      document.getElementById('fw-current-sub').textContent = 'לא הוגדר';
+    }
+  }).catch(function() {
+    document.getElementById('fw-current-sub').textContent = 'שגיאה בטעינה';
+  });
+}
+
+function publishFirmware() {
+  var version = (document.getElementById('fw-version').value || '').trim();
+  var md5     = (document.getElementById('fw-md5').value || '').trim();
+  var size    = parseInt(document.getElementById('fw-size').value || '0');
+  if (!version) { showFwMsg('חסר מספר גרסה', 'var(--red)'); return; }
+  if (!md5 || md5.length !== 32) { showFwMsg('MD5 לא תקין (חייב להיות 32 תווים)', 'var(--red)'); return; }
+  if (!size || size < 1000) { showFwMsg('גודל לא תקין', 'var(--red)'); return; }
+
+  var url = 'https://github.com/caplanim1967-sudo/smarta-lockers/releases/download/v' + version + '/firmware.bin';
+  var btn = document.getElementById('fw-publish-btn');
+  btn.disabled = true;
+  btn.textContent = 'מפרסם...';
+
+  apiPost('/api/admin/ota/release', { version: version, url: url, size: size, md5: md5 })
+    .then(function(res) {
+      if (res && res.error) { showFwMsg('שגיאה: ' + res.error, 'var(--red)'); }
+      else {
+        showFwMsg('✓ גרסה v' + version + ' פורסמה — כל המכשירים יתעדכנו בפול הבא', 'var(--green)');
+        loadFirmware();
+      }
+    })
+    .catch(function() { showFwMsg('שגיאת תקשורת', 'var(--red)'); })
+    .finally(function() { btn.disabled = false; btn.textContent = '📦 פרסם גרסה'; });
+}
+
+function showFwMsg(msg, color) {
+  var el = document.getElementById('fw-msg');
+  el.style.display = 'block';
+  el.style.color = color;
+  el.textContent = msg;
+}
 
 // ─── UTILS ────────────────────────────────────────────────
 function esc(s) {
