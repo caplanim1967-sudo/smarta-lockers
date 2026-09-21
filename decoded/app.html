@@ -2769,11 +2769,21 @@ function buildLockerGrid() {
     // שמור לשימוש sendAllMessages
     _sendModalData = { newCells: newCells, r1Cells: r1Cells, r2Cells: r2Cells, r3Cells: r3Cells, r4Cells: r4Cells };
 
-    var arrTpl = s.msg_arrival   || 'היי {שם}! 📦 הגיעה לך חבילה מ-{חברה}{תא}. לאישור קבלה: הקלד 1';
-    var r1Tpl  = s.msg_reminder1 || 'היי {שם} 👋 תזכורת — יש לך חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם';
-    var r2Tpl  = s.msg_reminder2 || 'היי {שם} ⚠️ תזכורת שנייה — חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם';
-    var r3Tpl  = s.msg_reminder3 || 'היי {שם} 🚨 תזכורת שלישית — חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם';
-    var r4Tpl  = s.msg_reminder4 || 'היי {שם} ⛔ תזכורת אחרונה — חבילה כבר {ימים} ימים{תא}. ללא איסוף תחויב בקנס';
+    var arrTpl = isBasic
+      ? (s.msg_arrival         || 'היי {שם}! הגיעה לך חבילה מ-{חברה}{תא}. תודה!')
+      : (s.msg_arrival_premium || s.msg_arrival || 'היי {שם}! הגיעה לך חבילה בלוקר. התקשר לאיסוף. תודה!');
+    var r1Tpl = isBasic
+      ? (s.msg_reminder1         || 'היי {שם} תזכורת — יש לך חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם')
+      : (s.msg_reminder1_premium || s.msg_reminder1 || 'היי {שם} תזכורת — יש לך חבילה כבר {ימים} ימים בלוקר. אנא אסוף בהקדם');
+    var r2Tpl = isBasic
+      ? (s.msg_reminder2         || 'היי {שם} תזכורת שנייה — חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם')
+      : (s.msg_reminder2_premium || s.msg_reminder2 || 'היי {שם} תזכורת שנייה — חבילה כבר {ימים} ימים בלוקר. אנא אסוף בהקדם');
+    var r3Tpl = isBasic
+      ? (s.msg_reminder3         || 'היי {שם} תזכורת שלישית — חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם')
+      : (s.msg_reminder3_premium || s.msg_reminder3 || 'היי {שם} תזכורת שלישית — חבילה כבר {ימים} ימים בלוקר. אנא אסוף בהקדם');
+    var r4Tpl = isBasic
+      ? (s.msg_reminder4         || 'היי {שם} תזכורת אחרונה — חבילה כבר {ימים} ימים{תא}. ללא איסוף תחויב בקנס')
+      : (s.msg_reminder4_premium || s.msg_reminder4 || 'היי {שם} תזכורת אחרונה — חבילה כבר {ימים} ימים בלוקר. ללא איסוף תחויב בקנס');
 
     var html = '<div class="modal-title">📣 שלח הודעות לכולם</div>' +
       '<div class="modal-sub" style="margin-bottom:16px">בחר אילו הודעות לשלוח</div>';
