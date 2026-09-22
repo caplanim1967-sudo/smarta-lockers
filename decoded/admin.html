@@ -418,6 +418,10 @@ textarea{resize:vertical;min-height:80px;}
         <div id="mon-activity" style="color:var(--muted);font-size:13px;text-align:center;padding:24px">טוען...</div>
       </div>
       <div class="card">
+        <div class="card-title">🟢 מצב מכשירים</div>
+        <div id="mon-esp-status" style="color:var(--muted);font-size:13px;text-align:center;padding:16px">טוען...</div>
+      </div>
+      <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <div class="card-title" style="margin:0">📟 לוג מכשירים</div>
           <select id="mon-esp-filter" style="font-size:12px;padding:4px 8px" onchange="loadDeviceLogs()">
@@ -1712,6 +1716,7 @@ function loadMonitoring() {
   var subEl = document.getElementById('mon-comm-sub');
   if (subEl) subEl.textContent = commName;
 
+  loadEspStatus();
   loadDeviceLogs();
 
   fetch(API_BASE + '/api/health').then(function(r){return r.json();}).then(function(d) {
@@ -1784,6 +1789,49 @@ function loadMonitoring() {
             '<td><span class="badge ' + (p.status==='waiting'?'badge-yellow':'badge-green') + '">' + (p.status==='waiting'?'ממתין':'נאסף') + '</span></td></tr>';
         }).join('') + '</tbody></table>';
     }
+  });
+}
+
+// ─── ESP STATUS ───────────────────────────────────────────
+function loadEspStatus() {
+  var el = document.getElementById('mon-esp-status');
+  if (!el) return;
+  var STALE_SEC = 300; // 5 דקות ← מכשיר נחשב לא פעיל
+  apiGet('/api/admin/esp-status').then(function(rows) {
+    rows = Array.isArray(rows) ? rows : [];
+    if (!rows.length) { el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:8px">אין מכשירים רשומים</div>'; return; }
+    var now = Math.floor(Date.now() / 1000);
+    el.innerHTML = '<table style="width:100%;table-layout:fixed">' +
+      '<thead><tr>' +
+        '<th style="width:8%;text-align:right">סטטוס</th>' +
+        '<th style="width:22%;text-align:right">ישוב</th>' +
+        '<th style="width:16%;text-align:right">מכשיר</th>' +
+        '<th style="width:10%;text-align:right">גרסה</th>' +
+        '<th style="width:44%;text-align:right;direction:ltr;unicode-bidi:plaintext">פול אחרון</th>' +
+      '</tr></thead><tbody>' +
+      rows.map(function(r) {
+        var age = now - (r.last_seen || 0);
+        var online = age < STALE_SEC;
+        var dot = online ? '🟢' : '🔴';
+        var ageStr = age < 60 ? 'לפני ' + age + ' שנ\'' :
+                     age < 3600 ? 'לפני ' + Math.floor(age/60) + ' דק\'' :
+                     age < 86400 ? 'לפני ' + Math.floor(age/3600) + ' שע\'' :
+                     'לפני ' + Math.floor(age/86400) + ' ימים';
+        var d = new Date(r.last_seen * 1000);
+        var timeStr = d.toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit'}) + ' ' +
+                      d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        return '<tr>' +
+          '<td style="text-align:right;font-size:16px">' + dot + '</td>' +
+          '<td style="font-size:12px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.community_name||r.community_id||'—') + '</td>' +
+          '<td style="font-family:monospace;font-size:11px;text-align:right">' + esc(r.esp_id) + '</td>' +
+          '<td style="font-size:12px;text-align:right;color:var(--muted)">v' + esc(r.fw_version||'—') + '</td>' +
+          '<td style="font-size:11px;text-align:right;direction:ltr;unicode-bidi:plaintext;color:' + (online?'var(--green)':'var(--red)') + '">' +
+            timeStr + ' <span style="color:var(--muted)">(' + ageStr + ')</span>' +
+          '</td>' +
+        '</tr>';
+      }).join('') + '</tbody></table>';
+  }).catch(function() {
+    el.innerHTML = '<div style="color:var(--red);text-align:center;padding:8px">שגיאה בטעינת מצב מכשירים</div>';
   });
 }
 

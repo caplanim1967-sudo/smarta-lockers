@@ -385,6 +385,21 @@ export default {
         return ok(results);
       }
 
+      // ── Admin: ESP32 status (last_seen) ──────────────────────
+      if (path === '/api/admin/esp-status' && method === 'GET') {
+        const authUser = await getUser(request, env);
+        if (!authUser || authUser.role !== 'smarta_admin') return unauthorized();
+        await ensureEspStatusTable(env.smarta_db);
+        const { results } = await env.smarta_db.prepare(`
+          SELECT s.esp_id, s.last_seen, s.fw_version, l.community_id, c.name AS community_name
+          FROM esp_status s
+          LEFT JOIN locker_configs l ON l.esp_id = s.esp_id
+          LEFT JOIN communities c ON c.id = l.community_id
+          ORDER BY s.last_seen DESC
+        `).all();
+        return ok(results);
+      }
+
       // ── ESP32 polling — public, no JWT ─────────────────────
       if (path === '/api/esp/commands' && method === 'GET') {
         const espId = url.searchParams.get('esp_id');
@@ -434,6 +449,14 @@ export default {
             if (meta.version && meta.version !== fwVer) otaMeta = meta;
           }
         }
+
+        // עדכן last_seen לניטור מצב מכשיר
+        await ensureEspStatusTable(env.smarta_db);
+        await env.smarta_db.prepare(
+          `INSERT INTO esp_status (esp_id, last_seen, fw_version)
+           VALUES (?, ?, ?)
+           ON CONFLICT(esp_id) DO UPDATE SET last_seen=excluded.last_seen, fw_version=excluded.fw_version`
+        ).bind(espId, nowSec(), fwVer || null).run().catch(() => {});
 
         const base = cmds.length > 0
           ? { cells: cmds.map(c => c.cell_number) }
@@ -1063,6 +1086,15 @@ async function ensureOtaTable(db) {
   await db.prepare(`CREATE TABLE IF NOT EXISTS ota_meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
+  )`).run();
+}
+
+// ── esp_status — last_seen לכל מכשיר ────────────────────────────────────
+async function ensureEspStatusTable(db) {
+  await db.prepare(`CREATE TABLE IF NOT EXISTS esp_status (
+    esp_id      TEXT PRIMARY KEY,
+    last_seen   INTEGER NOT NULL,
+    fw_version  TEXT
   )`).run();
 }
 
