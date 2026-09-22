@@ -426,6 +426,23 @@ textarea{resize:vertical;min-height:80px;}
         </div>
         <div id="mon-device-logs" style="color:var(--muted);font-size:13px;text-align:center;padding:24px">טוען...</div>
       </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <div class="card-title" style="margin:0">🚪 היסטוריית פתיחות <span id="door-count-badge" style="font-size:11px;font-weight:400;color:var(--muted)"></span></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <select id="door-comm-filter" style="font-size:12px;padding:4px 8px" onchange="loadDoorEvents()">
+              <option value="">כל הישובים</option>
+            </select>
+            <select id="door-days-filter" style="font-size:12px;padding:4px 8px" onchange="loadDoorEvents()">
+              <option value="1">היום</option>
+              <option value="7" selected>7 ימים</option>
+              <option value="14">14 ימים</option>
+            </select>
+          </div>
+        </div>
+        <div id="mon-door-events" style="color:var(--muted);font-size:13px;text-align:center;padding:24px">טוען...</div>
+      </div>
     </div>
 
     <!-- PAYMENTS -->
@@ -1714,6 +1731,7 @@ function loadMonitoring() {
 
   loadEspStatus();
   loadDeviceLogs();
+  loadDoorEvents();
 
   fetch(API_BASE + '/api/health').then(function(r){return r.json();}).then(function(d) {
     document.getElementById('mon-health').textContent = d.ok ? '✓ תקין' : '✗ תקלה';
@@ -1871,6 +1889,81 @@ function loadDeviceLogs() {
   }).catch(function() {
     el.innerHTML = '<div style="color:var(--red);text-align:center;padding:16px">שגיאה בטעינת לוגים</div>';
   });
+}
+
+// ─── DOOR EVENTS ──────────────────────────────────────────
+var _doorRows = [], _doorSort = { col: 'ts', dir: -1 };
+
+function populateDoorCommFilter() {
+  var sel = document.getElementById('door-comm-filter');
+  if (!sel || sel.options.length > 1) return;
+  allSettlements.forEach(function(s) {
+    var o = document.createElement('option'); o.value = s.id; o.textContent = s.name || s.id; sel.appendChild(o);
+  });
+}
+
+function loadDoorEvents() {
+  populateDoorCommFilter();
+  var commId = (document.getElementById('door-comm-filter') || {}).value || '';
+  var days   = parseInt((document.getElementById('door-days-filter') || {}).value || '7');
+  var from   = Math.floor(Date.now() / 1000) - days * 86400;
+  var url = '/api/admin/door-events?from=' + from + (commId ? '&community_id=' + encodeURIComponent(commId) : '');
+  var el = document.getElementById('mon-door-events');
+  if (!el) return;
+  el.innerHTML = '<span style="color:var(--muted)">טוען...</span>';
+  apiGet(url).then(function(rows) {
+    _doorRows = Array.isArray(rows) ? rows : [];
+    renderDoorTable();
+  }).catch(function() {
+    el.innerHTML = '<div style="color:var(--red);text-align:center;padding:16px">שגיאה בטעינת היסטוריית פתיחות</div>';
+  });
+}
+
+function renderDoorTable() {
+  var el = document.getElementById('mon-door-events');
+  if (!el) return;
+  var badge = document.getElementById('door-count-badge');
+  if (badge) badge.textContent = _doorRows.length ? '(' + _doorRows.length + ' רשומות)' : '';
+  if (!_doorRows.length) { el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px">אין פתיחות בתקופה זו</div>'; return; }
+
+  var sorted = _doorRows.slice().sort(function(a, b) {
+    var av = a[_doorSort.col] || '', bv = b[_doorSort.col] || '';
+    return typeof av === 'number' ? (av - bv) * _doorSort.dir : String(av).localeCompare(String(bv), 'he') * _doorSort.dir;
+  });
+
+  var fmtTs = function(ts) {
+    if (!ts) return '—';
+    var d = new Date(ts * 1000);
+    return d.toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit',year:'2-digit'}) + ' ' +
+           d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  };
+  var parseCell = function(detail) {
+    var m = (detail || '').match(/ch=(\d+)/);
+    return m ? 'תא ' + m[1] : '—';
+  };
+  var thStyle = 'cursor:pointer;user-select:none;text-align:right;white-space:nowrap';
+  var arrow = function(col) { return _doorSort.col === col ? (_doorSort.dir === 1 ? ' ▲' : ' ▼') : ''; };
+  var th = function(col, label, w) {
+    return '<th style="width:' + w + ';' + thStyle + '" onclick="doorSortBy(\'' + col + '\')">' + label + arrow(col) + '</th>';
+  };
+
+  el.innerHTML = '<div style="overflow-x:auto"><table style="width:100%;table-layout:fixed">' +
+    '<thead><tr>' +
+      th('community_name','ישוב','20%') + th('esp_id','מכשיר','16%') + th('detail','תא','12%') + th('ts','זמן','52%') +
+    '</tr></thead><tbody>' +
+    sorted.map(function(r) {
+      return '<tr>' +
+        '<td style="font-size:12px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.community_name||r.community_id||'—') + '</td>' +
+        '<td style="font-family:monospace;font-size:11px;text-align:right">' + esc(r.esp_id||'—') + '</td>' +
+        '<td style="text-align:right;font-weight:600">' + parseCell(r.detail) + '</td>' +
+        '<td style="font-size:11px;color:var(--muted);text-align:right;direction:ltr;unicode-bidi:plaintext">' + fmtTs(r.ts) + '</td>' +
+      '</tr>';
+    }).join('') + '</tbody></table></div>';
+}
+
+function doorSortBy(col) {
+  if (_doorSort.col === col) { _doorSort.dir *= -1; } else { _doorSort.col = col; _doorSort.dir = -1; }
+  renderDoorTable();
 }
 
 // ─── MONITORING AUTO-REFRESH ──────────────────────────────

@@ -401,6 +401,34 @@ export default {
         return ok(results);
       }
 
+      // ── Admin: door events history ───────────────────────────
+      if (path === '/api/admin/door-events' && method === 'GET') {
+        const authUser = await getUser(request, env);
+        if (!authUser || authUser.role !== 'smarta_admin') return unauthorized();
+        await ensureDoorEventsTable(env.smarta_db);
+        const commId = url.searchParams.get('community_id') || null;
+        const espId  = url.searchParams.get('esp_id')       || null;
+        const from   = parseInt(url.searchParams.get('from') || '0') || 0;
+        const to     = parseInt(url.searchParams.get('to')   || '0') || 0;
+        const limit  = Math.min(parseInt(url.searchParams.get('limit') || '200'), 1000);
+        const where = [];
+        const params = [];
+        if (espId)  { where.push('d.esp_id = ?'); params.push(espId); }
+        if (from)   { where.push('d.ts >= ?');    params.push(from); }
+        if (to)     { where.push('d.ts <= ?');    params.push(to); }
+        if (commId) { where.push('(SELECT community_id FROM locker_configs WHERE esp_id = d.esp_id LIMIT 1) = ?'); params.push(commId); }
+        const whereClause = where.length ? ' WHERE ' + where.join(' AND ') : '';
+        const q = `SELECT d.*,
+                     (SELECT community_id FROM locker_configs WHERE esp_id = d.esp_id LIMIT 1) AS community_id,
+                     (SELECT name FROM settlements WHERE id = (SELECT community_id FROM locker_configs WHERE esp_id = d.esp_id LIMIT 1) LIMIT 1) AS community_name
+                   FROM door_events d
+                   ${whereClause}
+                   ORDER BY d.ts DESC LIMIT ?`;
+        params.push(limit);
+        const { results } = await env.smarta_db.prepare(q).bind(...params).all();
+        return ok(results);
+      }
+
       // ── Admin: ESP32 status (last_seen) ──────────────────────
       if (path === '/api/admin/esp-status' && method === 'GET') {
         const authUser = await getUser(request, env);
