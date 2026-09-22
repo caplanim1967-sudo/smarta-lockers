@@ -358,7 +358,7 @@ export default {
           ).bind(esp_id, detail || null, now).run();
           await env.smarta_db.prepare(
             'DELETE FROM door_events WHERE ts < ?'
-          ).bind(now - 7 * 86400).run().catch(() => {});
+          ).bind(now - 14 * 86400).run().catch(() => {});
         } else {
           // אירועי מערכת → device_logs, שמירה 500 שורות לכל מכשיר
           await ensureDeviceLogsTable(env.smarta_db);
