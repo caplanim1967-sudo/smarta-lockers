@@ -376,7 +376,7 @@ export default {
         const whereClause = where.length ? ' WHERE ' + where.join(' AND ') : '';
         const q = `SELECT d.*, l.community_id, c.name AS community_name
                    FROM device_logs d
-                   LEFT JOIN lockers l ON l.esp_id = d.esp_id
+                   LEFT JOIN locker_configs l ON l.esp_id = d.esp_id
                    LEFT JOIN communities c ON c.id = l.community_id
                    ${whereClause}
                    ORDER BY d.ts DESC LIMIT ?`;
