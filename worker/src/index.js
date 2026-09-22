@@ -376,7 +376,7 @@ export default {
         const whereClause = where.length ? ' WHERE ' + where.join(' AND ') : '';
         const q = `SELECT d.*,
                      (SELECT community_id FROM locker_configs WHERE esp_id = d.esp_id LIMIT 1) AS community_id,
-                     (SELECT name FROM communities WHERE id = (SELECT community_id FROM locker_configs WHERE esp_id = d.esp_id LIMIT 1) LIMIT 1) AS community_name
+                     (SELECT name FROM settlements WHERE id = (SELECT community_id FROM locker_configs WHERE esp_id = d.esp_id LIMIT 1) LIMIT 1) AS community_name
                    FROM device_logs d
                    ${whereClause}
                    ORDER BY d.ts DESC LIMIT ?`;
@@ -393,7 +393,7 @@ export default {
         const { results } = await env.smarta_db.prepare(`
           SELECT s.*,
             (SELECT community_id FROM locker_configs WHERE esp_id = s.esp_id LIMIT 1) AS community_id,
-            (SELECT name FROM communities WHERE id = (SELECT community_id FROM locker_configs WHERE esp_id = s.esp_id LIMIT 1) LIMIT 1) AS community_name
+            (SELECT name FROM settlements WHERE id = (SELECT community_id FROM locker_configs WHERE esp_id = s.esp_id LIMIT 1) LIMIT 1) AS community_name
           FROM esp_status s
           ORDER BY s.last_seen DESC
         `).all();
