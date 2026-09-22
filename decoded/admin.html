@@ -417,6 +417,15 @@ textarea{resize:vertical;min-height:80px;}
         <div class="card-title">📊 פעילות אחרונה</div>
         <div id="mon-activity" style="color:var(--muted);font-size:13px;text-align:center;padding:24px">טוען...</div>
       </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div class="card-title" style="margin:0">📟 לוג מכשירים</div>
+          <select id="mon-esp-filter" style="font-size:12px;padding:4px 8px" onchange="loadDeviceLogs()">
+            <option value="">כל המכשירים</option>
+          </select>
+        </div>
+        <div id="mon-device-logs" style="color:var(--muted);font-size:13px;text-align:center;padding:24px">טוען...</div>
+      </div>
     </div>
 
     <!-- PAYMENTS -->
@@ -1703,6 +1712,8 @@ function loadMonitoring() {
   var subEl = document.getElementById('mon-comm-sub');
   if (subEl) subEl.textContent = commName;
 
+  loadDeviceLogs();
+
   fetch(API_BASE + '/api/health').then(function(r){return r.json();}).then(function(d) {
     document.getElementById('mon-health').textContent = d.ok ? '✓ תקין' : '✗ תקלה';
   }).catch(function() { document.getElementById('mon-health').textContent = '—'; });
@@ -1773,6 +1784,60 @@ function loadMonitoring() {
             '<td><span class="badge ' + (p.status==='waiting'?'badge-yellow':'badge-green') + '">' + (p.status==='waiting'?'ממתין':'נאסף') + '</span></td></tr>';
         }).join('') + '</tbody></table>';
     }
+  });
+}
+
+// ─── DEVICE LOGS ──────────────────────────────────────────
+function loadDeviceLogs() {
+  var espId = (document.getElementById('mon-esp-filter') || {}).value || '';
+  var url = '/api/admin/device-logs' + (espId ? '?esp_id=' + encodeURIComponent(espId) : '');
+  var el = document.getElementById('mon-device-logs');
+  if (!el) return;
+  el.innerHTML = '<span style="color:var(--muted)">טוען...</span>';
+  apiGet(url).then(function(rows) {
+    rows = Array.isArray(rows) ? rows : [];
+    if (!rows.length) { el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px">אין רשומות</div>'; return; }
+    var fmtTs = function(ts) {
+      if (!ts) return '—';
+      var d = new Date(ts * 1000);
+      return d.toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit'}) + ' ' +
+             d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    };
+    var levelBadge = function(l) {
+      if (l === 'warn')  return '<span class="badge badge-yellow">warn</span>';
+      if (l === 'error') return '<span class="badge badge-red">error</span>';
+      return '<span class="badge badge-green">info</span>';
+    };
+    el.innerHTML = '<table style="width:100%;table-layout:fixed">' +
+      '<thead><tr>' +
+        '<th style="width:18%;text-align:right">מכשיר</th>' +
+        '<th style="width:10%;text-align:right">רמה</th>' +
+        '<th style="width:16%;text-align:right">אירוע</th>' +
+        '<th style="width:36%;text-align:right">פרטים</th>' +
+        '<th style="width:20%;text-align:right;direction:ltr;unicode-bidi:plaintext">זמן</th>' +
+      '</tr></thead><tbody>' +
+      rows.map(function(r) {
+        return '<tr>' +
+          '<td style="font-family:monospace;font-size:12px;text-align:right">' + esc(r.esp_id||'—') + '</td>' +
+          '<td style="text-align:right">' + levelBadge(r.level) + '</td>' +
+          '<td style="font-size:12px;text-align:right">' + esc(r.event||'—') + '</td>' +
+          '<td style="font-size:11px;color:var(--muted);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.detail||'—') + '</td>' +
+          '<td style="font-size:11px;color:var(--muted);text-align:right;white-space:nowrap;direction:ltr;unicode-bidi:plaintext">' + fmtTs(r.ts) + '</td>' +
+        '</tr>';
+      }).join('') + '</tbody></table>';
+    // מלא את ה-select של מכשירים
+    var espSel = document.getElementById('mon-esp-filter');
+    if (espSel && espSel.options.length <= 1) {
+      var seen = {};
+      rows.forEach(function(r) { if (r.esp_id) seen[r.esp_id] = true; });
+      Object.keys(seen).sort().forEach(function(id) {
+        var o = document.createElement('option');
+        o.value = id; o.textContent = id;
+        espSel.appendChild(o);
+      });
+    }
+  }).catch(function() {
+    el.innerHTML = '<div style="color:var(--red);text-align:center;padding:16px">שגיאה בטעינת לוגים</div>';
   });
 }
 
