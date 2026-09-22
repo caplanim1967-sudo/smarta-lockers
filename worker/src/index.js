@@ -366,13 +366,15 @@ export default {
         const authUser = await getUser(request, env);
         if (!authUser || authUser.role !== 'smarta_admin') return unauthorized();
         await ensureDeviceLogsTable(env.smarta_db);
-        const espId  = url.searchParams.get('esp_id') || null;
-        const limit  = Math.min(parseInt(url.searchParams.get('limit') || '100'), 500);
-        const level  = url.searchParams.get('level') || null;
+        const espId      = url.searchParams.get('esp_id')      || null;
+        const commId     = url.searchParams.get('community_id') || null;
+        const level      = url.searchParams.get('level')        || null;
+        const limit      = Math.min(parseInt(url.searchParams.get('limit') || '50'), 500);
         const where = [];
         const params = [];
-        if (espId) { where.push('d.esp_id = ?'); params.push(espId); }
-        if (level) { where.push('d.level = ?');  params.push(level);  }
+        if (espId)  { where.push('d.esp_id = ?'); params.push(espId); }
+        if (level)  { where.push('d.level = ?');  params.push(level); }
+        if (commId) { where.push('(SELECT community_id FROM locker_configs WHERE esp_id = d.esp_id LIMIT 1) = ?'); params.push(commId); }
         const whereClause = where.length ? ' WHERE ' + where.join(' AND ') : '';
         const q = `SELECT d.*,
                      (SELECT community_id FROM locker_configs WHERE esp_id = d.esp_id LIMIT 1) AS community_id,

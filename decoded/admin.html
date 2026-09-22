@@ -422,7 +422,12 @@ textarea{resize:vertical;min-height:80px;}
         <div id="mon-esp-status" style="color:var(--muted);font-size:13px;text-align:center;padding:16px">טוען...</div>
       </div>
       <div class="card">
-        <div class="card-title">📟 לוג מכשירים</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div class="card-title" style="margin:0">📟 לוג מכשירים <span style="font-size:11px;font-weight:400;color:var(--muted)">(50 אחרונים)</span></div>
+          <select id="mon-log-comm-filter" style="font-size:12px;padding:4px 8px" onchange="loadDeviceLogs()">
+            <option value="">כל הישובים</option>
+          </select>
+        </div>
         <div id="mon-device-logs" style="color:var(--muted);font-size:13px;text-align:center;padding:24px">טוען...</div>
       </div>
     </div>
@@ -1831,8 +1836,22 @@ function loadEspStatus() {
 }
 
 // ─── DEVICE LOGS ──────────────────────────────────────────
+function populateLogCommFilter() {
+  var sel = document.getElementById('mon-log-comm-filter');
+  if (!sel || sel.options.length > 1) return;
+  var current = sel.value;
+  allSettlements.forEach(function(s) {
+    var o = document.createElement('option');
+    o.value = s.id; o.textContent = s.name || s.id;
+    if (s.id === current) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
 function loadDeviceLogs() {
-  var url = '/api/admin/device-logs';
+  populateLogCommFilter();
+  var commId = (document.getElementById('mon-log-comm-filter') || {}).value || '';
+  var url = '/api/admin/device-logs' + (commId ? '?community_id=' + encodeURIComponent(commId) : '');
   var el = document.getElementById('mon-device-logs');
   if (!el) return;
   el.innerHTML = '<span style="color:var(--muted)">טוען...</span>';
