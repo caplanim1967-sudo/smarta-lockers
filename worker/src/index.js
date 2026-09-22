@@ -374,10 +374,10 @@ export default {
         if (espId) { where.push('d.esp_id = ?'); params.push(espId); }
         if (level) { where.push('d.level = ?');  params.push(level);  }
         const whereClause = where.length ? ' WHERE ' + where.join(' AND ') : '';
-        const q = `SELECT d.*, l.community_id, c.name AS community_name
+        const q = `SELECT d.*,
+                     (SELECT community_id FROM locker_configs WHERE esp_id = d.esp_id LIMIT 1) AS community_id,
+                     (SELECT name FROM communities WHERE id = (SELECT community_id FROM locker_configs WHERE esp_id = d.esp_id LIMIT 1) LIMIT 1) AS community_name
                    FROM device_logs d
-                   LEFT JOIN locker_configs l ON l.esp_id = d.esp_id
-                   LEFT JOIN communities c ON c.id = l.community_id
                    ${whereClause}
                    ORDER BY d.ts DESC LIMIT ?`;
         params.push(limit);
@@ -391,10 +391,10 @@ export default {
         if (!authUser || authUser.role !== 'smarta_admin') return unauthorized();
         await ensureEspStatusTable(env.smarta_db);
         const { results } = await env.smarta_db.prepare(`
-          SELECT s.esp_id, s.last_seen, s.fw_version, l.community_id, c.name AS community_name
+          SELECT s.*,
+            (SELECT community_id FROM locker_configs WHERE esp_id = s.esp_id LIMIT 1) AS community_id,
+            (SELECT name FROM communities WHERE id = (SELECT community_id FROM locker_configs WHERE esp_id = s.esp_id LIMIT 1) LIMIT 1) AS community_name
           FROM esp_status s
-          LEFT JOIN locker_configs l ON l.esp_id = s.esp_id
-          LEFT JOIN communities c ON c.id = l.community_id
           ORDER BY s.last_seen DESC
         `).all();
         return ok(results);
