@@ -348,16 +348,29 @@ export default {
         if (!esp_id || !level || !event) return err('esp_id, level, event חובה');
         const allowed = ['info', 'warn', 'error'];
         if (!allowed.includes(level)) return err('level חייב להיות info/warn/error');
-        await ensureDeviceLogsTable(env.smarta_db);
-        await env.smarta_db.prepare(
-          'INSERT INTO device_logs (esp_id, level, event, detail, ts) VALUES (?,?,?,?,?)'
-        ).bind(esp_id, level, event, detail || null, nowSec()).run();
-        // שמור רק 500 שורות אחרונות לכל מכשיר
-        await env.smarta_db.prepare(
-          `DELETE FROM device_logs WHERE esp_id = ? AND id NOT IN (
-             SELECT id FROM device_logs WHERE esp_id = ? ORDER BY ts DESC LIMIT 500
-           )`
-        ).bind(esp_id, esp_id).run().catch(() => {});
+        const now = nowSec();
+
+        if (event === 'door_open') {
+          // פתיחות דלת → טבלה נפרדת, שמירה 7 ימים
+          await ensureDoorEventsTable(env.smarta_db);
+          await env.smarta_db.prepare(
+            'INSERT INTO door_events (esp_id, detail, ts) VALUES (?,?,?)'
+          ).bind(esp_id, detail || null, now).run();
+          await env.smarta_db.prepare(
+            'DELETE FROM door_events WHERE ts < ?'
+          ).bind(now - 7 * 86400).run().catch(() => {});
+        } else {
+          // אירועי מערכת → device_logs, שמירה 500 שורות לכל מכשיר
+          await ensureDeviceLogsTable(env.smarta_db);
+          await env.smarta_db.prepare(
+            'INSERT INTO device_logs (esp_id, level, event, detail, ts) VALUES (?,?,?,?,?)'
+          ).bind(esp_id, level, event, detail || null, now).run();
+          await env.smarta_db.prepare(
+            `DELETE FROM device_logs WHERE esp_id = ? AND id NOT IN (
+               SELECT id FROM device_logs WHERE esp_id = ? ORDER BY ts DESC LIMIT 500
+             )`
+          ).bind(esp_id, esp_id).run().catch(() => {});
+        }
         return ok({ logged: true });
       }
 
@@ -368,12 +381,13 @@ export default {
         await ensureDeviceLogsTable(env.smarta_db);
         const espId      = url.searchParams.get('esp_id')      || null;
         const commId     = url.searchParams.get('community_id') || null;
-        const level      = url.searchParams.get('level')        || null;
+        const level      = url.searchParams.get('level')        || null;  // 'warn' = warn+error only
         const limit      = Math.min(parseInt(url.searchParams.get('limit') || '50'), 500);
         const where = [];
         const params = [];
         if (espId)  { where.push('d.esp_id = ?'); params.push(espId); }
-        if (level)  { where.push('d.level = ?');  params.push(level); }
+        if (level === 'warn') { where.push("d.level IN ('warn','error')"); }
+        else if (level)       { where.push('d.level = ?'); params.push(level); }
         if (commId) { where.push('(SELECT community_id FROM locker_configs WHERE esp_id = d.esp_id LIMIT 1) = ?'); params.push(commId); }
         const whereClause = where.length ? ' WHERE ' + where.join(' AND ') : '';
         const q = `SELECT d.*,
@@ -452,13 +466,18 @@ export default {
           }
         }
 
-        // עדכן last_seen לניטור מצב מכשיר
+        // עדכן last_seen — מקסימום פעם בדקה כדי לא להכביד על D1
         await ensureEspStatusTable(env.smarta_db);
-        await env.smarta_db.prepare(
-          `INSERT INTO esp_status (esp_id, last_seen, fw_version)
-           VALUES (?, ?, ?)
-           ON CONFLICT(esp_id) DO UPDATE SET last_seen=excluded.last_seen, fw_version=excluded.fw_version`
-        ).bind(espId, nowSec(), fwVer || null).run().catch(() => {});
+        const prevSeen = (await env.smarta_db.prepare(
+          'SELECT last_seen FROM esp_status WHERE esp_id = ?'
+        ).bind(espId).first().catch(() => null))?.last_seen || 0;
+        if (nowSec() - prevSeen > 60) {
+          await env.smarta_db.prepare(
+            `INSERT INTO esp_status (esp_id, last_seen, fw_version)
+             VALUES (?, ?, ?)
+             ON CONFLICT(esp_id) DO UPDATE SET last_seen=excluded.last_seen, fw_version=excluded.fw_version`
+          ).bind(espId, nowSec(), fwVer || null).run().catch(() => {});
+        }
 
         const base = cmds.length > 0
           ? { cells: cmds.map(c => c.cell_number) }
@@ -1089,6 +1108,18 @@ async function ensureOtaTable(db) {
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
   )`).run();
+}
+
+// ── door_events — פתיחות דלת, שמירה 7 ימים ──────────────────────────────
+async function ensureDoorEventsTable(db) {
+  await db.prepare(`CREATE TABLE IF NOT EXISTS door_events (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    esp_id  TEXT    NOT NULL,
+    detail  TEXT,
+    ts      INTEGER NOT NULL
+  )`).run();
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_door_events_esp_ts
+    ON door_events(esp_id, ts DESC)`).run().catch(() => {});
 }
 
 // ── esp_status — last_seen לכל מכשיר ────────────────────────────────────
