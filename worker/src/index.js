@@ -369,13 +369,17 @@ export default {
         const espId  = url.searchParams.get('esp_id') || null;
         const limit  = Math.min(parseInt(url.searchParams.get('limit') || '100'), 500);
         const level  = url.searchParams.get('level') || null;
-        let q = 'SELECT * FROM device_logs';
-        const params = [];
         const where = [];
-        if (espId) { where.push('esp_id = ?'); params.push(espId); }
-        if (level) { where.push('level = ?');  params.push(level);  }
-        if (where.length) q += ' WHERE ' + where.join(' AND ');
-        q += ' ORDER BY ts DESC LIMIT ?';
+        const params = [];
+        if (espId) { where.push('d.esp_id = ?'); params.push(espId); }
+        if (level) { where.push('d.level = ?');  params.push(level);  }
+        const whereClause = where.length ? ' WHERE ' + where.join(' AND ') : '';
+        const q = `SELECT d.*, l.community_id, c.name AS community_name
+                   FROM device_logs d
+                   LEFT JOIN lockers l ON l.esp_id = d.esp_id
+                   LEFT JOIN communities c ON c.id = l.community_id
+                   ${whereClause}
+                   ORDER BY d.ts DESC LIMIT ?`;
         params.push(limit);
         const { results } = await env.smarta_db.prepare(q).bind(...params).all();
         return ok(results);
