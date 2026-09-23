@@ -2496,7 +2496,15 @@ function buildLockerGrid() {
       savePackageData();
       buildLockerGrid();
     }
-    apiPost('/api/messages/send', { messages: [{ cell_id: String(num), type: 'arrival' }] })
+    // בחר type לפי ימי המתנה
+    var pkg  = packageData[num];
+    var days = pkg ? parseInt(pkg.days) || 0 : 0;
+    var type = 'arrival';
+    if      (days >= 7) type = 'reminder4';
+    else if (days >= 5) type = 'reminder3';
+    else if (days >= 3) type = 'reminder2';
+    else if (days >= 1) type = 'reminder1';
+    apiPost('/api/messages/send', { messages: [{ cell_id: String(num), type: type }] })
       .then(function(res) {
         if (res && res.sent > 0) showToast('הודעה נשלחה לדייר בתא ' + num + ' ✓');
         else showToast('שליחת ההודעה נכשלה — בדוק נייד דייר', 'var(--red)');
