@@ -901,6 +901,19 @@
   </div>
 </div>
 
+<!-- EMPTY CELL MODAL -->
+<div class="modal-overlay" id="modal-empty-cell">
+  <div class="modal">
+    <div class="modal-title" id="empty-cell-title">תא —</div>
+    <div class="modal-sub" style="color:var(--green)">תא פנוי</div>
+    <div class="modal-actions" style="flex-direction:column;gap:8px;margin-top:16px">
+      <button class="modal-btn confirm" style="background:var(--red);font-size:15px;padding:14px" onclick="openEmptyCell()">🔓 פתח תא</button>
+      <button class="modal-btn" style="flex:1;background:rgba(139,92,246,0.15);color:#8b5cf6;border:1px solid rgba(139,92,246,0.3);font-size:13px;padding:12px" onclick="loadPackageFromEmpty()">📦 טען חבילה</button>
+      <button class="modal-btn cancel" onclick="closeModal('modal-empty-cell')">סגור</button>
+    </div>
+  </div>
+</div>
+
 <!-- EDIT LOAD MODAL — עריכת כל החבילות בתא + הוספת חבילה חדשה -->
 <div class="modal-overlay" id="edit-load-modal">
   <div class="modal" style="max-width:480px">
@@ -2136,8 +2149,7 @@ function buildLockerGrid() {
         cell.addEventListener('click', () => {
           if (isFaulty) { openFaultModal(cellDef.num, pkg.faultType); return; }
           if (!pkg) {
-            showScreen('new-package');
-            setTimeout(() => populateCellSelect(cellDef.num), 50);
+            openEmptyCellModal(cellDef.num);
             return;
           }
           openCellModal(cellDef.num, pkg.resident, pkg.courier, pkg.time, pkg.days, pkg.code);
@@ -2499,6 +2511,31 @@ function buildLockerGrid() {
       notify: document.getElementById('cell-chk-notify').checked
     };
     buildLockerGrid();
+  }
+
+  function openEmptyCellModal(num) {
+    _currentCellNum = num;
+    document.getElementById('empty-cell-title').textContent = 'תא ' + num;
+    openModal('modal-empty-cell');
+  }
+
+  function openEmptyCell() {
+    closeModal('modal-empty-cell');
+    var num = _currentCellNum;
+    if (!num) return;
+    apiPost('/api/locker/open-manual', { cells: [num] })
+      .then(function(res) {
+        if (res && res.error) showToast('שגיאה: ' + res.error, 'var(--red)');
+        else showToast('תא ' + num + ' נפתח ✓', 'var(--green)');
+      })
+      .catch(function() { showToast('שגיאת תקשורת', 'var(--red)'); });
+  }
+
+  function loadPackageFromEmpty() {
+    var num = _currentCellNum;
+    closeModal('modal-empty-cell');
+    showScreen('new-package');
+    setTimeout(function() { populateCellSelect(num); }, 50);
   }
 
   function openCellModal(cell, resident, courier, time, days, code) {

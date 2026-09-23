@@ -1712,6 +1712,45 @@ function deleteUser(id, name) {
   apiDelete('/api/admin/users/' + id).catch(function() {});
 }
 
+// ─── FAULTS ───────────────────────────────────────────────
+var _faultRows = [], _faultSort = { col: 'created_at', dir: -1 };
+
+function loadFaults(filterComm) {
+  var url = '/api/admin/faults' + (filterComm ? '?community_id=' + encodeURIComponent(filterComm) : '');
+  apiGet(url).then(function(rows) {
+    _faultRows = Array.isArray(rows) ? rows : [];
+    var cnt = document.getElementById('mon-faults');
+    if (cnt) { cnt.textContent = _faultRows.length || '✓'; cnt.style.color = _faultRows.length ? 'var(--red)' : 'var(--green)'; }
+    renderFaultTable();
+  }).catch(function() {
+    var cnt = document.getElementById('mon-faults');
+    if (cnt) cnt.textContent = '—';
+    var fb = document.getElementById('mon-faults-body');
+    if (fb) fb.innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px">שגיאה בטעינת תקלות</div>';
+  });
+}
+
+function renderFaultTable() {
+  var fb = document.getElementById('mon-faults-body');
+  if (!fb) return;
+  if (!_faultRows.length) { fb.innerHTML = '<div style="color:var(--green);text-align:center;padding:16px">✓ אין תקלות פתוחות</div>'; return; }
+  var s = _faultSort, arr = function(c) { return s.col===c ? (s.dir===1?' ▲':' ▼') : ''; };
+  var th = function(c, lbl, w, ltr) { return '<th ' + _thStyle(s,c,w,ltr) + ' onclick="faultSortBy(\'' + c + '\')">' + lbl + arr(c) + '</th>'; };
+  var sorted = _sortRows(_faultRows, s);
+  fb.innerHTML = '<table style="table-layout:fixed;width:100%"><thead><tr>' +
+    th('community_name','ישוב','24%') + th('cell_number','תא','10%') + '<th style="width:11%;text-align:right">סטטוס</th>' +
+    th('fault_note','תיאור','35%') + th('created_at','דווח ב','20%',true) +
+    '</tr></thead><tbody>' +
+    sorted.map(function(c) { return '<tr>' +
+      '<td style="font-size:12px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(c.community_name||c.community_id||'—') + '</td>' +
+      '<td style="text-align:right;white-space:nowrap"><strong>תא ' + esc(String(c.cell_number||'—')) + '</strong></td>' +
+      '<td style="text-align:right"><span class="badge badge-red">תקלה</span></td>' +
+      '<td style="font-size:12px;color:var(--muted);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(c.fault_note||'—') + '</td>' +
+      '<td style="text-align:right;white-space:nowrap;font-size:12px;color:var(--muted);direction:ltr;unicode-bidi:plaintext">' + _fmtTs(c.created_at) + '</td>' +
+    '</tr>'; }).join('') + '</tbody></table>';
+}
+function faultSortBy(col) { _faultSort = { col: col, dir: _faultSort.col===col ? -_faultSort.dir : -1 }; renderFaultTable(); }
+
 // ─── MONITORING ───────────────────────────────────────────
 function populateMonFilter() {
   var sel = document.getElementById('mon-comm-filter');
@@ -1732,49 +1771,11 @@ function loadMonitoring() {
   loadEspStatus();
   loadDeviceLogs();
   loadDoorEvents();
+  loadFaults(filterComm);
 
   fetch(API_BASE + '/api/health').then(function(r){return r.json();}).then(function(d) {
-    document.getElementById('mon-health').textContent = d.ok ? '✓ תקין' : '✗ תקלה';
+    document.getElementById('mon-health').textContent = (d.ok || d.status === 'ok') ? '✓ תקין' : '✗ תקלה';
   }).catch(function() { document.getElementById('mon-health').textContent = '—'; });
-
-  // תקלות תאים — admin endpoint
-  var faultsUrl = '/api/admin/faults' + (filterComm ? '?community_id=' + encodeURIComponent(filterComm) : '');
-  apiGet(faultsUrl).then(function(faults) {
-    faults = Array.isArray(faults) ? faults : [];
-    document.getElementById('mon-faults').textContent = faults.length || '✓';
-    document.getElementById('mon-faults').style.color = faults.length ? 'var(--red)' : 'var(--green)';
-    var fb = document.getElementById('mon-faults-body');
-    if (!faults.length) {
-      fb.innerHTML = '<div style="color:var(--green);text-align:center;padding:16px">✓ אין תקלות פתוחות</div>';
-    } else {
-      var fmtTs = function(ts) {
-        if (!ts) return '—';
-        var d = new Date(ts * 1000);
-        return d.toLocaleDateString('he-IL', {day:'2-digit',month:'2-digit',year:'2-digit'}) + ' ' +
-               d.toLocaleTimeString('he-IL', {hour:'2-digit',minute:'2-digit'});
-      };
-      fb.innerHTML = '<table style="table-layout:fixed;width:100%">' +
-        '<thead><tr>' +
-          '<th style="width:24%;text-align:right">ישוב</th>' +
-          '<th style="width:10%;text-align:right">תא</th>' +
-          '<th style="width:11%;text-align:right">סטטוס</th>' +
-          '<th style="width:35%;text-align:right">תיאור</th>' +
-          '<th style="width:20%;text-align:right;direction:ltr;unicode-bidi:plaintext">דווח ב</th>' +
-        '</tr></thead><tbody>' +
-        faults.map(function(c) {
-          return '<tr>' +
-            '<td style="font-size:12px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(c.community_name || c.community_id) + '</td>' +
-            '<td style="text-align:right;white-space:nowrap"><strong>תא ' + c.cell_number + '</strong></td>' +
-            '<td style="text-align:right"><span class="badge badge-red">תקלה</span></td>' +
-            '<td style="font-size:12px;color:var(--muted);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(c.fault_note || '—') + '</td>' +
-            '<td style="text-align:right;white-space:nowrap;font-size:12px;color:var(--muted);direction:ltr;unicode-bidi:plaintext">' + fmtTs(c.created_at) + '</td>' +
-          '</tr>';
-        }).join('') + '</tbody></table>';
-    }
-  }).catch(function() {
-    document.getElementById('mon-faults').textContent = '—';
-    document.getElementById('mon-faults-body').innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px">שגיאה בטעינת תקלות</div>';
-  });
 
   // Use manager token for community-scoped data
   var mgrToken = sessionStorage.getItem('manager_token') || adminToken;
@@ -1790,106 +1791,115 @@ function loadMonitoring() {
   });
 }
 
+// ─── helpers ──────────────────────────────────────────────
+var _fmtTs = function(ts) {
+  if (!ts) return '—';
+  var d = new Date(ts * 1000);
+  return d.toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit'}) + ' ' +
+         d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+};
+function _sortRows(rows, sort) {
+  return rows.slice().sort(function(a, b) {
+    var av = a[sort.col], bv = b[sort.col];
+    if (av == null) av = ''; if (bv == null) bv = '';
+    return (typeof av === 'number' ? av - bv : String(av).localeCompare(String(bv), 'he')) * sort.dir;
+  });
+}
+function _thStyle(sort, col, w, ltr) {
+  var arr = sort.col === col ? (sort.dir === 1 ? ' ▲' : ' ▼') : '';
+  return 'style="width:' + w + ';text-align:right;cursor:pointer;user-select:none' + (ltr ? ';direction:ltr;unicode-bidi:plaintext' : '') + '"';
+}
+
 // ─── ESP STATUS ───────────────────────────────────────────
+var _espRows = [], _espSort = { col: 'last_seen', dir: -1 };
+
 function loadEspStatus() {
   var el = document.getElementById('mon-esp-status');
   if (!el) return;
-  var STALE_SEC = 300; // 5 דקות ← מכשיר נחשב לא פעיל
   apiGet('/api/admin/esp-status').then(function(rows) {
-    rows = Array.isArray(rows) ? rows : [];
-    if (!rows.length) { el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:8px">אין מכשירים רשומים</div>'; return; }
-    var now = Math.floor(Date.now() / 1000);
-    el.innerHTML = '<table style="width:100%;table-layout:fixed">' +
-      '<thead><tr>' +
-        '<th style="width:8%;text-align:right">סטטוס</th>' +
-        '<th style="width:22%;text-align:right">ישוב</th>' +
-        '<th style="width:16%;text-align:right">מכשיר</th>' +
-        '<th style="width:10%;text-align:right">גרסה</th>' +
-        '<th style="width:44%;text-align:right;direction:ltr;unicode-bidi:plaintext">פול אחרון</th>' +
-      '</tr></thead><tbody>' +
-      rows.map(function(r) {
-        var age = now - (r.last_seen || 0);
-        var online = age < STALE_SEC;
-        var dot = online ? '🟢' : '🔴';
-        var ageStr = age < 60 ? 'לפני ' + age + ' שנ\'' :
-                     age < 3600 ? 'לפני ' + Math.floor(age/60) + ' דק\'' :
-                     age < 86400 ? 'לפני ' + Math.floor(age/3600) + ' שע\'' :
-                     'לפני ' + Math.floor(age/86400) + ' ימים';
-        var d = new Date(r.last_seen * 1000);
-        var timeStr = d.toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit'}) + ' ' +
-                      d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-        return '<tr>' +
-          '<td style="text-align:right;font-size:16px">' + dot + '</td>' +
-          '<td style="font-size:12px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.community_name||r.community_id||'—') + '</td>' +
-          '<td style="font-family:monospace;font-size:11px;text-align:right">' + esc(r.esp_id) + '</td>' +
-          '<td style="font-size:12px;text-align:right;color:var(--muted)">v' + esc(r.fw_version||'—') + '</td>' +
-          '<td style="font-size:11px;text-align:right;direction:ltr;unicode-bidi:plaintext;color:' + (online?'var(--green)':'var(--red)') + '">' +
-            timeStr + ' <span style="color:var(--muted)">(' + ageStr + ')</span>' +
-          '</td>' +
-        '</tr>';
-      }).join('') + '</tbody></table>';
+    _espRows = Array.isArray(rows) ? rows : [];
+    renderEspTable();
   }).catch(function() {
-    el.innerHTML = '<div style="color:var(--red);text-align:center;padding:8px">שגיאה בטעינת מצב מכשירים</div>';
+    document.getElementById('mon-esp-status').innerHTML = '<div style="color:var(--red);text-align:center;padding:8px">שגיאה</div>';
   });
 }
 
+function renderEspTable() {
+  var el = document.getElementById('mon-esp-status');
+  if (!el) return;
+  if (!_espRows.length) { el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:8px">אין מכשירים רשומים</div>'; return; }
+  var STALE = 300, now = Math.floor(Date.now() / 1000);
+  var s = _espSort, arr = function(c) { return s.col===c ? (s.dir===1?' ▲':' ▼') : ''; };
+  var th = function(c, lbl, w, ltr) { return '<th ' + _thStyle(s,c,w,ltr) + ' onclick="espSortBy(\'' + c + '\')">' + lbl + arr(c) + '</th>'; };
+  var sorted = _sortRows(_espRows, s);
+  el.innerHTML = '<table style="width:100%;table-layout:fixed"><thead><tr>' +
+    '<th style="width:8%;text-align:right">סטטוס</th>' +
+    th('community_name','ישוב','22%') + th('esp_id','מכשיר','16%') + th('fw_version','גרסה','10%') + th('last_seen','פול אחרון','44%',true) +
+    '</tr></thead><tbody>' +
+    sorted.map(function(r) {
+      var age = now - (r.last_seen||0), online = age < STALE;
+      var ageStr = age<60 ? 'לפני '+age+' שנ\'' : age<3600 ? 'לפני '+Math.floor(age/60)+' דק\'' : age<86400 ? 'לפני '+Math.floor(age/3600)+' שע\'' : 'לפני '+Math.floor(age/86400)+' ימים';
+      return '<tr>' +
+        '<td style="text-align:right;font-size:16px">' + (online?'🟢':'🔴') + '</td>' +
+        '<td style="font-size:12px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.community_name||r.community_id||'—') + '</td>' +
+        '<td style="font-family:monospace;font-size:11px;text-align:right">' + esc(r.esp_id||'—') + '</td>' +
+        '<td style="font-size:12px;text-align:right;color:var(--muted)">v' + esc(r.fw_version||'—') + '</td>' +
+        '<td style="font-size:11px;direction:ltr;unicode-bidi:plaintext;text-align:right;color:' + (online?'var(--green)':'var(--red)') + '">' +
+          _fmtTs(r.last_seen) + ' <span style="color:var(--muted)">(' + ageStr + ')</span></td>' +
+      '</tr>';
+    }).join('') + '</tbody></table>';
+}
+function espSortBy(col) { _espSort = { col: col, dir: _espSort.col===col ? -_espSort.dir : -1 }; renderEspTable(); }
+
 // ─── DEVICE LOGS ──────────────────────────────────────────
+var _logRows = [], _logSort = { col: 'ts', dir: -1 };
+
 function populateLogCommFilter() {
   var sel = document.getElementById('mon-log-comm-filter');
   if (!sel || sel.options.length > 1) return;
-  var current = sel.value;
-  allSettlements.forEach(function(s) {
-    var o = document.createElement('option');
-    o.value = s.id; o.textContent = s.name || s.id;
-    if (s.id === current) o.selected = true;
-    sel.appendChild(o);
-  });
+  allSettlements.forEach(function(s) { var o = document.createElement('option'); o.value=s.id; o.textContent=s.name||s.id; sel.appendChild(o); });
 }
 
 function loadDeviceLogs() {
   populateLogCommFilter();
-  var commId = (document.getElementById('mon-log-comm-filter') || {}).value || '';
-  var url = '/api/admin/device-logs' + (commId ? '?community_id=' + encodeURIComponent(commId) : '');
+  var commId = (document.getElementById('mon-log-comm-filter')||{}).value||'';
+  var level  = (document.getElementById('mon-log-level-filter')||{}).value||'';
+  var params = [];
+  if (commId) params.push('community_id=' + encodeURIComponent(commId));
+  if (level)  params.push('level=' + encodeURIComponent(level));
+  var url = '/api/admin/device-logs' + (params.length ? '?' + params.join('&') : '');
   var el = document.getElementById('mon-device-logs');
   if (!el) return;
   el.innerHTML = '<span style="color:var(--muted)">טוען...</span>';
   apiGet(url).then(function(rows) {
-    rows = Array.isArray(rows) ? rows : [];
-    if (!rows.length) { el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px">אין רשומות</div>'; return; }
-    var fmtTs = function(ts) {
-      if (!ts) return '—';
-      var d = new Date(ts * 1000);
-      return d.toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit'}) + ' ' +
-             d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    };
-    var levelBadge = function(l) {
-      if (l === 'warn')  return '<span class="badge badge-yellow">warn</span>';
-      if (l === 'error') return '<span class="badge badge-red">error</span>';
-      return '<span class="badge badge-green">info</span>';
-    };
-    el.innerHTML = '<table style="width:100%;table-layout:fixed">' +
-      '<thead><tr>' +
-        '<th style="width:16%;text-align:right">ישוב</th>' +
-        '<th style="width:14%;text-align:right">מכשיר</th>' +
-        '<th style="width:9%;text-align:right">רמה</th>' +
-        '<th style="width:14%;text-align:right">אירוע</th>' +
-        '<th style="width:27%;text-align:right">פרטים</th>' +
-        '<th style="width:20%;text-align:right;direction:ltr;unicode-bidi:plaintext">זמן</th>' +
-      '</tr></thead><tbody>' +
-      rows.map(function(r) {
-        return '<tr>' +
-          '<td style="font-size:12px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.community_name||r.community_id||'—') + '</td>' +
-          '<td style="font-family:monospace;font-size:11px;text-align:right">' + esc(r.esp_id||'—') + '</td>' +
-          '<td style="text-align:right">' + levelBadge(r.level) + '</td>' +
-          '<td style="font-size:12px;text-align:right">' + esc(r.event||'—') + '</td>' +
-          '<td style="font-size:11px;color:var(--muted);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.detail||'—') + '</td>' +
-          '<td style="font-size:11px;color:var(--muted);text-align:right;white-space:nowrap;direction:ltr;unicode-bidi:plaintext">' + fmtTs(r.ts) + '</td>' +
-        '</tr>';
-      }).join('') + '</tbody></table>';
+    _logRows = Array.isArray(rows) ? rows : [];
+    renderLogTable();
   }).catch(function() {
-    el.innerHTML = '<div style="color:var(--red);text-align:center;padding:16px">שגיאה בטעינת לוגים</div>';
+    document.getElementById('mon-device-logs').innerHTML = '<div style="color:var(--red);text-align:center;padding:16px">שגיאה</div>';
   });
 }
+
+function renderLogTable() {
+  var el = document.getElementById('mon-device-logs');
+  if (!el) return;
+  if (!_logRows.length) { el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:16px">אין רשומות</div>'; return; }
+  var s = _logSort, arr = function(c) { return s.col===c ? (s.dir===1?' ▲':' ▼') : ''; };
+  var th = function(c, lbl, w, ltr) { return '<th ' + _thStyle(s,c,w,ltr) + ' onclick="logSortBy(\'' + c + '\')">' + lbl + arr(c) + '</th>'; };
+  var levelBadge = function(l) { return l==='warn'?'<span class="badge badge-yellow">warn</span>':l==='error'?'<span class="badge badge-red">error</span>':'<span class="badge badge-green">info</span>'; };
+  var sorted = _sortRows(_logRows, s);
+  el.innerHTML = '<table style="width:100%;table-layout:fixed"><thead><tr>' +
+    th('community_name','ישוב','16%') + th('esp_id','מכשיר','14%') + th('level','רמה','9%') + th('event','אירוע','14%') + th('detail','פרטים','27%') + th('ts','זמן','20%',true) +
+    '</tr></thead><tbody>' +
+    sorted.map(function(r) { return '<tr>' +
+      '<td style="font-size:12px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.community_name||r.community_id||'—') + '</td>' +
+      '<td style="font-family:monospace;font-size:11px;text-align:right">' + esc(r.esp_id||'—') + '</td>' +
+      '<td style="text-align:right">' + levelBadge(r.level) + '</td>' +
+      '<td style="font-size:12px;text-align:right">' + esc(r.event||'—') + '</td>' +
+      '<td style="font-size:11px;color:var(--muted);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.detail||'—') + '</td>' +
+      '<td style="font-size:11px;color:var(--muted);text-align:right;white-space:nowrap;direction:ltr;unicode-bidi:plaintext">' + _fmtTs(r.ts) + '</td>' +
+    '</tr>'; }).join('') + '</tbody></table>';
+}
+function logSortBy(col) { _logSort = { col: col, dir: _logSort.col===col ? -_logSort.dir : -1 }; renderLogTable(); }
 
 // ─── DOOR EVENTS ──────────────────────────────────────────
 var _doorRows = [], _doorSort = { col: 'ts', dir: -1 };
