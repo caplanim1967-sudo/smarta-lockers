@@ -218,7 +218,80 @@ async function getUser(request, env) {
 
 // ─── MAIN EXPORT ─────────────────────────────────────────────────────────────
 
+// ─── REMINDER CRON ───────────────────────────────────────────────────────────
+
+async function runReminders(env) {
+  const db  = env.smarta_db;
+  const now = Math.floor(Date.now() / 1000);
+
+  const { results: pkgs } = await db.prepare(`
+    SELECT p.id, p.community_id, p.cell_id, p.assigned_at, p.lock_code, p.notes,
+           COALESCE(p.reminders_sent, 0) AS reminders_sent,
+           r.first_name, r.phone, r.notify_method,
+           lc.tier
+    FROM packages p
+    LEFT JOIN residents r      ON r.id  = p.resident_id
+    LEFT JOIN locker_configs lc ON lc.community_id = p.community_id
+    WHERE p.status NOT IN ('collected','confirmed')
+      AND r.phone IS NOT NULL
+  `).all();
+
+  const cache = {};
+  async function getSettings(cid) {
+    if (cache[cid]) return cache[cid];
+    const row = await db.prepare('SELECT msg_settings_json FROM settlements WHERE id = ?').bind(cid).first();
+    let saved = {};
+    try { saved = JSON.parse(row?.msg_settings_json || '{}'); } catch(_) {}
+    cache[cid] = {
+      reminder1_days: 1, reminder2_days: 3, reminder3_days: 5, reminder4_days: 7,
+      msg_reminder1: 'היי {שם}! תזכורת — יש לך חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם. תודה!',
+      msg_reminder2: 'היי {שם}! תזכורת שנייה — חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם. תודה!',
+      msg_reminder3: 'היי {שם}! תזכורת שלישית — חבילה כבר {ימים} ימים{תא}. אנא אסוף בהקדם. תודה!',
+      msg_reminder4: 'היי {שם}! תזכורת אחרונה — חבילה כבר {ימים} ימים{תא}. ללא איסוף תחויב בקנס. תודה!',
+      ...saved,
+    };
+    return cache[cid];
+  }
+
+  let sent = 0, skipped = 0;
+  for (const pkg of pkgs) {
+    const s      = await getSettings(pkg.community_id);
+    const days   = Math.floor((now - (pkg.assigned_at || 0)) / 86400);
+    const done   = pkg.reminders_sent || 0;
+    const isBasic = (pkg.tier || 'basic') === 'basic';
+
+    let level = 0;
+    if      (days >= s.reminder4_days && done < 4) level = 4;
+    else if (days >= s.reminder3_days && done < 3) level = 3;
+    else if (days >= s.reminder2_days && done < 2) level = 2;
+    else if (days >= s.reminder1_days && done < 1) level = 1;
+    if (!level) { skipped++; continue; }
+
+    const template = s[`msg_reminder${level}`] || '';
+    const cellPart = isBasic ? ` בתא ${pkg.cell_id}` : '';
+    const text = template
+      .replace(/\{שם\}/g,   pkg.first_name || '')
+      .replace(/\{תא\}/g,   cellPart)
+      .replace(/\{קוד\}/g,  isBasic ? (pkg.lock_code || '') : '')
+      .replace(/\{ימים\}/g, String(days))
+      .replace(/\{הערה\}/g, pkg.notes ? String(pkg.notes) : '')
+      .replace(/ {2,}/g, ' ').trim();
+
+    const ok = await sendMessage(pkg.phone, text, pkg.notify_method || 'sms', env);
+    if (ok) {
+      await db.prepare('UPDATE packages SET reminders_sent = ? WHERE id = ?')
+        .bind(level, pkg.id).run();
+      sent++;
+    } else { skipped++; }
+  }
+  console.log(`[reminders cron] sent=${sent} skipped=${skipped}`);
+}
+
 export default {
+  async scheduled(_event, env) {
+    await runReminders(env);
+  },
+
   async fetch(request, env) {
     // CORS preflight
     if (request.method === 'OPTIONS') {
