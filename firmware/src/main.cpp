@@ -14,10 +14,17 @@
 //  v1.34: לוג CSQ קבוע ב-DIAG
 //  v1.35: OTA — עדכון פירמוור אוטומטי דרך GPRS
 //  v1.36: Cloud logging — boot/door/ota/ssl_reset/gprs_reconnect
+//  v1.39: ssl_reset #3+ → ESP.restart() במקום GPRS reconnect (RING מתאפס נכון)
+//  v1.41: WiFi+GPRS dual mode — WiFi HTTP כשזמין, GPRS fallback; Captive Portal ראשון
 // ════════════════════════════════════════════════════════════════════
 
 #define TINY_GSM_MODEM_SIM7600
 #define TINY_GSM_USE_GPRS true
+#include <WiFi.h>
+#include <WiFiClientSecure.h>  // [v1.41] WiFi HTTPS
+#include <WebServer.h>         // [v1.41] Captive Portal
+#include <DNSServer.h>         // [v1.41] Captive Portal DNS
+#include <Preferences.h>       // [v1.41] NVS WiFi credentials
 #include <esp_task_wdt.h>
 #include <sys/time.h>   // [v1.14] settimeofday()
 #include <TinyGsmClient.h>
@@ -31,7 +38,7 @@
 //  ⚙️  הגדרות
 // ────────────────────────────────────────────────────────────────────
 #define ESP_ID          "MEFA-01"
-#define FIRMWARE_VERSION "1.38"   // [v1.36] נשלח ב-poll, Worker משווה לגרסה ב-D1
+#define FIRMWARE_VERSION "1.41"   // [v1.41] WiFi+GPRS dual mode
 #define APN             "internet"
 #define API_HOST     "smarta-api.smarta-api.workers.dev"
 // [v1.28] Cloudflare anycast IPs — עוקף DNS של 019+ שנכשל
@@ -112,6 +119,111 @@ bool          clipReceived    = false;
 unsigned long ringPendingMs   = 0;
 String        pendingCaller   = "";
 
+// [v1.41] WiFi dual-mode
+bool          _wifiMode       = false;
+WebServer     _apServer(80);
+DNSServer     _dnsServer;
+
+// ─── NVS WiFi credentials ─────────────────────────────────────────
+bool loadWifiCreds(String& ssid, String& pass) {
+  Preferences p; p.begin("smarta_wifi", true);
+  ssid = p.getString("ssid", "");
+  pass = p.getString("pass", "");
+  p.end();
+  return ssid.length() > 0;
+}
+void saveWifiCreds(const String& ssid, const String& pass) {
+  Preferences p; p.begin("smarta_wifi", false);
+  p.putString("ssid", ssid);
+  p.putString("pass", pass);
+  p.end();
+}
+void clearWifiCreds() {
+  Preferences p; p.begin("smarta_wifi", false);
+  p.clear(); p.end();
+}
+
+bool tryConnectWifi(const String& ssid, const String& pass) {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid.c_str(), pass.c_str());
+  Serial.printf("[WIFI] מתחבר ל: %s\n", ssid.c_str());
+  for (int i = 0; i < 20; i++) {
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.printf("[WIFI] מחובר! IP: %s\n", WiFi.localIP().toString().c_str());
+      return true;
+    }
+    delay(500);
+    esp_task_wdt_reset();
+  }
+  Serial.println("[WIFI] חיבור נכשל — ממשיך על GPRS");
+  WiFi.mode(WIFI_OFF);
+  return false;
+}
+
+// HTML pages for captive portal (PROGMEM to save RAM)
+static const char CAPTIVE_HTML[] PROGMEM = R"rawhtml(
+<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Smarta — WiFi</title>
+<style>body{font-family:Arial,sans-serif;max-width:380px;margin:30px auto;padding:16px;direction:rtl}
+h2{color:#4a9}input{width:100%;padding:10px;margin:6px 0 12px;box-sizing:border-box;border:1px solid #ccc;border-radius:6px;font-size:15px}
+button{width:100%;padding:13px;background:#4a9;color:#fff;border:none;border-radius:6px;font-size:16px;cursor:pointer}</style>
+</head><body>
+<h2>🔒 Smarta — הגדרת WiFi</h2>
+<p>הזן את פרטי הרשת של המיקום:</p>
+<form method="post" action="/save">
+<label>שם רשת (SSID)</label>
+<input type="text" name="ssid" autocomplete="off" required>
+<label>סיסמה</label>
+<input type="password" name="pass" autocomplete="off">
+<button type="submit">שמור וחבר</button>
+</form></body></html>
+)rawhtml";
+
+static const char CAPTIVE_OK[] PROGMEM = R"rawhtml(
+<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
+<title>Smarta — נשמר</title></head>
+<body style="font-family:Arial;text-align:center;padding:40px;direction:rtl">
+<h2>✅ נשמר!</h2><p>הלוקר מתחבר לרשת ומאתחל. ניתן לסגור דף זה.</p>
+</body></html>
+)rawhtml";
+
+void startCaptivePortal() {
+  WiFi.mode(WIFI_OFF);
+  delay(100);
+  String apName = "Smarta-";
+  uint32_t mac = (uint32_t)(ESP.getEfuseMac() >> 16) & 0xFFFF;
+  char macHex[5]; snprintf(macHex, sizeof(macHex), "%04X", mac);
+  apName += macHex;
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(apName.c_str());
+  Serial.printf("[CAPTIVE] AP: %s  IP: %s\n", apName.c_str(), WiFi.softAPIP().toString().c_str());
+  _dnsServer.start(53, "*", WiFi.softAPIP());
+  _apServer.on("/", HTTP_GET, []() {
+    _apServer.send_P(200, "text/html", CAPTIVE_HTML);
+  });
+  _apServer.on("/save", HTTP_POST, []() {
+    String ssid = _apServer.arg("ssid");
+    String pass = _apServer.arg("pass");
+    if (ssid.length() == 0) { _apServer.send(400, "text/plain", "SSID חסר"); return; }
+    _apServer.send_P(200, "text/html", CAPTIVE_OK);
+    saveWifiCreds(ssid, pass);
+    delay(1500);
+    ESP.restart();
+  });
+  _apServer.onNotFound([]() {
+    _apServer.sendHeader("Location", "http://192.168.4.1/", true);
+    _apServer.send(302, "text/plain", "");
+  });
+  _apServer.begin();
+  Serial.println("[CAPTIVE] ממתין להגדרת WiFi...");
+  while (true) {
+    _dnsServer.processNextRequest();
+    _apServer.handleClient();
+    delay(10);
+  }
+}
+
 // ─── Forward declarations ─────────────────────────────────────────
 void handleModemInput();
 
@@ -166,6 +278,8 @@ void closeCell(uint8_t board, uint8_t channel) {
   Serial.printf("[RS485] CLOSE board=%d ch=%d\n", board, channel);
 }
 
+void flushLogs(); // forward declaration — defined below
+
 // ────────────────────────────────────────────────────────────────────
 //  [v1.11] resetHttpState — מאפס state HTTP
 //  תמיד קודם secureClient.stop() → מנקה write_error של SSLClient
@@ -211,26 +325,11 @@ void resetHttpState() {
       delay(1000);   // [v1.11] שנייה נוספת — מודם מתייצב אחרי SSL timeout
     } else {
       // reset#3+: NETCLOSE + GPRS reconnect — TCP stack מלא מאופס
-      s_resetCount = 0;
-      Serial.println("[HTTP] 2 resets נכשלו → NETCLOSE + GPRS reconnect");
-      esp_task_wdt_reset();
-      modem.sendAT("+CIPCLOSE=0,0");
-      modem.waitResponse(2000L);
-      modem.sendAT("+NETCLOSE");        // [v1.33] איפוס TCP stack מלא
-      modem.waitResponse(5000L);
-      delay(2000);
-      esp_task_wdt_reset();
-      modem.gprsDisconnect();
-      delay(3000);
-      esp_task_wdt_reset();
-      bool ok = false;
-      int att = 0;
-      while (!ok) {
-        att++;
-        Serial.printf("[HTTP] GPRS ניסיון %d\n", att);
-        ok = modem.gprsConnect(APN);
-        if (!ok) { delay(10000); esp_task_wdt_reset(); }
-      }
+      // [v1.39] reset#3+ → restart מלא — GPRS reconnect לא מחזיר RING detection
+      Serial.println("[HTTP] 2 resets נכשלו → ESP.restart()");
+      flushLogs();   // שלח ssl_reset ללוג לפני restart
+      delay(500);
+      ESP.restart();
       modem.sendAT("+CDNSCFG=\"8.8.8.8\",\"8.8.4.4\"");
       modem.waitResponse(2000L);
       delay(5000);
@@ -283,9 +382,65 @@ void ensureConnected() {
 }
 
 // ────────────────────────────────────────────────────────────────────
+//  [v1.41] WiFi HTTP — ישיר עם WiFiClientSecure (ללא HTTPClient)
+// ────────────────────────────────────────────────────────────────────
+// קורא body לאחר headers
+static String _wifiReadBody(WiFiClientSecure& c, unsigned long timeoutMs) {
+  unsigned long t = millis();
+  // דלג על headers
+  while (c.connected() || c.available()) {
+    if (millis() - t > timeoutMs) break;
+    if (!c.available()) { delay(5); continue; }
+    String line = c.readStringUntil('\n');
+    if (line == "\r" || line == "") break;
+  }
+  // קרא body
+  String body = "";
+  t = millis();
+  while ((c.connected() || c.available()) && millis() - t < timeoutMs) {
+    if (c.available()) { body += (char)c.read(); t = millis(); }
+    else delay(2);
+  }
+  return body;
+}
+
+String wifiGet(const String& path) {
+  if (WiFi.status() != WL_CONNECTED) { _wifiMode = false; return ""; }
+  WiFiClientSecure c; c.setInsecure();
+  if (!c.connect(API_HOST, 443)) {
+    Serial.println("[WIFI-HTTP] GET connect failed"); _wifiMode = false; return "";
+  }
+  c.printf("GET %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n", path.c_str(), API_HOST);
+  // קרא שורת סטטוס
+  String status = c.readStringUntil('\n');
+  int code = status.indexOf("200") >= 0 ? 200 : 0;
+  String resp = (code == 200) ? _wifiReadBody(c, 8000) : "";
+  c.stop();
+  Serial.printf("[WIFI-HTTP] GET %s → %s\n", path.c_str(), code == 200 ? "200" : status.substring(0,30).c_str());
+  return resp;
+}
+
+String wifiPost(const String& path, const String& body) {
+  if (WiFi.status() != WL_CONNECTED) { _wifiMode = false; return ""; }
+  WiFiClientSecure c; c.setInsecure();
+  if (!c.connect(API_HOST, 443)) {
+    Serial.println("[WIFI-HTTP] POST connect failed"); _wifiMode = false; return "";
+  }
+  c.printf("POST %s HTTP/1.0\r\nHost: %s\r\nContent-Type: application/json\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s",
+           path.c_str(), API_HOST, (int)body.length(), body.c_str());
+  String status = c.readStringUntil('\n');
+  int code = status.indexOf("200") >= 0 ? 200 : 0;
+  String resp = (code == 200) ? _wifiReadBody(c, 15000) : "";
+  c.stop();
+  Serial.printf("[WIFI-HTTP] POST %s → %s\n", path.c_str(), code == 200 ? "200" : status.substring(0,30).c_str());
+  return resp;
+}
+
+// ────────────────────────────────────────────────────────────────────
 //  HTTPS
 // ────────────────────────────────────────────────────────────────────
 String httpPost(const String& path, const String& body) {
+  if (_wifiMode) return wifiPost(path, body);
   if (s_httpFailCount >= HTTP_FAIL_RESET) resetHttpState();
   ensureConnected();
   if (!secureClient.connected()) { s_httpFailCount++; return ""; }
@@ -316,6 +471,7 @@ String httpPost(const String& path, const String& body) {
 }
 
 String httpGet(const String& path) {
+  if (_wifiMode) return wifiGet(path);
   if (s_httpFailCount >= HTTP_FAIL_RESET) resetHttpState();
   ensureConnected();
   if (!secureClient.connected()) { s_httpFailCount++; return ""; }
@@ -572,6 +728,9 @@ void pollCourierCommands() {
     Serial.printf("[POLL] batch פותח %d תאים\n", (int)cells.size());
     for (int cell : cells) {
       if (cell <= 0) continue;
+      // [v1.41] פקודות מיוחדות
+      if (cell == 999) { Serial.println("[WIFI] איפוס WiFi credentials"); clearWifiCreds(); delay(500); ESP.restart(); }
+      if (cell == 998) { Serial.println("[WIFI] פותח Captive Portal"); flushLogs(); startCaptivePortal(); }
       char detail[24]; snprintf(detail, sizeof(detail), "board=1 ch=%d", cell);
       queueLog("info", "door_open", detail);
       openCell(1, (uint8_t)cell);
@@ -628,6 +787,14 @@ void handleModemInput() {
 //  Reconnect
 // ────────────────────────────────────────────────────────────────────
 void checkConnection() {
+  if (_wifiMode) {
+    // [v1.41] בדוק WiFi — אם נפל, נסה reconnect
+    if (WiFi.status() == WL_CONNECTED) return;
+    String ssid, pass;
+    if (loadWifiCreds(ssid, pass)) _wifiMode = tryConnectWifi(ssid, pass);
+    if (_wifiMode) return;
+    Serial.println("[WIFI] נפל — עובר ל-GPRS");
+  }
   if (modem.isGprsConnected()) return;
   Serial.println("[NET] מתחבר מחדש...");
   queueLog("warn", "gprs_reconnect", "");
@@ -670,6 +837,18 @@ void setup() {
   Serial.begin(115200);
   delay(200);
   Serial.println("\n[BOOT] Smarta Lockers v" FIRMWARE_VERSION " — " ESP_ID);  // v1.36
+
+  // [v1.41] WiFi — נסה להתחבר לרשת שמורה
+  {
+    String wSsid, wPass;
+    if (loadWifiCreds(wSsid, wPass)) {
+      _wifiMode = tryConnectWifi(wSsid, wPass);
+    } else {
+      Serial.println("[WIFI] אין credentials — ממשיך על GPRS");
+      WiFi.mode(WIFI_OFF);
+    }
+  }
+  if (_wifiMode) Serial.println("[WIFI] מצב WiFi פעיל — HTTP דרך WiFi");
 
   pinMode(RS485_DE, OUTPUT);
   digitalWrite(RS485_DE, LOW);

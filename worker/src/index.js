@@ -1079,6 +1079,26 @@ async function handleAdmin(path, method, request, env, user, url) {
     return ok(results);
   }
 
+  // ── Admin locker command (WiFi setup / reset) ───────────
+  if (path === '/api/admin/locker-command' && method === 'POST') {
+    const b = await request.json().catch(() => ({}));
+    const commId = b.community_id;
+    const cells  = Array.isArray(b.cells) ? b.cells.map(Number).filter(n => Number.isInteger(n) && n > 0) : [];
+    if (!commId) return err('community_id חובה');
+    if (!cells.length) return err('cells חובה');
+    const locker = await db.prepare('SELECT esp_id FROM locker_configs WHERE community_id = ?').bind(commId).first();
+    if (!locker)          return err('לוקר לא נמצא לקהילה זו');
+    if (!locker.esp_id)   return err('esp_id חסר ללוקר זה');
+    const now = nowSec();
+    const stmts = cells.map((cell, i) =>
+      db.prepare('INSERT INTO esp_commands (id, esp_id, community_id, cell_number, created_at) VALUES (?, ?, ?, ?, ?)')
+        .bind(newId(), locker.esp_id, commId, cell, now + i)
+    );
+    await db.batch(stmts);
+    console.log(`[ADMIN-CMD] admin=${user.sub} community=${commId} esp=${locker.esp_id} cells=[${cells}]`);
+    return ok({ ok: true });
+  }
+
   // ── Onboarding wizard (3-step) ───────────────────────────
   if (path === '/api/admin/onboarding' && method === 'POST') {
     return handleOnboarding(request, env, db);
