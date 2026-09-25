@@ -17,6 +17,7 @@
 //  v1.39: ssl_reset #3+ → ESP.restart() במקום GPRS reconnect (RING מתאפס נכון)
 //  v1.41: WiFi+GPRS dual mode — WiFi HTTP כשזמין, GPRS fallback; Captive Portal ראשון
 //  v1.42: תיקון WDT בלולאת Captive Portal (90s timeout → reset)
+//  v1.43: OTA HTTP/1.0 — מונע chunked encoding שגרם ל-MD5 Check Failed
 // ════════════════════════════════════════════════════════════════════
 
 #define TINY_GSM_MODEM_SIM7600
@@ -39,7 +40,7 @@
 //  ⚙️  הגדרות
 // ────────────────────────────────────────────────────────────────────
 #define ESP_ID          "MEFA-01"
-#define FIRMWARE_VERSION "1.42"   // [v1.42] Captive Portal WDT fix
+#define FIRMWARE_VERSION "1.43"   // [v1.43] OTA HTTP/1.0 fix (chunked encoding)
 #define APN             "internet"
 #define API_HOST     "smarta-api.smarta-api.workers.dev"
 // [v1.28] Cloudflare anycast IPs — עוקף DNS של 019+ שנכשל
@@ -582,8 +583,8 @@ void performOTA(const String& path, int size, const String& md5str) {
     return;
   }
 
-  // HTTP GET ידני (לא דרך ArduinoHttpClient — צריך stream גולמי)
-  secureClient.printf("GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n",
+  // HTTP GET ידני — HTTP/1.0 מונע chunked encoding שיפגום ב-MD5
+  secureClient.printf("GET %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n",
                       path.c_str(), API_HOST);
 
   // קרא headers — אסוף Content-Length
