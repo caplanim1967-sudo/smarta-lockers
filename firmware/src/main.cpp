@@ -16,6 +16,7 @@
 //  v1.36: Cloud logging — boot/door/ota/ssl_reset/gprs_reconnect
 //  v1.39: ssl_reset #3+ → ESP.restart() במקום GPRS reconnect (RING מתאפס נכון)
 //  v1.41: WiFi+GPRS dual mode — WiFi HTTP כשזמין, GPRS fallback; Captive Portal ראשון
+//  v1.42: תיקון WDT בלולאת Captive Portal (90s timeout → reset)
 // ════════════════════════════════════════════════════════════════════
 
 #define TINY_GSM_MODEM_SIM7600
@@ -38,7 +39,7 @@
 //  ⚙️  הגדרות
 // ────────────────────────────────────────────────────────────────────
 #define ESP_ID          "MEFA-01"
-#define FIRMWARE_VERSION "1.41"   // [v1.41] WiFi+GPRS dual mode
+#define FIRMWARE_VERSION "1.42"   // [v1.42] Captive Portal WDT fix
 #define APN             "internet"
 #define API_HOST     "smarta-api.smarta-api.workers.dev"
 // [v1.28] Cloudflare anycast IPs — עוקף DNS של 019+ שנכשל
@@ -220,6 +221,7 @@ void startCaptivePortal() {
   while (true) {
     _dnsServer.processNextRequest();
     _apServer.handleClient();
+    esp_task_wdt_reset();
     delay(10);
   }
 }
