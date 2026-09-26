@@ -617,28 +617,36 @@ export default {
         const cid = lockerRow.community_id;
         const callerPhone = rawCaller.replace(/^\+?972/, '0').replace(/[^\d]/g, '');
 
-        const resident = await env.smarta_db.prepare(
-          'SELECT id, first_name, last_name FROM residents WHERE community_id = ? AND phone = ?'
-        ).bind(cid, callerPhone).first();
-        if (!resident) {
+        // Match by primary phone OR alt_phone (alt contact can also open)
+        const { results: matchedResidents } = await env.smarta_db.prepare(
+          'SELECT id, first_name, last_name FROM residents WHERE community_id = ? AND (phone = ? OR alt_phone = ?)'
+        ).bind(cid, callerPhone, callerPhone).all();
+        if (!matchedResidents.length) {
           console.warn(`[OPEN] שיחה ממספר לא מזוהה: ${callerPhone} ← לוקר ${lockerId}`);
           return ok({ cells: [], reason: 'resident_not_found' });
         }
 
-        const { results: pkgs } = await env.smarta_db.prepare(`
-          SELECT id, cell_id FROM packages
-          WHERE community_id = ? AND resident_id = ? AND status = 'waiting'
-          ORDER BY assigned_at ASC
-        `).bind(cid, resident.id).all();
+        // Collect waiting packages for all matched residents
+        const allPkgs = [];
+        for (const r of matchedResidents) {
+          const { results: rPkgs } = await env.smarta_db.prepare(`
+            SELECT id, cell_id FROM packages
+            WHERE community_id = ? AND resident_id = ? AND status = 'waiting'
+            ORDER BY assigned_at ASC
+          `).bind(cid, r.id).all();
+          allPkgs.push(...rPkgs);
+        }
 
-        if (!pkgs.length) {
-          console.log(`[OPEN] אין חבילות ממתינות לדייר ${resident.first_name} בלוקר ${lockerId}`);
+        if (!allPkgs.length) {
+          const names = matchedResidents.map(r => `${r.first_name} ${r.last_name}`).join(', ');
+          console.log(`[OPEN] אין חבילות ממתינות עבור: ${names} בלוקר ${lockerId}`);
           return ok({ cells: [], reason: 'no_packages' });
         }
 
-        const cells = pkgs.map(p => parseInt(p.cell_id)).filter(Boolean);
-        console.log(`[OPEN] ${resident.first_name} ${resident.last_name} ← תאים: [${cells.join(',')}] בלוקר ${lockerId}`);
-        return ok({ cells, resident_name: `${resident.first_name} ${resident.last_name}` });
+        const cells = [...new Set(allPkgs.map(p => parseInt(p.cell_id)).filter(Boolean))].sort((a,b) => a-b);
+        const names = matchedResidents.map(r => `${r.first_name} ${r.last_name}`).join(', ');
+        console.log(`[OPEN] ${names} ← תאים: [${cells.join(',')}] בלוקר ${lockerId}`);
+        return ok({ cells, resident_name: names });
       }
 
       // First-run setup (only if zero users exist)
