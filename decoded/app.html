@@ -3264,6 +3264,7 @@ window.addEventListener('message', function(e) {
   // ══════════════════════════════════════════════════════════
   var _pkgViewMode = 'form';
   var _tableCheckState = {};
+  var _tableResCandidates = {};
 
   function switchPkgView(v) {
     _pkgViewMode = v;
@@ -3410,17 +3411,29 @@ window.addEventListener('message', function(e) {
       return r.name.toLowerCase().includes(q) || (r.phone||'').includes(q);
     }).slice(0,8);
     if (!matched.length) { drop.style.display='none'; return; }
-    drop.innerHTML = matched.map(function(r){
-      return '<div class="tbl-res-drop-item" onmousedown="tableSelectResident('+num+',\''+escHtml(r.name)+'\')">'+escHtml(r.name)+' — '+(r.phone||'')+'</div>';
+    _tableResCandidates[num] = matched;
+    drop.innerHTML = matched.map(function(r, i){
+      return '<div class="tbl-res-drop-item" onmousedown="tableSelectResident('+num+','+i+')">'+escHtml(r.name)+' — '+(r.phone||'')+'</div>';
     }).join('');
     drop.style.display = 'block';
   }
 
   function tableResBlur(num) {
-    setTimeout(function(){ var d=document.getElementById('trdrop-'+num); if(d) d.style.display='none'; }, 200);
+    setTimeout(function(){
+      var d = document.getElementById('trdrop-'+num); if (d) d.style.display='none';
+      // Revert input to committed resident name (or empty for free cells)
+      var inp = document.getElementById('tres-'+num);
+      if (inp) {
+        var committed = packageData[num] && packageData[num].resident ? packageData[num].resident : '';
+        inp.value = committed;
+      }
+    }, 200);
   }
 
-  function tableSelectResident(num, resName) {
+  function tableSelectResident(num, idx) {
+    var resObj = ((_tableResCandidates[num] || [])[idx]) || {};
+    var resName = resObj.name || '';
+    if (!resName) return;
     var inp = document.getElementById('tres-'+num); if (inp) inp.value = resName;
     var drop = document.getElementById('trdrop-'+num); if (drop) drop.style.display='none';
 
@@ -3439,7 +3452,6 @@ window.addEventListener('message', function(e) {
       }
     }
 
-    var resObj = _residentsCache.find(function(r){ return r.name===resName; }) || {};
     var set = function(id, v) { var el=document.getElementById(id); if(el) el.textContent=v||'—'; };
     set('tphone-'+num, resObj.phone);
     set('tidnum-'+num, resObj.id_number);
