@@ -3334,8 +3334,8 @@ window.addEventListener('message', function(e) {
               '<input type="text" id="tbarcode-'+num+'" placeholder="סרוק..." style="width:70px;font-family:monospace;font-size:11px" onkeydown="tableBarcodeKey('+num+',event)">' +
             '</div>' +
           '</td>' +
-          '<td style="font-size:11px;color:var(--muted);text-align:center;white-space:nowrap">'+escHtml(pkg.time||'—')+'</td>' +
-          '<td style="text-align:center">'+daysBadge(pkg.days||0)+'</td>' +
+          '<td id="ttime-'+num+'" style="font-size:11px;color:var(--muted);text-align:center;white-space:nowrap">'+escHtml(pkg.time||'—')+'</td>' +
+          '<td id="tdays-'+num+'" style="text-align:center">'+daysBadge(pkg.days||0)+'</td>' +
           '<td style="text-align:center;font-size:11px;color:var(--muted)" id="thousenum-'+num+'">'+escHtml(resObj.house_number||'—')+'</td>' +
           '<td style="font-size:11px;color:var(--muted)" id="taltname-'+num+'">'+escHtml(resObj.alt_name||'—')+'</td>' +
           '</tr>';
@@ -3463,14 +3463,20 @@ window.addEventListener('message', function(e) {
       var oldIds = (old._ids || []).slice();
       delete packageData[num];
       savePackageData();
-      var inner = document.getElementById('tchips-inner-'+num);
-      if (inner) { inner.querySelectorAll('.bc-chip').forEach(function(c){ c.remove(); }); }
       if (oldIds.length) {
         oldIds.forEach(function(id){ apiPost('/api/packages/'+id+'/collect',{}).catch(function(){}); });
       } else {
         apiPost('/api/packages/collect-cell',{ cell_id:String(num) }).catch(function(){});
       }
     }
+
+    // Always clear chips and reset time/days when selecting a resident
+    var inner = document.getElementById('tchips-inner-'+num);
+    if (inner) { inner.querySelectorAll('.bc-chip').forEach(function(c){ c.remove(); }); }
+    var timeEl = document.getElementById('ttime-'+num);
+    if (timeEl) timeEl.textContent = '—';
+    var daysEl = document.getElementById('tdays-'+num);
+    if (daysEl) daysEl.innerHTML = '<span class="days-badge days-0">0</span>';
 
     var set = function(id, v) { var el=document.getElementById(id); if(el) el.textContent=v||'—'; };
     set('tphone-'+num, resObj.phone);
@@ -3485,7 +3491,7 @@ window.addEventListener('message', function(e) {
     var timeStr = 'היום ' + new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
     var lockCode = String(Math.floor(Math.random()*90)+10) + String(num).padStart(2,'0');
     if (!packageData[num]) packageData[num] = { packages:[], _ids:[] };
-    Object.assign(packageData[num], { status:'loading', resident:resName, time:timeStr, days:'0', code:lockCode });
+    Object.assign(packageData[num], { status:'loading', resident:resName, time:null, days:'0', code:lockCode });
     if (!packageData[num].packages) packageData[num].packages = [];
     if (!packageData[num]._ids) packageData[num]._ids = [];
     cellSelection[num] = { notify:true };
