@@ -3415,6 +3415,17 @@ window.addEventListener('message', function(e) {
     drop.innerHTML = matched.map(function(r, i){
       return '<div class="tbl-res-drop-item" onmousedown="tableSelectResident('+num+','+i+')">'+escHtml(r.name)+' — '+(r.phone||'')+'</div>';
     }).join('');
+    // Use fixed positioning so dropdown floats above table rows (escapes table stacking context)
+    var inp = document.getElementById('tres-'+num);
+    if (inp) {
+      var rect = inp.getBoundingClientRect();
+      drop.style.position = 'fixed';
+      drop.style.top = (rect.bottom + 2) + 'px';
+      drop.style.left = rect.left + 'px';
+      drop.style.right = 'auto';
+      drop.style.width = rect.width + 'px';
+      drop.style.zIndex = '9999';
+    }
     drop.style.display = 'block';
   }
 
