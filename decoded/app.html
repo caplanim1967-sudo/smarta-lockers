@@ -764,9 +764,9 @@
         <button class="view-toggle-btn active" id="vt-form" onclick="switchPkgView('form')">טופס</button>
         <button class="view-toggle-btn" id="vt-table" onclick="switchPkgView('table')">טבלה</button>
       </div>
-      <div id="table-action-bar" style="display:none;gap:8px;align-items:center;flex-wrap:wrap;">
-        <button onclick="tableOpenSelected()" class="primary-btn" style="padding:5px 12px;font-size:12px;background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)">🔓 <span id="tbl-open-lbl">פתח מסומנים</span></button>
-        <button onclick="tableSendSmsSelected()" class="primary-btn" style="padding:5px 12px;font-size:12px;background:rgba(79,142,247,.15);color:var(--accent);border:1px solid rgba(79,142,247,.3)">💬 <span id="tbl-sms-lbl">שלח SMS מסומנים</span></button>
+      <div id="table-action-bar" style="display:none;gap:6px;align-items:center;">
+        <button onclick="tableOpenSelected()" class="primary-btn" style="width:auto;margin-top:0;padding:5px 10px;font-size:12px;background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)">🔓 <span id="tbl-open-lbl">פתח מסומנים</span></button>
+        <button onclick="tableSendSmsSelected()" class="primary-btn" style="width:auto;margin-top:0;padding:5px 10px;font-size:12px;background:rgba(79,142,247,.15);color:var(--accent);border:1px solid rgba(79,142,247,.3)">💬 <span id="tbl-sms-lbl">שלח SMS מסומנים</span></button>
       </div>
     </div>
 
@@ -3305,17 +3305,25 @@ window.addEventListener('message', function(e) {
         var chips = barcodes.map(function(code){
           return '<span class="bc-chip" data-code="'+escHtml(code)+'">'+escHtml(code)+'<span class="bc-chip-x" onclick="tableRemoveBarcode('+num+',\''+escHtml(code)+'\')">✕</span></span>';
         }).join('');
-        rows += '<tr class="row-occupied">' +
+        rows += '<tr class="row-occupied" id="trow-'+num+'">' +
           '<td style="text-align:center"><input type="checkbox" '+chk+' onchange="tableChkChange('+num+',this.checked)"></td>' +
           '<td style="text-align:center;font-weight:600;color:var(--muted)">'+num+'</td>' +
-          '<td><span style="background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:var(--green);font-size:11px;padding:2px 8px;border-radius:99px">'+escHtml(pkg.resident||'')+'</span></td>' +
-          '<td class="num-cell" style="font-size:11px;color:var(--muted)">'+escHtml(resObj.phone||'—')+'</td>' +
-          '<td class="num-cell" style="font-size:11px;color:var(--muted)">'+escHtml(resObj.id_number||'—')+'</td>' +
-          '<td><div style="display:flex;gap:4px;flex-wrap:wrap">'+chips+'</div></td>' +
+          '<td style="position:relative">' +
+            '<input type="text" id="tres-'+num+'" value="'+escHtml(pkg.resident||'')+'" oninput="tableResInput('+num+',this.value)" onblur="tableResBlur('+num+')" autocomplete="off">' +
+            '<div id="trdrop-'+num+'" class="tbl-res-drop" style="display:none"></div>' +
+          '</td>' +
+          '<td class="num-cell" style="font-size:11px;color:var(--muted)" id="tphone-'+num+'">'+escHtml(resObj.phone||'—')+'</td>' +
+          '<td class="num-cell" style="font-size:11px;color:var(--muted)" id="tidnum-'+num+'">'+escHtml(resObj.id_number||'—')+'</td>' +
+          '<td id="tchips-cell-'+num+'" onclick="var b=document.getElementById(\'tbarcode-'+num+'\');if(b)b.focus()" style="cursor:text">' +
+            '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center" id="tchips-inner-'+num+'">' +
+              chips +
+              '<input type="text" id="tbarcode-'+num+'" placeholder="סרוק..." style="width:70px;font-family:monospace;font-size:11px" onkeydown="tableBarcodeKey('+num+',event)">' +
+            '</div>' +
+          '</td>' +
           '<td style="font-size:11px;color:var(--muted);text-align:center;white-space:nowrap">'+escHtml(pkg.time||'—')+'</td>' +
           '<td style="text-align:center">'+daysBadge(pkg.days||0)+'</td>' +
-          '<td style="text-align:center;font-size:11px;color:var(--muted)">'+escHtml(resObj.house_number||'—')+'</td>' +
-          '<td style="font-size:11px;color:var(--muted)">'+escHtml(resObj.alt_name||'—')+'</td>' +
+          '<td style="text-align:center;font-size:11px;color:var(--muted)" id="thousenum-'+num+'">'+escHtml(resObj.house_number||'—')+'</td>' +
+          '<td style="font-size:11px;color:var(--muted)" id="taltname-'+num+'">'+escHtml(resObj.alt_name||'—')+'</td>' +
           '</tr>';
       } else {
         rows += '<tr class="row-free" id="trow-'+num+'">' +
@@ -3327,7 +3335,7 @@ window.addEventListener('message', function(e) {
           '</td>' +
           '<td class="num-cell" style="font-size:11px;color:var(--muted)" id="tphone-'+num+'">—</td>' +
           '<td class="num-cell" style="font-size:11px;color:var(--muted)" id="tidnum-'+num+'">—</td>' +
-          '<td id="tchips-cell-'+num+'">' +
+          '<td id="tchips-cell-'+num+'" onclick="var b=document.getElementById(\'tbarcode-'+num+'\');if(b)b.focus()" style="cursor:text">' +
             '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center" id="tchips-inner-'+num+'">' +
               '<input type="text" id="tbarcode-'+num+'" placeholder="סרוק..." style="width:70px;font-family:monospace;font-size:11px" onkeydown="tableBarcodeKey('+num+',event)" disabled>' +
             '</div>' +
@@ -3415,6 +3423,22 @@ window.addEventListener('message', function(e) {
   function tableSelectResident(num, resName) {
     var inp = document.getElementById('tres-'+num); if (inp) inp.value = resName;
     var drop = document.getElementById('trdrop-'+num); if (drop) drop.style.display='none';
+
+    // Clear old resident data if overwriting occupied cell
+    var old = packageData[num];
+    if (old && old.resident && old.resident !== resName) {
+      var oldIds = (old._ids || []).slice();
+      delete packageData[num];
+      savePackageData();
+      var inner = document.getElementById('tchips-inner-'+num);
+      if (inner) { inner.querySelectorAll('.bc-chip').forEach(function(c){ c.remove(); }); }
+      if (oldIds.length) {
+        oldIds.forEach(function(id){ apiPost('/api/packages/'+id+'/collect',{}).catch(function(){}); });
+      } else {
+        apiPost('/api/packages/collect-cell',{ cell_id:String(num) }).catch(function(){});
+      }
+    }
+
     var resObj = _residentsCache.find(function(r){ return r.name===resName; }) || {};
     var set = function(id, v) { var el=document.getElementById(id); if(el) el.textContent=v||'—'; };
     set('tphone-'+num, resObj.phone);
@@ -3491,7 +3515,7 @@ window.addEventListener('message', function(e) {
     var config = FALLBACK_CONFIG;
     try { var s = localStorage.getItem('smarta_locker_config_v2'); if (s) config = JSON.parse(s); } catch(e) {}
     var all = []; config.layout.forEach(function(col){ col.forEach(function(c){ if(!c.disabled) all.push(c.num); }); });
-    return all.filter(function(n){ return _tableCheckState[n]!==false; });
+    return all.filter(function(n){ return _tableCheckState[n]!==false; }).sort(function(a,b){ return a-b; });
   }
 
   function tableOpenSelected() {
