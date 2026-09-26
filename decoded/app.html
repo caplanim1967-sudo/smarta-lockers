@@ -3265,6 +3265,20 @@ window.addEventListener('message', function(e) {
   var _pkgViewMode = 'form';
   var _tableCheckState = {};
   var _tableResCandidates = {};
+  var _tableDropEl = null;   // single global dropdown, child of <body>
+  var _tableDropNum = -1;
+
+  function getTableDrop() {
+    if (!_tableDropEl) {
+      _tableDropEl = document.createElement('div');
+      _tableDropEl.className = 'tbl-res-drop';
+      _tableDropEl.style.display = 'none';
+      _tableDropEl.style.position = 'fixed';
+      _tableDropEl.style.zIndex = '9999';
+      document.body.appendChild(_tableDropEl);
+    }
+    return _tableDropEl;
+  }
 
   function switchPkgView(v) {
     _pkgViewMode = v;
@@ -3309,9 +3323,8 @@ window.addEventListener('message', function(e) {
         rows += '<tr class="row-occupied" id="trow-'+num+'">' +
           '<td style="text-align:center"><input type="checkbox" '+chk+' onchange="tableChkChange('+num+',this.checked)"></td>' +
           '<td style="text-align:center;font-weight:600;color:var(--muted)">'+num+'</td>' +
-          '<td style="position:relative">' +
+          '<td>' +
             '<input type="text" id="tres-'+num+'" value="'+escHtml(pkg.resident||'')+'" oninput="tableResInput('+num+',this.value)" onblur="tableResBlur('+num+')" onfocus="this.select()" autocomplete="off">' +
-            '<div id="trdrop-'+num+'" class="tbl-res-drop" style="display:none"></div>' +
           '</td>' +
           '<td class="num-cell" style="font-size:11px;color:var(--muted)" id="tphone-'+num+'">'+escHtml(resObj.phone||'—')+'</td>' +
           '<td class="num-cell" style="font-size:11px;color:var(--muted)" id="tidnum-'+num+'">'+escHtml(resObj.id_number||'—')+'</td>' +
@@ -3330,9 +3343,8 @@ window.addEventListener('message', function(e) {
         rows += '<tr class="row-free" id="trow-'+num+'">' +
           '<td style="text-align:center"><input type="checkbox" '+chk+' onchange="tableChkChange('+num+',this.checked)"></td>' +
           '<td style="text-align:center;font-weight:600;color:var(--muted)">'+num+'</td>' +
-          '<td style="position:relative">' +
+          '<td>' +
             '<input type="text" id="tres-'+num+'" placeholder="הקלד שם דייר..." oninput="tableResInput('+num+',this.value)" onblur="tableResBlur('+num+')" autocomplete="off">' +
-            '<div id="trdrop-'+num+'" class="tbl-res-drop" style="display:none"></div>' +
           '</td>' +
           '<td class="num-cell" style="font-size:11px;color:var(--muted)" id="tphone-'+num+'">—</td>' +
           '<td class="num-cell" style="font-size:11px;color:var(--muted)" id="tidnum-'+num+'">—</td>' +
@@ -3403,35 +3415,31 @@ window.addEventListener('message', function(e) {
   }
 
   function tableResInput(num, val) {
-    var drop = document.getElementById('trdrop-'+num);
-    if (!drop) return;
-    if (!val.trim()) { drop.style.display='none'; return; }
+    var drop = getTableDrop();
+    if (!val.trim()) { drop.style.display='none'; _tableDropNum=-1; return; }
     var q = val.trim().toLowerCase();
     var matched = _residentsCache.filter(function(r){
       return r.name.toLowerCase().includes(q) || (r.phone||'').includes(q);
     }).slice(0,8);
-    if (!matched.length) { drop.style.display='none'; return; }
+    if (!matched.length) { drop.style.display='none'; _tableDropNum=-1; return; }
     _tableResCandidates[num] = matched;
+    _tableDropNum = num;
     drop.innerHTML = matched.map(function(r, i){
       return '<div class="tbl-res-drop-item" onmousedown="tableSelectResident('+num+','+i+')">'+escHtml(r.name)+' — '+(r.phone||'')+'</div>';
     }).join('');
-    // Use fixed positioning so dropdown floats above table rows (escapes table stacking context)
     var inp = document.getElementById('tres-'+num);
     if (inp) {
       var rect = inp.getBoundingClientRect();
-      drop.style.position = 'fixed';
       drop.style.top = (rect.bottom + 2) + 'px';
       drop.style.left = rect.left + 'px';
-      drop.style.right = 'auto';
       drop.style.width = rect.width + 'px';
-      drop.style.zIndex = '9999';
     }
     drop.style.display = 'block';
   }
 
   function tableResBlur(num) {
     setTimeout(function(){
-      var d = document.getElementById('trdrop-'+num); if (d) d.style.display='none';
+      if (_tableDropNum === num) { getTableDrop().style.display='none'; _tableDropNum=-1; }
       // Revert input to committed resident name (or empty for free cells)
       var inp = document.getElementById('tres-'+num);
       if (inp) {
@@ -3446,7 +3454,7 @@ window.addEventListener('message', function(e) {
     var resName = resObj.name || '';
     if (!resName) return;
     var inp = document.getElementById('tres-'+num); if (inp) inp.value = resName;
-    var drop = document.getElementById('trdrop-'+num); if (drop) drop.style.display='none';
+    getTableDrop().style.display='none'; _tableDropNum=-1;
 
     // Clear old resident data if overwriting occupied cell
     var old = packageData[num];
