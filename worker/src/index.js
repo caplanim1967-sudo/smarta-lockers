@@ -374,9 +374,14 @@ export default {
         if (!info.url) return err('OTA URL missing', 404);
         const upstream = await fetch(info.url);
         if (!upstream.ok) return err('OTA upstream failed', 502);
-        const headers = { 'Content-Type': 'application/octet-stream' };
-        if (info.size) headers['Content-Length'] = String(info.size);
-        return new Response(upstream.body, { headers });
+        // Buffer entirely — prevents chunked Transfer-Encoding which corrupts OTA
+        const buf = await upstream.arrayBuffer();
+        return new Response(buf, {
+          headers: {
+            'Content-Type': 'application/octet-stream',
+            'Content-Length': String(buf.byteLength),
+          },
+        });
       }
 
       // ── Admin: get current OTA status ─────────────────────────────
@@ -521,6 +526,7 @@ export default {
       if (path === '/api/esp/commands' && method === 'GET') {
         const espId = url.searchParams.get('esp_id');
         const fwVer = url.searchParams.get('fw') || '';  // [v1.35] גרסת פירמוור
+        const netType = url.searchParams.get('net') || null;  // wifi / gprs
         if (!espId) return err('esp_id חובה');
 
         // שליפת כל הפקודות הממתינות — batch לפתיחה מהירה
@@ -574,10 +580,10 @@ export default {
         ).bind(espId).first().catch(() => null))?.last_seen || 0;
         if (nowSec() - prevSeen > 60) {
           await env.smarta_db.prepare(
-            `INSERT INTO esp_status (esp_id, last_seen, fw_version)
-             VALUES (?, ?, ?)
-             ON CONFLICT(esp_id) DO UPDATE SET last_seen=excluded.last_seen, fw_version=excluded.fw_version`
-          ).bind(espId, nowSec(), fwVer || null).run().catch(() => {});
+            `INSERT INTO esp_status (esp_id, last_seen, fw_version, net_type)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT(esp_id) DO UPDATE SET last_seen=excluded.last_seen, fw_version=excluded.fw_version, net_type=excluded.net_type`
+          ).bind(espId, nowSec(), fwVer || null, netType).run().catch(() => {});
         }
 
         const base = cmds.length > 0

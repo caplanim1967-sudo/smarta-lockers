@@ -1834,13 +1834,20 @@ function renderEspTable() {
   var sorted = _sortRows(_espRows, s);
   el.innerHTML = '<table style="width:100%;table-layout:fixed"><thead><tr>' +
     '<th style="width:6%;text-align:right">סטטוס</th>' +
-    th('community_name','ישוב','20%') + th('esp_id','מכשיר','14%') + th('fw_version','גרסה','9%') + th('last_seen','פול אחרון','28%',true) +
-    '<th style="width:23%;text-align:right">WiFi</th>' +
+    th('community_name','ישוב','20%') + th('esp_id','מכשיר','14%') + th('fw_version','גרסה','9%') + th('last_seen','פול אחרון','21%',true) +
+    '<th style="width:8%;text-align:right">רשת</th>' +
+    '<th style="width:22%;text-align:right">WiFi</th>' +
     '</tr></thead><tbody>' +
     sorted.map(function(r) {
       var age = now - (r.last_seen||0), online = age < STALE;
       var ageStr = age<60 ? 'לפני '+age+' שנ\'' : age<3600 ? 'לפני '+Math.floor(age/60)+' דק\'' : age<86400 ? 'לפני '+Math.floor(age/3600)+' שע\'' : 'לפני '+Math.floor(age/86400)+' ימים';
       var cid = esc(r.community_id||'');
+      var isWifi = r.net_type === 'wifi';
+      var netBadge = r.net_type === 'wifi'
+        ? '<span style="color:var(--green);font-size:11px;font-weight:600">📶 WiFi</span>'
+        : r.net_type === 'gprs'
+          ? '<span style="color:var(--blue,#3b82f6);font-size:11px;font-weight:600">📡 GPRS</span>'
+          : '<span style="color:var(--muted);font-size:11px">—</span>';
       return '<tr>' +
         '<td style="text-align:right;font-size:16px">' + (online?'🟢':'🔴') + '</td>' +
         '<td style="font-size:12px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.community_name||r.community_id||'—') + '</td>' +
@@ -1848,9 +1855,11 @@ function renderEspTable() {
         '<td style="font-size:12px;text-align:right;color:var(--muted)">v' + esc(r.fw_version||'—') + '</td>' +
         '<td style="font-size:11px;direction:ltr;unicode-bidi:plaintext;text-align:right;color:' + (online?'var(--green)':'var(--red)') + '">' +
           _fmtTs(r.last_seen) + ' <span style="color:var(--muted)">(' + ageStr + ')</span></td>' +
+        '<td style="text-align:right">' + netBadge + '</td>' +
         '<td style="text-align:right">' +
-          '<button class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 7px;margin-left:4px" onclick="adminLockerCmd(\'' + cid + '\',998)" title="הפעל Captive Portal לקליטת WiFi">📶 הגדר WiFi</button>' +
-          '<button class="btn btn-danger btn-sm" style="font-size:10px;padding:3px 7px" onclick="adminLockerCmd(\'' + cid + '\',999)" title="מחק credentials WiFi ואתחל">🗑 אפס WiFi</button>' +
+          (!isWifi ? '<button class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 7px;margin-left:4px" onclick="adminLockerCmd(\'' + cid + '\',998)" title="הפעל Captive Portal לקליטת WiFi">📶 הגדר WiFi</button>' : '') +
+          (isWifi ? '<button class="btn btn-danger btn-sm" style="font-size:10px;padding:3px 7px;margin-left:4px" onclick="adminLockerCmd(\'' + cid + '\',999)" title="מחק credentials WiFi ואתחל">🗑 אפס WiFi</button>' : '') +
+          '<button class="btn btn-warning btn-sm" style="font-size:10px;padding:3px 7px" onclick="adminLockerCmd(\'' + cid + '\',997)" title="אתחל ESP מרחוק">🔄 אתחל</button>' +
         '</td>' +
       '</tr>';
     }).join('') + '</tbody></table>';
