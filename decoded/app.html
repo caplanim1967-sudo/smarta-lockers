@@ -3310,7 +3310,7 @@ window.addEventListener('message', function(e) {
           '<td style="text-align:center"><input type="checkbox" '+chk+' onchange="tableChkChange('+num+',this.checked)"></td>' +
           '<td style="text-align:center;font-weight:600;color:var(--muted)">'+num+'</td>' +
           '<td style="position:relative">' +
-            '<input type="text" id="tres-'+num+'" value="'+escHtml(pkg.resident||'')+'" oninput="tableResInput('+num+',this.value)" onblur="tableResBlur('+num+')" autocomplete="off">' +
+            '<input type="text" id="tres-'+num+'" value="'+escHtml(pkg.resident||'')+'" oninput="tableResInput('+num+',this.value)" onblur="tableResBlur('+num+')" onfocus="this.select()" autocomplete="off">' +
             '<div id="trdrop-'+num+'" class="tbl-res-drop" style="display:none"></div>' +
           '</td>' +
           '<td class="num-cell" style="font-size:11px;color:var(--muted)" id="tphone-'+num+'">'+escHtml(resObj.phone||'—')+'</td>' +
