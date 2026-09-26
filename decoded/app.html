@@ -3331,7 +3331,7 @@ window.addEventListener('message', function(e) {
           '<td id="tchips-cell-'+num+'" onclick="var b=document.getElementById(\'tbarcode-'+num+'\');if(b)b.focus()" style="cursor:text">' +
             '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center" id="tchips-inner-'+num+'">' +
               chips +
-              '<input type="text" id="tbarcode-'+num+'" placeholder="סרוק..." style="width:70px;font-family:monospace;font-size:11px" onkeydown="tableBarcodeKey('+num+',event)">' +
+              '<input type="text" id="tbarcode-'+num+'" placeholder="סרוק..." style="width:70px;font-family:monospace;font-size:11px" onkeydown="tableBarcodeKey('+num+',event)" oninput="tableBarcodeInput('+num+',this.value)">' +
             '</div>' +
           '</td>' +
           '<td id="ttime-'+num+'" style="font-size:11px;color:var(--muted);text-align:center;white-space:nowrap">'+escHtml(pkg.time||'—')+'</td>' +
@@ -3350,7 +3350,7 @@ window.addEventListener('message', function(e) {
           '<td class="num-cell" style="font-size:11px;color:var(--muted)" id="tidnum-'+num+'">—</td>' +
           '<td id="tchips-cell-'+num+'" onclick="var b=document.getElementById(\'tbarcode-'+num+'\');if(b)b.focus()" style="cursor:text">' +
             '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center" id="tchips-inner-'+num+'">' +
-              '<input type="text" id="tbarcode-'+num+'" placeholder="סרוק..." style="width:70px;font-family:monospace;font-size:11px" onkeydown="tableBarcodeKey('+num+',event)" disabled>' +
+              '<input type="text" id="tbarcode-'+num+'" placeholder="סרוק..." style="width:70px;font-family:monospace;font-size:11px" onkeydown="tableBarcodeKey('+num+',event)" oninput="tableBarcodeInput('+num+',this.value)" disabled>' +
             '</div>' +
           '</td>' +
           '<td style="text-align:center;color:var(--muted)">—</td>' +
@@ -3505,14 +3505,30 @@ window.addEventListener('message', function(e) {
     }).catch(function(e){ console.warn('table autosave failed',e); });
   }
 
+  var _barcodeTimer = null;
+
   function tableBarcodeKey(num, e) {
     if (e.key==='Enter' || e.key==='Tab') {
+      clearTimeout(_barcodeTimer);
       var inp = document.getElementById('tbarcode-'+num);
       if (!inp||!inp.value.trim()) return;
       tableAddBarcode(num, inp.value.trim());
       inp.value='';
+      inp.focus();
       e.preventDefault();
     }
+  }
+
+  function tableBarcodeInput(num, val) {
+    clearTimeout(_barcodeTimer);
+    if (!val || val.trim().length < 4) return;
+    _barcodeTimer = setTimeout(function() {
+      var inp = document.getElementById('tbarcode-'+num);
+      if (!inp || !inp.value.trim() || inp.value.trim().length < 4) return;
+      tableAddBarcode(num, inp.value.trim());
+      inp.value = '';
+      inp.focus();
+    }, 800);
   }
 
   function tableAddBarcode(num, code) {
