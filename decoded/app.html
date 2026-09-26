@@ -3431,7 +3431,8 @@ window.addEventListener('message', function(e) {
     if (inp) {
       var rect = inp.getBoundingClientRect();
       drop.style.top = (rect.bottom + 2) + 'px';
-      drop.style.left = rect.left + 'px';
+      drop.style.left = 'auto';
+      drop.style.right = (window.innerWidth - rect.right) + 'px';
       drop.style.width = rect.width + 'px';
     }
     drop.style.display = 'block';
