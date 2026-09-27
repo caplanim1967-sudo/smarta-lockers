@@ -595,6 +595,9 @@
     .primary-btn { padding: 15px; font-size: 16px; }
     .bottom-nav { display: flex; }
     body { padding-bottom: 70px; }
+    th.col-hide-mobile, td.col-hide-mobile { display: none; }
+    col.col-hide-mobile { visibility: collapse; }
+    .view-toggle { display: none; }
   }
 
   @media (max-width: 480px) {
@@ -2419,8 +2422,13 @@ function buildLockerGrid() {
   }
 
   function showScreen(name, el) {
-    if (name === 'history') loadHistoryFromAPI();
-    if (name === 'new-package') { populateCellSelect(window._preCell); window._preCell = null; if (_pkgViewMode === 'table') buildPackageTable(); }
+    if (name === 'history') { loadHistoryFromAPI(); setBottomNav('bn-history'); }
+    if (name === 'dashboard') setBottomNav('bn-dashboard');
+    if (name === 'new-package') {
+      populateCellSelect(window._preCell); window._preCell = null;
+      if (_pkgViewMode === 'table') { buildPackageTable(); setBottomNav('bn-table'); }
+      else setBottomNav('bn-form');
+    }
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
     document.getElementById('screen-' + name).classList.add('active');
@@ -3285,8 +3293,9 @@ window.addEventListener('message', function(e) {
     document.getElementById('pkg-form-view').style.display = v === 'form' ? '' : 'none';
     document.getElementById('pkg-table-view').style.display = v === 'table' ? '' : 'none';
     document.getElementById('table-action-bar').style.display = v === 'table' ? 'flex' : 'none';
-    document.getElementById('vt-form').classList.toggle('active', v === 'form');
-    document.getElementById('vt-table').classList.toggle('active', v === 'table');
+    var vtf = document.getElementById('vt-form'); if (vtf) vtf.classList.toggle('active', v === 'form');
+    var vtt = document.getElementById('vt-table'); if (vtt) vtt.classList.toggle('active', v === 'table');
+    setBottomNav(v === 'form' ? 'bn-form' : 'bn-table');
     if (v === 'table') buildPackageTable();
   }
 
@@ -3327,7 +3336,7 @@ window.addEventListener('message', function(e) {
             '<input type="text" id="tres-'+num+'" value="'+escHtml(pkg.resident||'')+'" oninput="tableResInput('+num+',this.value)" onblur="tableResBlur('+num+')" onfocus="this.select()" autocomplete="off">' +
           '</td>' +
           '<td class="num-cell" style="font-size:11px;color:var(--muted)" id="tphone-'+num+'">'+escHtml(resObj.phone||'—')+'</td>' +
-          '<td class="num-cell" style="font-size:11px;color:var(--muted)" id="tidnum-'+num+'">'+escHtml(resObj.id_number||'—')+'</td>' +
+          '<td class="num-cell col-hide-mobile" style="font-size:11px;color:var(--muted)" id="tidnum-'+num+'">'+escHtml(resObj.id_number||'—')+'</td>' +
           '<td id="tchips-cell-'+num+'" onclick="var b=document.getElementById(\'tbarcode-'+num+'\');if(b)b.focus()" style="cursor:text">' +
             '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center" id="tchips-inner-'+num+'">' +
               chips +
@@ -3336,8 +3345,8 @@ window.addEventListener('message', function(e) {
           '</td>' +
           '<td id="ttime-'+num+'" style="font-size:11px;color:var(--muted);text-align:center;white-space:nowrap">'+escHtml(pkg.time||'—')+'</td>' +
           '<td id="tdays-'+num+'" style="text-align:center">'+daysBadge(pkg.days||0)+'</td>' +
-          '<td style="text-align:center;font-size:11px;color:var(--muted)" id="thousenum-'+num+'">'+escHtml(resObj.house_number||'—')+'</td>' +
-          '<td style="font-size:11px;color:var(--muted)" id="taltname-'+num+'">'+escHtml(resObj.alt_name||'—')+'</td>' +
+          '<td class="col-hide-mobile" style="text-align:center;font-size:11px;color:var(--muted)" id="thousenum-'+num+'">'+escHtml(resObj.house_number||'—')+'</td>' +
+          '<td class="col-hide-mobile" style="font-size:11px;color:var(--muted)" id="taltname-'+num+'">'+escHtml(resObj.alt_name||'—')+'</td>' +
           '</tr>';
       } else {
         rows += '<tr class="row-free" id="trow-'+num+'">' +
@@ -3347,7 +3356,7 @@ window.addEventListener('message', function(e) {
             '<input type="text" id="tres-'+num+'" placeholder="הקלד שם דייר..." oninput="tableResInput('+num+',this.value)" onblur="tableResBlur('+num+')" autocomplete="off">' +
           '</td>' +
           '<td class="num-cell" style="font-size:11px;color:var(--muted)" id="tphone-'+num+'">—</td>' +
-          '<td class="num-cell" style="font-size:11px;color:var(--muted)" id="tidnum-'+num+'">—</td>' +
+          '<td class="num-cell col-hide-mobile" style="font-size:11px;color:var(--muted)" id="tidnum-'+num+'">—</td>' +
           '<td id="tchips-cell-'+num+'" onclick="var b=document.getElementById(\'tbarcode-'+num+'\');if(b)b.focus()" style="cursor:text">' +
             '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center" id="tchips-inner-'+num+'">' +
               '<input type="text" id="tbarcode-'+num+'" placeholder="סרוק..." style="width:70px;font-family:monospace;font-size:11px" onkeydown="tableBarcodeKey('+num+',event)" oninput="tableBarcodeInput('+num+',this.value)" disabled>' +
@@ -3355,8 +3364,8 @@ window.addEventListener('message', function(e) {
           '</td>' +
           '<td style="text-align:center;color:var(--muted)">—</td>' +
           '<td style="text-align:center;color:var(--muted)">—</td>' +
-          '<td style="text-align:center;font-size:11px;color:var(--muted)" id="thousenum-'+num+'">—</td>' +
-          '<td style="font-size:11px;color:var(--muted)" id="taltname-'+num+'">—</td>' +
+          '<td class="col-hide-mobile" style="text-align:center;font-size:11px;color:var(--muted)" id="thousenum-'+num+'">—</td>' +
+          '<td class="col-hide-mobile" style="font-size:11px;color:var(--muted)" id="taltname-'+num+'">—</td>' +
           '</tr>';
       }
     });
@@ -3366,14 +3375,14 @@ window.addEventListener('message', function(e) {
     var html = '<div class="pkg-table-wrap"><table class="pkg-table">' +
       '<colgroup>' +
         '<col style="width:34px"><col style="width:40px"><col style="width:130px">' +
-        '<col style="width:96px"><col style="width:80px"><col style="width:170px">' +
-        '<col style="width:88px"><col style="width:54px"><col style="width:60px"><col style="width:90px">' +
+        '<col style="width:96px"><col class="col-hide-mobile" style="width:80px"><col style="width:170px">' +
+        '<col style="width:88px"><col style="width:54px"><col class="col-hide-mobile" style="width:60px"><col class="col-hide-mobile" style="width:90px">' +
       '</colgroup>' +
       '<thead><tr>' +
         '<th style="text-align:center"><input type="checkbox" id="tbl-chk-all" '+masterChk+' onchange="tableToggleAll(this.checked)"></th>' +
-        '<th style="text-align:center">תא</th><th>דייר</th><th>נייד</th><th>ת"ז</th><th>ברקוד</th>' +
+        '<th style="text-align:center">תא</th><th>דייר</th><th>נייד</th><th class="col-hide-mobile">ת"ז</th><th>ברקוד</th>' +
         '<th style="text-align:center">פתיחה אחרונה</th><th style="text-align:center">ימים</th>' +
-        '<th style="text-align:center">מס\' בית</th><th>איש קשר נוסף</th>' +
+        '<th class="col-hide-mobile" style="text-align:center">מס\' בית</th><th class="col-hide-mobile">איש קשר נוסף</th>' +
       '</tr></thead>' +
       '<tbody>'+rows+'</tbody></table></div>';
 
@@ -3661,8 +3670,11 @@ window.addEventListener('message', function(e) {
   <button class="bottom-nav-btn active" id="bn-dashboard" onclick="showScreen('dashboard');setBottomNav('bn-dashboard')">
     <span class="bn-icon">📦</span>לוח בקרה
   </button>
-  <button class="bottom-nav-btn" id="bn-new-package" onclick="showScreen('new-package');setBottomNav('bn-new-package')">
-    <span class="bn-icon">➕</span>חבילה חדשה
+  <button class="bottom-nav-btn" id="bn-form" onclick="showScreen('new-package');switchPkgView('form');setBottomNav('bn-form')">
+    <span class="bn-icon">➕</span>טופס
+  </button>
+  <button class="bottom-nav-btn" id="bn-table" onclick="showScreen('new-package');switchPkgView('table');setBottomNav('bn-table')">
+    <span class="bn-icon">📊</span>טבלה
   </button>
   <button class="bottom-nav-btn" id="bn-history" onclick="showScreen('history');setBottomNav('bn-history')">
     <span class="bn-icon">📋</span>היסטוריה
