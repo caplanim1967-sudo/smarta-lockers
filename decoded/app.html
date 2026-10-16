@@ -1254,7 +1254,8 @@
       // ── 3. מזג לתוך packageData ───────────────────────────
       Object.keys(fresh).forEach(function(k) {
         if (packageData[k] && packageData[k].status === 'loading') {
-          if (fresh[k].status !== 'faulty') fresh[k].status = 'loading';
+          // שמור loading רק אם ה-API לא אישר occupied (notified_at מוגדר)
+          if (fresh[k].status !== 'faulty' && fresh[k].status !== 'occupied') fresh[k].status = 'loading';
         }
         packageData[k] = fresh[k];
       });
