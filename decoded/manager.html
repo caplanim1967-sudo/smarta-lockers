@@ -746,6 +746,17 @@ function apiPatch(path, body) {
 }
 
 // ─── ייבוא מאקסל ─────────────────────────────────────────
+// נרמול מספר טלפון ישראלי — מקבל פורמטים שונים ומחזיר 05XXXXXXXX
+function normalizePhone(raw) {
+  var s = String(raw || '').replace(/[-\s().]/g, '');
+  if (!s) return '';
+  // +972XXXXXXXXX → 0XXXXXXXXX
+  if (s.startsWith('+972')) s = '0' + s.slice(4);
+  // 972XXXXXXXXX → 0XXXXXXXXX
+  else if (s.startsWith('972') && s.length === 12) s = '0' + s.slice(3);
+  return s;
+}
+
 // שמות העמודות הקבועים (חייבים להתאים לתבנית)
 var EXCEL_COLS = {
   first_name:          'שם פרטי',
@@ -824,9 +835,9 @@ function importFromExcel(input) {
 
         var fn   = cellVal(row, 'first_name');
         var ln   = cellVal(row, 'last_name');
-        var ph   = cellVal(row, 'phone').replace(/[-\s]/g, '');
+        var ph   = normalizePhone(cellVal(row, 'phone'));
         var id   = cellVal(row, 'id_number').replace(/\D/g, '');
-        var altPh= cellVal(row, 'alt_phone').replace(/[-\s]/g, '');
+        var altPh= normalizePhone(cellVal(row, 'alt_phone'));
         var altId= cellVal(row, 'alt_id_number').replace(/\D/g, '');
         var ntfy = cellVal(row, 'notify_method').toLowerCase() || 'whatsapp';
         var altNtfy = cellVal(row, 'alt_notify_method').toLowerCase() || 'whatsapp';
@@ -835,9 +846,9 @@ function importFromExcel(input) {
         if (!fn)                          rowErrs.push('שם פרטי חסר');
         if (!ln)                          rowErrs.push('שם משפחה חסר');
         if (!ph)                          rowErrs.push('נייד חסר');
-        else if (!/^05\d{8}$/.test(ph))   rowErrs.push('נייד לא תקין (חייב להתחיל ב-05, 10 ספרות)');
+        else if (!/^05\d{8}$/.test(ph))   rowErrs.push('נייד לא תקין: ' + ph + ' (חייב להתחיל ב-05, 10 ספרות)');
         if (id  && !/^\d{9}$/.test(id))   rowErrs.push('ת"ז לא תקין (9 ספרות)');
-        if (altPh && !/^05\d{8}$/.test(altPh)) rowErrs.push('נייד איש קשר לא תקין');
+        if (altPh && !/^05\d{8}$/.test(altPh)) rowErrs.push('נייד איש קשר לא תקין: ' + altPh);
         if (altId && !/^\d{9}$/.test(altId))   rowErrs.push('ת"ז איש קשר לא תקין (9 ספרות)');
         if (!['whatsapp','sms'].includes(ntfy))       ntfy = 'whatsapp';
         if (!['whatsapp','sms','none'].includes(altNtfy)) altNtfy = 'whatsapp';
@@ -879,18 +890,28 @@ function importFromExcel(input) {
 
       if (!valid.length) { showToast('אין שורות תקינות לייבוא', 'error'); return; }
 
-      // ייבוא רץ
+      // ייבוא רץ עם progress
       var done = 0, failed = 0, total = valid.length;
+      var toast = document.getElementById('toast');
+      function updateProgress() {
+        var pct = Math.round((done + failed) / total * 100);
+        toast.textContent = 'מייבא דיירים... ' + (done + failed) + '/' + total + ' (' + pct + '%)';
+        toast.style.background = 'var(--primary)';
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
+      }
+      updateProgress();
       function next(i) {
         if (i >= total) {
-          showToast('יובאו ' + done + ' דיירים' + (failed ? ' | ' + failed + ' שגיאות שרת' : '') + ' ✓');
+          showToast('יובאו ' + done + ' דיירים' + (failed ? ' | ' + failed + ' כבר קיימים / שגיאה' : '') + ' ✓');
           loadResidents();
           return;
         }
         apiPost('/api/residents', valid[i]).then(function(res) {
           if (res && res.error) failed++; else done++;
+          updateProgress();
           next(i + 1);
-        }).catch(function() { failed++; next(i + 1); });
+        }).catch(function() { failed++; updateProgress(); next(i + 1); });
       }
       next(0);
 
