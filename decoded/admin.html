@@ -1670,30 +1670,36 @@ function saveEditUser() {
   errEl.style.display='none';
   var idx = allUsers.findIndex(function(x){return x.id===id;});
   if (idx < 0) { showToast('שגיאה: משתמש לא נמצא', 'error'); return; }
-  allUsers[idx] = Object.assign({}, allUsers[idx], {
-    first_name: first, last_name: last,
-    username: uname || allUsers[idx].username,
-    phone: phone || null
-  });
-  function finishEdit() {
-    saveUsersToStorage();
-    closeModal('edit-user-modal');
-    showToast(first + ' ' + last + ' עודכן ✓');
-    loadUsers();
-    renderSettlements();
-  }
-  if (pass) {
-    hashPassword(pass)
-      .then(function(hash) { allUsers[idx].passwordHash = hash; allUsers[idx].passwordChangedAt = Date.now(); finishEdit(); })
-      .catch(function() { allUsers[idx].passwordHash = 'fallback:' + btoa(unescape(encodeURIComponent(pass))); allUsers[idx].passwordChangedAt = Date.now(); finishEdit(); });
-  } else {
-    finishEdit();
-  }
-  // Best-effort API sync
   var payload = { first_name:first, last_name:last, phone:phone||null };
   if (uname) payload.username = uname;
   if (pass)  payload.password = pass;
-  apiPost('/api/admin/users/' + id, payload).catch(function(){});
+  errEl.textContent = 'שומר...';
+  errEl.style.color = 'var(--primary)';
+  errEl.style.display = 'block';
+  apiPost('/api/admin/users/' + id, payload)
+    .then(function(res) {
+      errEl.style.color = '';
+      if (res && res.error) {
+        errEl.textContent = 'שגיאת שמירה: ' + res.error;
+        errEl.style.display = 'block';
+        return;
+      }
+      allUsers[idx] = Object.assign({}, allUsers[idx], {
+        first_name: first, last_name: last,
+        username: uname || allUsers[idx].username,
+        phone: phone || null
+      });
+      saveUsersToStorage();
+      closeModal('edit-user-modal');
+      showToast(first + ' ' + last + ' עודכן ✓');
+      loadUsers();
+      renderSettlements();
+    })
+    .catch(function() {
+      errEl.style.color = '';
+      errEl.textContent = 'שגיאת תקשורת — נסה שנית';
+      errEl.style.display = 'block';
+    });
 }
 
 function deleteUser(id, name) {
