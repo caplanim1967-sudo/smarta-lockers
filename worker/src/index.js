@@ -646,6 +646,19 @@ export default {
         const cells = [...new Set(allPkgs.map(p => parseInt(p.cell_id)).filter(Boolean))].sort((a,b) => a-b);
         const names = matchedResidents.map(r => `${r.first_name} ${r.last_name}`).join(', ');
         console.log(`[OPEN] ${names} ← תאים: [${cells.join(',')}] בלוקר ${lockerId}`);
+        // רשום שיחה ב-audit log — לא חוסם פתיחה אם נכשל
+        try {
+          await ensurePackageAuditTable(env.smarta_db);
+          const callerDesc = `${names} (${callerPhone})`;
+          const ts = nowSec();
+          await Promise.all(allPkgs.map(pkg =>
+            env.smarta_db.prepare(
+              'INSERT INTO package_audit_log (id, package_id, community_id, action, changed_by, created_at) VALUES (?,?,?,?,?,?)'
+            ).bind(newId(), pkg.id, cid, 'called', callerDesc, ts).run()
+          ));
+        } catch(e) {
+          console.warn('[OPEN] audit log כשל:', e?.message);
+        }
         return ok({ cells, resident_name: names });
       }
 
@@ -1514,7 +1527,9 @@ async function handleCommunity(path, method, request, env, user, url) {
         p.assigned_at as placed_at,
         (r.first_name || ' ' || r.last_name) as resident_name,
         r.phone as resident_phone,
-        s.name as community_name
+        s.name as community_name,
+        (SELECT MAX(created_at) FROM package_audit_log WHERE package_id = p.id AND action = 'called') as last_called_at,
+        (SELECT COUNT(*) FROM package_audit_log WHERE package_id = p.id AND action = 'called') as call_count
       FROM packages p
         LEFT JOIN residents r ON p.resident_id = r.id
         LEFT JOIN settlements s ON p.community_id = s.id`;
@@ -1533,7 +1548,9 @@ async function handleCommunity(path, method, request, env, user, url) {
           p.assigned_at as placed_at,
           (r.first_name || ' ' || r.last_name) as resident_name,
           r.phone as resident_phone,
-          s.name as community_name
+          s.name as community_name,
+          (SELECT MAX(created_at) FROM package_audit_log WHERE package_id = p.id AND action = 'called') as last_called_at,
+          (SELECT COUNT(*) FROM package_audit_log WHERE package_id = p.id AND action = 'called') as call_count
         FROM packages p
           LEFT JOIN residents r ON p.resident_id = r.id
           LEFT JOIN settlements s ON p.community_id = s.id`;
@@ -1671,6 +1688,7 @@ async function handleCommunity(path, method, request, env, user, url) {
     const isBasic = (lockerRow?.tier || 'basic') === 'basic';
 
     let sent = 0, failed = 0;
+    const notifiedPhones = new Set(); // מניעת כפל SMS לאותו דייר בסבב אחד
 
     for (const msg of b.messages) {
       const cellId = String(msg.cell_id);
@@ -1690,12 +1708,18 @@ async function handleCommunity(path, method, request, env, user, url) {
 
       const days = Math.floor((Date.now()/1000 - (pkg.assigned_at || 0)) / 86400);
 
+      // אם הדייר כבר קיבל הודעה בסבב זה — סמן notified_at בלי לשלוח שוב
+      if (type === 'arrival' && notifiedPhones.has(pkg.phone)) {
+        await db.prepare('UPDATE packages SET notified_at = ? WHERE id = ?')
+          .bind(nowSec(), pkg.id).run();
+        sent++;
+        continue;
+      }
+
       let text;
       if (type === 'arrival') {
-        // הגעה — משתמש ב-builder שמכיר basic/premium
         text = buildArrivalSms(s, isBasic ? 'basic' : 'premium', pkg.first_name, 1, cellId, pkg.lock_code, pkg.notes);
       } else {
-        // תזכורות — הבחנה basic/premium רק בתא
         const templateKey = `msg_${type}`;
         const template    = s[templateKey] || '';
         const cellPart    = isBasic ? ` בתא ${cellId}` : '';
@@ -1711,10 +1735,10 @@ async function handleCommunity(path, method, request, env, user, url) {
       const ok2 = await sendMessage(pkg.phone, text, pkg.notify_method || 'sms', env);
       if (ok2) {
         sent++;
-        // סמן בבסיס הנתונים שהודעת הגעה נשלחה
         if (type === 'arrival') {
           await db.prepare('UPDATE packages SET notified_at = ? WHERE id = ?')
             .bind(nowSec(), pkg.id).run();
+          notifiedPhones.add(pkg.phone);
         }
       } else {
         failed++;
@@ -2293,23 +2317,35 @@ async function handleCommunity(path, method, request, env, user, url) {
 
     // SMS אחד בלבד — בין אם חבילה אחת ובין אם כמה
     if (resident?.phone) {
-      const [settRow, lockerRow] = await Promise.all([
-        db.prepare('SELECT msg_settings_json FROM settlements WHERE id = ?').bind(targetCommunityId).first(),
-        db.prepare('SELECT tier FROM locker_configs WHERE id = ?').bind(b.locker_id || '').first(),
-      ]);
-      let settings = {};
-      try { settings = JSON.parse(settRow?.msg_settings_json || '{}'); } catch(_) {}
-      const tier     = lockerRow?.tier || 'basic';
-      // קוד מנעול — נשמר בחבילה הראשונה (כולן באותו תא, קוד זהה)
-      const lockCode = b.lock_code || null;
-      const notes    = b.notes    || null;
-      const text = buildArrivalSms(settings, tier, resident.first_name, barcodes.length, cellIdStr, lockCode, notes);
-      const smsSent = await sendMessage(resident.phone, text, resident.notify_method || 'sms', env);
-      // עדכן notified_at לכל החבילות שנשלחה עבורן הודעה
-      if (smsSent) {
+      // אם לדייר יש כבר חבילה ממתינה מוודעת בתא אחר — אל תשלח שוב
+      const alreadyNotified = b.resident_id
+        ? await db.prepare(
+            `SELECT 1 FROM packages WHERE resident_id = ? AND community_id = ? AND status = 'waiting' AND notified_at IS NOT NULL AND cell_id != ? LIMIT 1`
+          ).bind(b.resident_id, targetCommunityId, cellIdStr).first()
+        : null;
+
+      const ts = nowSec();
+      if (!alreadyNotified) {
+        const [settRow, lockerRow] = await Promise.all([
+          db.prepare('SELECT msg_settings_json FROM settlements WHERE id = ?').bind(targetCommunityId).first(),
+          db.prepare('SELECT tier FROM locker_configs WHERE id = ?').bind(b.locker_id || '').first(),
+        ]);
+        let settings = {};
+        try { settings = JSON.parse(settRow?.msg_settings_json || '{}'); } catch(_) {}
+        const tier     = lockerRow?.tier || 'basic';
+        const lockCode = b.lock_code || null;
+        const notes    = b.notes    || null;
+        const text = buildArrivalSms(settings, tier, resident.first_name, barcodes.length, cellIdStr, lockCode, notes);
+        const smsSent = await sendMessage(resident.phone, text, resident.notify_method || 'sms', env);
+        if (smsSent) {
+          for (const pkgId of packageIds) {
+            await db.prepare('UPDATE packages SET notified_at = ? WHERE id = ?').bind(ts, pkgId).run();
+          }
+        }
+      } else {
+        // דייר כבר מודע — סמן notified_at בלי לשלוח SMS נוסף
         for (const pkgId of packageIds) {
-          await db.prepare('UPDATE packages SET notified_at = ? WHERE id = ?')
-            .bind(nowSec(), pkgId).run();
+          await db.prepare('UPDATE packages SET notified_at = ? WHERE id = ?').bind(ts, pkgId).run();
         }
       }
     }

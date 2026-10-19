@@ -903,7 +903,8 @@
               <th class="th-center" onclick="sortHistory(3)" style="cursor:pointer">תא <span class="sort-ind" data-col="3">↕</span></th>
               <th class="th-center" onclick="sortHistory(4)" style="cursor:pointer">ברקוד <span class="sort-ind" data-col="4">↕</span></th>
               <th onclick="sortHistory(5)" style="cursor:pointer">חברת שילוח <span class="sort-ind" data-col="5">↕</span></th>
-              <th onclick="sortHistory(6)" style="cursor:pointer">סטטוס <span class="sort-ind" data-col="6">↕</span></th>
+              <th onclick="sortHistory(6)" style="cursor:pointer">התקשר <span class="sort-ind" data-col="6">↕</span></th>
+              <th onclick="sortHistory(7)" style="cursor:pointer">סטטוס <span class="sort-ind" data-col="7">↕</span></th>
             </tr>
           </thead>
           <tbody id="history-tbody"></tbody>
@@ -1218,7 +1219,9 @@
               days: String(Math.floor((Date.now()/1000 - pkg.placed_at) / 86400)),
               code: pkg.lock_code || '',
               packages: [],
-              _ids: []
+              _ids: [],
+              lastCalledAt: pkg.last_called_at || 0,
+              callCount: pkg.call_count || 0
             };
           }
           fresh[num].packages.push({
@@ -1295,7 +1298,7 @@
   function loadHistoryFromAPI() {
     var tbody = document.getElementById('history-tbody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">טוען...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">טוען...</td></tr>';
 
     Promise.all([
       apiGet('/api/packages/history'),
@@ -1309,7 +1312,8 @@
           resident: p.resident_name || '—', phone: p.resident_phone || '',
           cell: p.cell_id || '—', barcode: p.barcode || '—',
           courier: p.courier || '—', status: 'ממתינה',
-          _ts: p.placed_at || 0
+          _ts: p.placed_at || 0,
+          _callTs: p.last_called_at || 0, _callCount: p.call_count || 0
         };
       }).concat(collected.map(function(p) {
         return {
@@ -1317,7 +1321,8 @@
           resident: p.resident_name || '—', phone: p.resident_phone || '',
           cell: p.cell_id || '—', barcode: p.barcode || '—',
           courier: p.courier || '—', status: 'נאספה ✓',
-          _ts: p.placed_at || 0
+          _ts: p.placed_at || 0,
+          _callTs: p.last_called_at || 0, _callCount: p.call_count || 0
         };
       }));
 
@@ -1333,7 +1338,7 @@
       filterAndRenderHistory();
     }).catch(function() {
       var tbody = document.getElementById('history-tbody');
-      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:24px">שגיאה בטעינת היסטוריה</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--red);padding:24px">שגיאה בטעינת היסטוריה</td></tr>';
     });
   }
 
@@ -1430,11 +1435,19 @@
     var tbody = document.getElementById('history-tbody');
     if (!tbody) return;
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px">אין רשומות</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:32px">אין רשומות</td></tr>';
       return;
     }
     tbody.innerHTML = rows.map(function(r) {
       var statusColor = r.status.indexOf('נאספה') !== -1 ? 'var(--green)' : 'var(--accent)';
+      var calledCell;
+      if (r._callTs) {
+        var cd = new Date(r._callTs * 1000).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+        calledCell = '<span style="color:var(--accent)">' + cd + '</span>' +
+          (r._callCount > 1 ? ' <span style="font-size:11px;color:var(--muted)">×' + r._callCount + '</span>' : '');
+      } else {
+        calledCell = '<span style="color:var(--muted)">—</span>';
+      }
       return '<tr>' +
         '<td>' + r.date + '</td>' +
         '<td style="font-weight:700">' + r.resident + '</td>' +
@@ -1442,6 +1455,7 @@
         '<td style="font-weight:800;color:var(--accent);font-size:16px;text-align:center">' + r.cell + '</td>' +
         '<td style="font-family:monospace;font-size:11px;color:var(--accent);text-align:center">' + r.barcode + '</td>' +
         '<td>' + r.courier + '</td>' +
+        '<td>' + calledCell + '</td>' +
         '<td style="color:' + statusColor + ';font-weight:700">' + r.status + '</td>' +
         '</tr>';
     }).join('');
@@ -1451,7 +1465,8 @@
     var q      = (document.getElementById('hist-search')       || {}).value || '';
     var status = (document.getElementById('hist-status-filter') || {}).value || '';
     var rows   = _histAllRows.filter(function(r) {
-      var matchText   = !q      || (r.date + r.resident + r.phone + r.cell + r.barcode + r.courier + r.status).toLowerCase().includes(q.toLowerCase());
+      var calledStr = r._callTs ? new Date(r._callTs*1000).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+      var matchText   = !q      || (r.date + r.resident + r.phone + r.cell + r.barcode + r.courier + calledStr + r.status).toLowerCase().includes(q.toLowerCase());
       var matchStatus = !status || r.status.indexOf(status) !== -1;
       return matchText && matchStatus;
     });
@@ -1464,8 +1479,9 @@
         case 2: av = a.phone;    bv = b.phone;    break;
         case 3: av = parseInt(a.cell)||0; bv = parseInt(b.cell)||0; return (av - bv) * histSortDir;
         case 4: av = a.barcode;  bv = b.barcode;  break;
-        case 5: av = a.courier;  bv = b.courier;  break;
-        case 6: av = a.status;   bv = b.status;   break;
+        case 5: av = a.courier;   bv = b.courier;   break;
+        case 6: av = a._callTs||0; bv = b._callTs||0; return (av - bv) * histSortDir;
+        case 7: av = a.status;    bv = b.status;    break;
         default: return 0;
       }
       return String(av).localeCompare(String(bv), 'he') * histSortDir;
@@ -2188,6 +2204,15 @@ function buildLockerGrid() {
           res.style.cssText = 'font-size:' + NAME_SIZE + 'px;color:#fff;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1;direction:rtl;flex-shrink:0;text-align:center;word-spacing:2px;font-weight:600;';
           res.textContent = pkg.resident;
           cell.appendChild(res);
+        }
+
+        // ── ROW 2b: phone call indicator ──
+        if (pkg && isOccupied && pkg.lastCalledAt) {
+          const calledEl = document.createElement('div');
+          const calledTime = new Date(pkg.lastCalledAt * 1000).toLocaleString('he-IL',{hour:'2-digit',minute:'2-digit'});
+          calledEl.style.cssText = 'font-size:8px;color:rgba(255,255,255,0.75);line-height:1;text-align:center;flex-shrink:0;';
+          calledEl.textContent = '📞 ' + calledTime + (pkg.callCount > 1 ? ' ×' + pkg.callCount : '');
+          cell.appendChild(calledEl);
         }
 
         // ── ROW 3: lock code — centered below name ──
@@ -3345,6 +3370,7 @@ window.addEventListener('message', function(e) {
             '</div>' +
           '</td>' +
           '<td id="ttime-'+num+'" style="font-size:11px;color:var(--muted);text-align:center;white-space:nowrap">'+escHtml(pkg.time||'—')+'</td>' +
+          '<td style="font-size:11px;text-align:center;white-space:nowrap">'+(pkg.lastCalledAt ? '<span style="color:var(--accent)">'+new Date(pkg.lastCalledAt*1000).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</span>'+(pkg.callCount>1?' <span style="color:var(--muted)">×'+pkg.callCount+'</span>':'') : '<span style="color:var(--muted)">—</span>')+'</td>' +
           '<td id="tdays-'+num+'" style="text-align:center">'+daysBadge(pkg.days||0)+'</td>' +
           '<td class="col-hide-mobile" style="text-align:center;font-size:11px;color:var(--muted)" id="thousenum-'+num+'">'+escHtml(resObj.house_number||'—')+'</td>' +
           '<td class="col-hide-mobile" style="font-size:11px;color:var(--muted)" id="taltname-'+num+'">'+escHtml(resObj.alt_name||'—')+'</td>' +
@@ -3365,6 +3391,7 @@ window.addEventListener('message', function(e) {
           '</td>' +
           '<td style="text-align:center;color:var(--muted)">—</td>' +
           '<td style="text-align:center;color:var(--muted)">—</td>' +
+          '<td style="text-align:center;color:var(--muted)">—</td>' +
           '<td class="col-hide-mobile" style="text-align:center;font-size:11px;color:var(--muted)" id="thousenum-'+num+'">—</td>' +
           '<td class="col-hide-mobile" style="font-size:11px;color:var(--muted)" id="taltname-'+num+'">—</td>' +
           '</tr>';
@@ -3382,7 +3409,7 @@ window.addEventListener('message', function(e) {
       '<thead><tr>' +
         '<th style="text-align:center"><input type="checkbox" id="tbl-chk-all" '+masterChk+' onchange="tableToggleAll(this.checked)"></th>' +
         '<th style="text-align:center">תא</th><th>דייר</th><th>נייד</th><th class="col-hide-mobile">ת"ז</th><th>ברקוד</th>' +
-        '<th style="text-align:center">פתיחה אחרונה</th><th style="text-align:center">ימים</th>' +
+        '<th style="text-align:center">הוכנסה</th><th style="text-align:center">התקשר</th><th style="text-align:center">ימים</th>' +
         '<th class="col-hide-mobile" style="text-align:center">מס\' בית</th><th class="col-hide-mobile">איש קשר נוסף</th>' +
       '</tr></thead>' +
       '<tbody>'+rows+'</tbody></table></div>';
