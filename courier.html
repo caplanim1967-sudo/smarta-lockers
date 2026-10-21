@@ -2588,7 +2588,8 @@
       cell_number: _dep.cellNumber,
       resident_id: _dep.residentId,
       barcodes:    _dep.barcodes,
-      lock_code:   _dep.lockCode || null
+      lock_code:   _dep.lockCode || null,
+      company_id:  _dep.companyId || null
     }).then(function(data) {
       if (!data) return;
       if (data.error) { showToast(data.error, 'var(--red)'); return; }
