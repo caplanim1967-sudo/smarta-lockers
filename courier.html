@@ -330,8 +330,8 @@
     <div class="login-sub">מערכת הפקדת חבילות</div>
     <div class="login-title">כניסה לשליח</div>
     <div class="login-field">
-      <label>שם משתמש (ח.פ חברה)</label>
-      <input type="text" id="login-user" inputmode="text" autocomplete="username" placeholder="שם משתמש">
+      <label>שם משתמש / מספר טלפון</label>
+      <input type="text" id="login-user" inputmode="text" autocomplete="username" placeholder="ח.פ חברה או 05XXXXXXXX">
     </div>
     <div class="login-field">
       <label>סיסמה</label>
@@ -678,8 +678,8 @@
     </div>
     <input type="hidden" id="c-username">
     <div style="margin-bottom:14px">
-      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">טלפון נייד * <span style="font-size:11px;font-weight:400">(משמש גם כשם משתמש לכניסה)</span></label>
-      <input id="c-phone" type="tel" dir="ltr" placeholder="05XXXXXXXX" oninput="document.getElementById('c-username').value=this.value.replace(/[-\s]/g,'')" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);font-family:Heebo,sans-serif;outline:none;text-align:right">
+      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">טלפון נייד * <span style="font-size:11px;font-weight:400">(משמש לכניסה לאפליקציה)</span></label>
+      <input id="c-phone" type="tel" dir="ltr" placeholder="05XXXXXXXX" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);font-family:Heebo,sans-serif;outline:none;text-align:right">
     </div>
     <div id="c-new-password-hint" style="background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--accent);margin-bottom:16px">
       🔑 סיסמה זמנית: <strong>Smarta2026!</strong> — השליח יתבקש לשנות בכניסה הראשונה
@@ -947,7 +947,7 @@
     // iframe (smarta-all-v2): redirect ל-login.html
     var isIframe = (window.parent !== window);
     if (isIframe) {
-      try { window.parent.location.href = "./login.html"; } catch(e) { window.location.href = "./login.html"; }
+      window.parent.postMessage({ type: 'smarta-logout' }, '*');
     } else {
       document.getElementById('login-screen').style.display = 'flex';
       document.getElementById('app-screen').style.display  = 'none';
@@ -1086,14 +1086,13 @@
   function goBack() {
     try { window.parent.postMessage({ type: 'smarta-logout' }, '*'); } catch(e) {}
     setTimeout(function() {
-      try { window.parent.location.href = './login.html'; } catch(e) {}
+      try { window.parent.postMessage({ type: 'smarta-logout' }, '*'); } catch(e) {}
     }, 150);
   }
 
   function doLogout() {
     sessionStorage.clear();
-    try { window.parent.postMessage({ type: 'smarta-logout' }, '*'); }
-    catch(e) { window.location.href = './login.html'; }
+    window.parent.postMessage({ type: 'smarta-logout' }, '*');
   }
 
   function showScreen(name, el) {
@@ -1567,7 +1566,6 @@
 
       if (!first)    { errEl.textContent = 'שם פרטי הוא שדה חובה';    errEl.style.display = 'block'; return; }
       if (!last)     { errEl.textContent = 'שם משפחה הוא שדה חובה';   errEl.style.display = 'block'; return; }
-      if (!editingCourierId && !username) { errEl.textContent = 'שם משתמש הוא שדה חובה'; errEl.style.display = 'block'; return; }
       if (!phone)    { errEl.textContent = 'מספר טלפון הוא שדה חובה'; errEl.style.display = 'block'; return; }
       var cleanPhone = phone.replace(/[-\s]/g, '');
       if (!/^05\d{8}$/.test(cleanPhone)) {
@@ -1593,7 +1591,7 @@
         var body = { first_name: first, last_name: last, phone: phone || null, active: isActive };
         req = _apiPut('/api/courier-companies/' + companyId + '/users/' + wasEditing, body);
       } else {
-        var body = { first_name: first, last_name: last, username: username, phone: phone || null, role: 'courier' };
+        var body = { first_name: first, last_name: last, phone: phone || null, role: 'courier' };
         req = _apiPost('/api/courier-companies/' + companyId + '/users', body);
       }
 
