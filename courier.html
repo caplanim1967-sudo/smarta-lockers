@@ -2398,7 +2398,8 @@
       locker_id: _dep.lockerId,
       resident_id: _dep.residentId,
       current_cell_number: _dep.cellNumber,
-      current_volume: _dep.cellVolume
+      current_volume: _dep.cellVolume,
+      company_id: _dep.companyId || null
     }).then(function(data) {
       if (!data) return;
       if (data.no_cells) { depStep('nocells'); document.getElementById('dep-nocells-phone').textContent = _dep.residentPhone || ''; return; }
