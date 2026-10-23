@@ -330,8 +330,8 @@
     <div class="login-sub">מערכת הפקדת חבילות</div>
     <div class="login-title">כניסה לשליח</div>
     <div class="login-field">
-      <label>שם משתמש (ח.פ חברה)</label>
-      <input type="text" id="login-user" inputmode="text" autocomplete="username" placeholder="שם משתמש">
+      <label>שם משתמש / מספר טלפון</label>
+      <input type="text" id="login-user" inputmode="text" autocomplete="username" placeholder="ח.פ חברה או 05XXXXXXXX">
     </div>
     <div class="login-field">
       <label>סיסמה</label>
@@ -489,7 +489,7 @@
         <div class="card-title" style="justify-content:space-between">
           <span>📋 דוח חודשי מסכם</span>
           <div style="display:flex;gap:8px;align-items:center">
-            <select id="report-month" style="font-size:12px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;font-family:Heebo,sans-serif">
+            <select id="report-month" onchange="loadReport()" style="font-size:12px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;font-family:Heebo,sans-serif">
               <option>טוען...</option>
             </select>
             <select id="report-village" style="font-size:12px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;font-family:Heebo,sans-serif">
@@ -503,23 +503,23 @@
         <div class="summary-grid" style="grid-template-columns:repeat(4,1fr)">
           <div class="summary-item">
             <div class="s-label">סה"כ חבילות</div>
-            <div class="s-val" style="color:var(--accent)">147</div>
+            <div class="s-val" id="report-total" style="color:var(--accent)">—</div>
             <div class="s-sub">החודש</div>
           </div>
           <div class="summary-item">
             <div class="s-label">נמסרו בהצלחה</div>
-            <div class="s-val" style="color:var(--green)">131</div>
-            <div class="s-sub">89%</div>
+            <div class="s-val" id="report-delivered" style="color:var(--green)">—</div>
+            <div class="s-sub" id="report-delivered-pct"></div>
           </div>
           <div class="summary-item">
             <div class="s-label">לא נאספו</div>
-            <div class="s-val" style="color:var(--red)">4</div>
-            <div class="s-sub">קנס פוטנציאלי</div>
+            <div class="s-val" id="report-not-collected" style="color:var(--red)">—</div>
+            <div class="s-sub" id="report-fines-total" style="color:var(--red)"></div>
           </div>
           <div class="summary-item">
             <div class="s-label">סה"כ לחיוב</div>
-            <div class="s-val" style="color:var(--yellow)">₪0</div>
-            <div class="s-sub">לפני קנסות</div>
+            <div class="s-val" id="report-billing" style="color:var(--yellow)">—</div>
+            <div class="s-sub">כולל קנסות</div>
           </div>
         </div>
 
@@ -537,6 +537,13 @@
             </tbody>
           </table>
         </div>
+
+        <!-- הגדרות תמחור — מנהל קהילה בלבד -->
+        <div id="report-settings-panel" style="display:none;margin-top:18px;padding:16px;background:var(--surface2);border-radius:12px;border:1px solid var(--border)">
+          <div style="font-size:13px;font-weight:700;margin-bottom:14px;color:var(--text)">⚙️ הגדרות תמחור וקנסות — חברה זו בישוב שלי</div>
+          <div id="report-settings-rows" style="display:flex;flex-direction:column;gap:12px"></div>
+          <div id="report-settings-err" style="display:none;color:var(--red);font-size:12px;margin-top:8px"></div>
+        </div>
       </div>
     </div>
 
@@ -552,7 +559,7 @@
           ⚠️ קנס מוטל על חבילות שלא נאספו תוך 5 ימי עסקים. מחיר קנס: ₪70 לחבילה.
         </div>
         <div class="filter-row">
-          <select id="fines-month">
+          <select id="fines-month" onchange="loadFines()">
             <option>טוען...</option>
           </select>
           <select>
@@ -565,17 +572,14 @@
             <thead><tr>
               <th>תאריך הנחה</th><th>ישוב</th><th>תא</th><th>ברקוד</th><th>ימי המתנה</th><th>סכום קנס</th><th>סטטוס קנס</th>
             </tr></thead>
-            <tbody>
-              <tr><td>10/03/26</td><td>נחל עוז</td><td>11</td><td>IL654321789</td><td>5</td><td style="color:var(--red);font-weight:700">₪70</td><td><span class="badge badge-yellow">ממתין</span></td></tr>
-              <tr><td>09/03/26</td><td>בארי</td><td>14</td><td>IL444555666</td><td>7</td><td style="color:var(--red);font-weight:700">₪70</td><td><span class="badge badge-yellow">ממתין</span></td></tr>
-              <tr><td>05/03/26</td><td>בארי</td><td>9</td><td>IL777888999</td><td>6</td><td style="color:var(--red);font-weight:700">₪70</td><td><span class="badge badge-green">שולם</span></td></tr>
-              <tr><td>03/03/26</td><td>ניר עוז</td><td>4</td><td>IL000111222</td><td>8</td><td style="color:var(--red);font-weight:700">₪70</td><td><span class="badge badge-yellow">ממתין</span></td></tr>
+            <tbody id="fines-tbody">
+              <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">בחר חודש לטעינת נתונים</td></tr>
             </tbody>
           </table>
         </div>
         <div style="margin-top:16px;padding:14px 16px;background:var(--surface2);border-radius:10px;display:flex;justify-content:space-between;align-items:center">
           <span style="font-size:13px;color:var(--muted)">סה"כ קנסות פתוחים</span>
-          <span style="font-size:20px;font-weight:800;color:var(--red)">₪210</span>
+          <span id="fines-total" style="font-size:20px;font-weight:800;color:var(--red)">—</span>
         </div>
       </div>
     </div>
@@ -678,8 +682,8 @@
     </div>
     <input type="hidden" id="c-username">
     <div style="margin-bottom:14px">
-      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">טלפון נייד * <span style="font-size:11px;font-weight:400">(משמש גם כשם משתמש לכניסה)</span></label>
-      <input id="c-phone" type="tel" dir="ltr" placeholder="05XXXXXXXX" oninput="document.getElementById('c-username').value=this.value.replace(/[-\s]/g,'')" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);font-family:Heebo,sans-serif;outline:none;text-align:right">
+      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px">טלפון נייד * <span style="font-size:11px;font-weight:400">(משמש לכניסה לאפליקציה)</span></label>
+      <input id="c-phone" type="tel" dir="ltr" placeholder="05XXXXXXXX" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);font-family:Heebo,sans-serif;outline:none;text-align:right">
     </div>
     <div id="c-new-password-hint" style="background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--accent);margin-bottom:16px">
       🔑 סיסמה זמנית: <strong>Smarta2026!</strong> — השליח יתבקש לשנות בכניסה הראשונה
@@ -1566,7 +1570,6 @@
 
       if (!first)    { errEl.textContent = 'שם פרטי הוא שדה חובה';    errEl.style.display = 'block'; return; }
       if (!last)     { errEl.textContent = 'שם משפחה הוא שדה חובה';   errEl.style.display = 'block'; return; }
-      if (!editingCourierId && !username) { errEl.textContent = 'שם משתמש הוא שדה חובה'; errEl.style.display = 'block'; return; }
       if (!phone)    { errEl.textContent = 'מספר טלפון הוא שדה חובה'; errEl.style.display = 'block'; return; }
       var cleanPhone = phone.replace(/[-\s]/g, '');
       if (!/^05\d{8}$/.test(cleanPhone)) {
@@ -1592,7 +1595,7 @@
         var body = { first_name: first, last_name: last, phone: phone || null, active: isActive };
         req = _apiPut('/api/courier-companies/' + companyId + '/users/' + wasEditing, body);
       } else {
-        var body = { first_name: first, last_name: last, username: username, phone: phone || null, role: 'courier' };
+        var body = { first_name: first, last_name: last, phone: phone || null, role: 'courier' };
         req = _apiPost('/api/courier-companies/' + companyId + '/users', body);
       }
 
@@ -1752,6 +1755,146 @@
     document.getElementById('pkg-count').textContent = 'מציג ' + rows.length + ' רשומות';
   }
 
+  // ──── דוח חודשי ─────────────────────────────────────────
+  function loadReport() {
+    var companyId = _myCompanyId();
+    if (!companyId) return;
+    var month = (document.getElementById('report-month') || {}).value || '';
+    var tbody = document.querySelector('#screen-report tbody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">טוען...</td></tr>';
+    _apiGet('/api/courier-companies/' + companyId + '/report?month=' + month).then(function(rows) {
+      rows = Array.isArray(rows) ? rows : [];
+      var totalPkgs = 0, totalDelivered = 0, totalWaiting = 0, totalFines = 0, totalBilling = 0;
+      var setEl = function(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; };
+
+      // עדכן village dropdown
+      var villageEl = document.getElementById('report-village');
+      if (villageEl) {
+        var prev = villageEl.value;
+        villageEl.innerHTML = '<option value="">כל הישובים</option>' +
+          rows.map(function(r) { return '<option value="' + _esc(r.community_id) + '">' + _esc(r.community_name || r.community_id) + '</option>'; }).join('');
+        if (prev && rows.find(function(r){ return r.community_id === prev; })) villageEl.value = prev;
+      }
+
+      if (!rows.length) {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:32px">אין נתונים לחודש זה</td></tr>';
+        ['report-total','report-delivered','report-not-collected','report-billing'].forEach(function(id){ setEl(id, '0'); });
+        setEl('report-delivered-pct', '');
+        setEl('report-fines-total', '');
+        return;
+      }
+
+      if (tbody) tbody.innerHTML = rows.map(function(r) {
+        var notCollected = (r.total || 0) - (r.delivered || 0);
+        var fineTotal    = r.fines_enabled ? ((r.fined || 0) * (r.fine_amount || 70)) : 0;
+        var unitPrice    = r.price_per_delivery || 0;
+        var billing      = (r.total || 0) * unitPrice + fineTotal;
+        totalPkgs      += (r.total || 0);
+        totalDelivered += (r.delivered || 0);
+        totalWaiting   += notCollected;
+        totalFines     += fineTotal;
+        totalBilling   += billing;
+        return '<tr>' +
+          '<td>' + _esc(r.community_name || '—') + '</td>' +
+          '<td style="text-align:center">' + (r.total || 0) + '</td>' +
+          '<td style="text-align:center;color:var(--green)">' + (r.delivered || 0) + '</td>' +
+          '<td style="text-align:center;color:var(--red)">' + notCollected + '</td>' +
+          '<td style="text-align:center">₪' + unitPrice + '</td>' +
+          '<td style="text-align:center;font-weight:700">₪' + ((r.total || 0) * unitPrice) + '</td>' +
+          '<td style="text-align:center;color:' + (fineTotal ? 'var(--red)' : 'var(--muted)') + '">₪' + fineTotal + '</td>' +
+          '<td style="text-align:center;font-weight:800;color:var(--accent)">₪' + billing + '</td>' +
+          '<td style="text-align:center"><span class="badge badge-yellow">ממתין</span></td>' +
+          '</tr>';
+      }).join('');
+
+      var pct = totalPkgs ? Math.round(totalDelivered / totalPkgs * 100) : 0;
+      setEl('report-total',         totalPkgs);
+      setEl('report-delivered',     totalDelivered);
+      setEl('report-delivered-pct', pct + '%');
+      setEl('report-not-collected', totalWaiting);
+      setEl('report-fines-total',   totalFines ? '₪' + totalFines + ' קנסות' : '');
+      setEl('report-billing',       '₪' + totalBilling);
+      // פאנל הגדרות — מנהל קהילה בלבד
+      var _rUser = JSON.parse(sessionStorage.getItem('courier_user') || sessionStorage.getItem('smarta_user') || 'null');
+      var settingsPanel = document.getElementById('report-settings-panel');
+      if (settingsPanel && _rUser && _rUser.role === 'community_manager') {
+        settingsPanel.style.display = 'block';
+        var settingsRows = document.getElementById('report-settings-rows');
+        if (settingsRows) {
+          settingsRows.innerHTML = rows.map(function(r) {
+            return '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px;background:var(--surface);border-radius:8px">' +
+              '<span style="font-weight:600;font-size:13px;min-width:100px">' + _esc(r.community_name || r.community_id) + '</span>' +
+              '<label style="font-size:12px;color:var(--muted)">מחיר ליחידה ₪<input type="number" min="0" value="' + (r.price_per_delivery||0) + '" data-cid="' + _esc(r.community_id) + '" data-coid="' + companyId + '" data-field="price_per_delivery" style="width:70px;margin-right:4px;padding:4px 7px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:inherit"></label>' +
+              '<label style="font-size:12px;color:var(--muted)">קנס ₪<input type="number" min="0" value="' + (r.fine_amount||70) + '" data-cid="' + _esc(r.community_id) + '" data-coid="' + companyId + '" data-field="fine_amount" style="width:70px;margin-right:4px;padding:4px 7px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:inherit"></label>' +
+              '<label style="font-size:12px;color:var(--muted)">ימים עד קנס<input type="number" min="1" max="30" value="' + (r.fine_days||5) + '" data-cid="' + _esc(r.community_id) + '" data-coid="' + companyId + '" data-field="fine_days" style="width:55px;margin-right:4px;padding:4px 7px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:inherit"></label>' +
+              '<label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px"><input type="checkbox" data-cid="' + _esc(r.community_id) + '" data-coid="' + companyId + '" data-field="fines_enabled"' + (r.fines_enabled ? ' checked' : '') + '> קנסות פעילות</label>' +
+              '<button onclick="saveReportSettings(\'' + _esc(r.community_id) + '\',\'' + companyId + '\')" style="padding:5px 14px;border-radius:7px;border:none;background:var(--accent);color:#fff;font-size:12px;cursor:pointer;font-family:Heebo,sans-serif">שמור</button>' +
+            '</div>';
+          }).join('');
+        }
+      } else if (settingsPanel) {
+        settingsPanel.style.display = 'none';
+      }
+    }).catch(function() {
+      if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--red);padding:24px">שגיאה בטעינת הנתונים</td></tr>';
+    });
+  }
+
+  function saveReportSettings(communityId, companyId) {
+    var inputs   = document.querySelectorAll('[data-cid="' + communityId + '"][data-coid="' + companyId + '"]');
+    var errEl    = document.getElementById('report-settings-err');
+    var body     = { community_id: communityId };
+    inputs.forEach(function(inp) {
+      var f = inp.getAttribute('data-field');
+      if (inp.type === 'checkbox') body[f] = inp.checked;
+      else body[f] = Number(inp.value) || 0;
+    });
+    _apiPut('/api/courier-companies/' + companyId + '/settings', body).then(function(res) {
+      if (res && res.error) { if (errEl) { errEl.textContent = res.error; errEl.style.display = 'block'; } return; }
+      if (errEl) errEl.style.display = 'none';
+      showToast('הגדרות נשמרו ✓');
+      loadReport();
+      loadFines();
+    }).catch(function() { if (errEl) { errEl.textContent = 'שגיאת תקשורת'; errEl.style.display = 'block'; } });
+  }
+
+  // ──── קנסות ─────────────────────────────────────────────
+  function loadFines() {
+    var companyId = _myCompanyId();
+    if (!companyId) return;
+    var month  = (document.getElementById('fines-month') || {}).value || '';
+    var tbody  = document.getElementById('fines-tbody');
+    var totEl  = document.getElementById('fines-total');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">טוען...</td></tr>';
+    _apiGet('/api/courier-companies/' + companyId + '/fines?month=' + month).then(function(rows) {
+      rows = Array.isArray(rows) ? rows : [];
+      if (!rows.length) {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px">אין קנסות לחודש זה</td></tr>';
+        if (totEl) totEl.textContent = '₪0';
+        return;
+      }
+      var grandTotal = 0;
+      if (tbody) tbody.innerHTML = rows.map(function(r) {
+        grandTotal += (r.fine_amount || 70);
+        var dateStr = r.assigned_at
+          ? new Date(r.assigned_at * 1000).toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit',year:'2-digit'})
+          : '—';
+        return '<tr>' +
+          '<td>' + dateStr + '</td>' +
+          '<td>' + _esc(r.community_name || '—') + '</td>' +
+          '<td style="text-align:center;font-weight:700">' + _esc(r.cell_id || '—') + '</td>' +
+          '<td style="font-family:monospace;font-size:11px">' + _esc(r.barcode || '—') + '</td>' +
+          '<td style="text-align:center">' + (r.days_waiting || 0) + '</td>' +
+          '<td style="color:var(--red);font-weight:700">₪' + (r.fine_amount || 70) + '</td>' +
+          '<td><span class="badge badge-yellow">ממתין</span></td>' +
+          '</tr>';
+      }).join('');
+      if (totEl) totEl.textContent = '₪' + grandTotal;
+    }).catch(function() {
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:24px">שגיאה בטעינת הנתונים</td></tr>';
+    });
+  }
+
   // ──── מנהלי שילוח נוספים ────────────────────────────────
   function loadManagers() {
     var tbody = document.getElementById('managers-tbody');
@@ -1905,6 +2048,8 @@
     if (name === 'couriers') loadCouriers();
     if (name === 'managers') loadManagers();
     if (name === 'packages') loadPackagesReport();
+    if (name === 'report')   loadReport();
+    if (name === 'fines')    loadFines();
     // deposit: אין reset אוטומטי — _startDepositFlow מכין את ה-state לפני showScreen
   };
 
@@ -2399,7 +2544,8 @@
       locker_id: _dep.lockerId,
       resident_id: _dep.residentId,
       current_cell_number: _dep.cellNumber,
-      current_volume: _dep.cellVolume
+      current_volume: _dep.cellVolume,
+      company_id: _dep.companyId || null
     }).then(function(data) {
       if (!data) return;
       if (data.no_cells) { depStep('nocells'); document.getElementById('dep-nocells-phone').textContent = _dep.residentPhone || ''; return; }
@@ -2589,7 +2735,8 @@
       cell_number: _dep.cellNumber,
       resident_id: _dep.residentId,
       barcodes:    _dep.barcodes,
-      lock_code:   _dep.lockCode || null
+      lock_code:   _dep.lockCode || null,
+      company_id:  _dep.companyId || null
     }).then(function(data) {
       if (!data) return;
       if (data.error) { showToast(data.error, 'var(--red)'); return; }

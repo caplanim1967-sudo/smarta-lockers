@@ -234,6 +234,10 @@ async function runReminders(env) {
     LEFT JOIN locker_configs lc ON lc.community_id = p.community_id
     WHERE p.status NOT IN ('collected','confirmed')
       AND r.phone IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM package_audit_log
+        WHERE package_id = p.id AND action = 'called'
+      )
   `).all();
 
   const cache = {};
@@ -355,11 +359,19 @@ export default {
         if (!b.password || b.password.length < 8) return err('סיסמה חייבת להכיל לפחות 8 תווים');
         const newHash = await sha256hex(b.password);
         // מניעת שימוש חוזר בסיסמה הקיימת
-        const cur = await env.smarta_db.prepare('SELECT password_hash FROM users WHERE id = ?').bind(authUser.sub).first();
+        const cur = await env.smarta_db.prepare('SELECT password_hash, phone, role FROM users WHERE id = ?').bind(authUser.sub).first();
         if (cur && cur.password_hash === newHash) return err('לא ניתן לבחור את הסיסמה הקיימת — יש לבחור סיסמה חדשה');
-        await env.smarta_db.prepare(
-          'UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?'
-        ).bind(newHash, nowSec(), authUser.sub).run();
+        const now = nowSec();
+        // שליח: סנכרן סיסמה לכל חשבונות אותו טלפון (כמה חברות)
+        if (cur && cur.phone && (cur.role === 'courier' || cur.role === 'courier_manager')) {
+          await env.smarta_db.prepare(
+            `UPDATE users SET password_hash = ?, password_changed_at = ? WHERE phone = ? AND role IN ('courier','courier_manager')`
+          ).bind(newHash, now, cur.phone).run();
+        } else {
+          await env.smarta_db.prepare(
+            'UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?'
+          ).bind(newHash, now, authUser.sub).run();
+        }
         return ok({ changed: true });
       }
 
@@ -646,11 +658,12 @@ export default {
         const cells = [...new Set(allPkgs.map(p => parseInt(p.cell_id)).filter(Boolean))].sort((a,b) => a-b);
         const names = matchedResidents.map(r => `${r.first_name} ${r.last_name}`).join(', ');
         console.log(`[OPEN] ${names} ← תאים: [${cells.join(',')}] בלוקר ${lockerId}`);
+
         // רשום שיחה ב-audit log — לא חוסם פתיחה אם נכשל
+        const ts = nowSec();
         try {
           await ensurePackageAuditTable(env.smarta_db);
           const callerDesc = `${names} (${callerPhone})`;
-          const ts = nowSec();
           await Promise.all(allPkgs.map(pkg =>
             env.smarta_db.prepare(
               'INSERT INTO package_audit_log (id, package_id, community_id, action, changed_by, created_at) VALUES (?,?,?,?,?,?)'
@@ -714,9 +727,17 @@ async function handleSetup(request, env) {
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
 
+const PASSWORD_MAX_AGE_SEC = 180 * 86400; // 6 חודשים
+const PASSWORD_EPOCH = 1792454400; // 20/10/2026 — תחילת מדיניות חצי שנה
+function needsPasswordChange(passwordChangedAt) {
+  if (!passwordChangedAt) return true;
+  const effective = Math.max(passwordChangedAt, PASSWORD_EPOCH);
+  return (nowSec() - effective) > PASSWORD_MAX_AGE_SEC;
+}
+
 // עוזר: בנה payload + token לuser+company ספציפיים
 async function _buildCourierToken(u, cc, env) {
-  const mustChange = u.password_changed_at === null;
+  const mustChange = needsPasswordChange(u.password_changed_at);
   const payload = {
     sub:                u.id,
     role:               u.role,
@@ -734,7 +755,7 @@ async function _buildCourierToken(u, cc, env) {
 
 // עוזר: בנה token אחד עם כל חברות השילוח של השליח
 async function _buildMultiCourierToken(u, companiesList, env) {
-  const mustChange = u.password_changed_at === null;
+  const mustChange = needsPasswordChange(u.password_changed_at);
   const payload = {
     sub:                  u.id,
     role:                 u.role,
@@ -756,14 +777,25 @@ async function handleLogin(request, env) {
 
   const db = env.smarta_db;
 
-  // חיפוש לפי username קודם, אחר כך לפי phone
+  const hash = await sha256hex(password);
+
+  // חיפוש לפי username קודם
   let user = await db.prepare('SELECT * FROM users WHERE username = ? AND active = 1').bind(username).first();
-  if (!user) user = await db.prepare('SELECT * FROM users WHERE phone = ? AND active = 1').bind(username).first();
+
+  // fallback: חיפוש לפי טלפון — מחזיר את החשבון עם הסיסמה הנכונה
+  if (!user || user.password_hash !== hash) {
+    const cleanInput = username.replace(/[-\s]/g, '');
+    if (/^05\d{8}$/.test(cleanInput)) {
+      const { results: byPhone } = await db.prepare(
+        `SELECT * FROM users WHERE phone = ? AND active = 1 AND role IN ('courier','courier_manager')`
+      ).bind(cleanInput).all();
+      const matched = byPhone.find(u => u.password_hash === hash);
+      if (matched) user = matched;
+    }
+  }
 
   if (!user) return json({ error: 'שם משתמש או סיסמה שגויים' }, 401);
-
-  const hash = await sha256hex(password);
-  if (hash !== user.password_hash) return json({ error: 'שם משתמש או סיסמה שגויים' }, 401);
+  if (user.password_hash !== hash) return json({ error: 'שם משתמש או סיסמה שגויים' }, 401);
 
   // ── שליח / מנהל שילוח: בדוק אם שייך למספר חברות ──────────────
   const isCourierRole = user.role === 'courier' || user.role === 'courier_manager';
@@ -843,7 +875,7 @@ async function handleLogin(request, env) {
     try { features = JSON.parse(s?.features_json || '{}'); } catch(e) { features = {}; }
   }
 
-  const mustChangePassword = user.password_changed_at === null;
+  const mustChangePassword = needsPasswordChange(user.password_changed_at);
 
   const payload = {
     sub:                  user.id,
@@ -1308,6 +1340,18 @@ async function ensurePackageAuditTable(db) {
   )`).run();
 }
 
+async function ensureCCASettings(db) {
+  const cols = [
+    'price_per_delivery INTEGER DEFAULT 0',
+    'fines_enabled INTEGER DEFAULT 0',
+    'fine_amount INTEGER DEFAULT 70',
+    'fine_days INTEGER DEFAULT 5',
+  ];
+  for (const col of cols) {
+    try { await db.prepare(`ALTER TABLE courier_company_access ADD COLUMN ${col}`).run(); } catch {}
+  }
+}
+
 async function getUnavailableNums(db, communityId) {
   const [{ results: pkgs }, { results: faults }] = await Promise.all([
     db.prepare(`SELECT cell_id FROM packages WHERE community_id = ? AND status != 'collected'`).bind(communityId).all(),
@@ -1533,10 +1577,21 @@ async function handleCommunity(path, method, request, env, user, url) {
       FROM packages p
         LEFT JOIN residents r ON p.resident_id = r.id
         LEFT JOIN settlements s ON p.community_id = s.id`;
-    const { results } = communityId
-      ? await db.prepare(pkgSelect + ` WHERE p.community_id = ? AND p.status = 'collected' ORDER BY p.collected_at DESC LIMIT 500`).bind(communityId).all()
-      : await db.prepare(pkgSelect + ` WHERE p.status = 'collected' ORDER BY p.collected_at DESC LIMIT 500`).all();
-    return ok(results);
+    let histResults;
+    if (user.courier_company_id) {
+      // courier_manager — רק חבילות של החברה שלו
+      const q = communityId
+        ? pkgSelect + ` WHERE p.community_id = ? AND p.courier_company_id = ? AND p.status = 'collected' ORDER BY p.collected_at DESC LIMIT 500`
+        : pkgSelect + ` WHERE p.courier_company_id = ? AND p.status = 'collected' ORDER BY p.collected_at DESC LIMIT 500`;
+      histResults = communityId
+        ? (await db.prepare(q).bind(communityId, user.courier_company_id).all()).results
+        : (await db.prepare(q).bind(user.courier_company_id).all()).results;
+    } else {
+      histResults = communityId
+        ? (await db.prepare(pkgSelect + ` WHERE p.community_id = ? AND p.status = 'collected' ORDER BY p.collected_at DESC LIMIT 500`).bind(communityId).all()).results
+        : (await db.prepare(pkgSelect + ` WHERE p.status = 'collected' ORDER BY p.collected_at DESC LIMIT 500`).all()).results;
+    }
+    return ok(histResults);
   }
 
   if (path === '/api/packages') {
@@ -1558,6 +1613,7 @@ async function handleCommunity(path, method, request, env, user, url) {
       const params = [status];
       if (communityId) { where += ' AND p.community_id = ?'; params.push(communityId); }
       if (cellId)       { where += ' AND p.cell_id = ?'; params.push(String(cellId)); }
+      if (user.courier_company_id) { where += ' AND p.courier_company_id = ?'; params.push(user.courier_company_id); }
       const { results } = await db.prepare(pkgSelect + where + ' ORDER BY p.assigned_at DESC').bind(...params).all();
       return ok(results);
     }
@@ -1566,10 +1622,10 @@ async function handleCommunity(path, method, request, env, user, url) {
       if (!b.cell_id) return err('cell_id חובה');
       const id = newId();
       await db.prepare(`
-        INSERT INTO packages (id, community_id, resident_id, cell_id, barcode, courier, status, lock_code, notes, assigned_at)
-        VALUES (?, ?, ?, ?, ?, ?, 'waiting', ?, ?, ?)
+        INSERT INTO packages (id, community_id, resident_id, cell_id, barcode, courier, courier_company_id, status, lock_code, notes, assigned_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'waiting', ?, ?, ?)
       `).bind(id, communityId, b.resident_id || null, b.cell_id,
-        b.barcode || null, b.courier || 'דואר ישראל',
+        b.barcode || null, b.courier || 'דואר ישראל', user.courier_company_id || null,
         b.lock_code || null, b.notes || null, nowSec()).run();
 
       await ensurePackageAuditTable(db);
@@ -2011,15 +2067,14 @@ async function handleCommunity(path, method, request, env, user, url) {
       ).bind(newId(), companyId_cc, communityId, user.sub, nowSec()).run();
     }
 
-    // יצירת מנהל ראשי של החברה (רק לחברה חדשה)
+    // יצירת מנהל ראשי של החברה (רק לחברה חדשה) — שם המשתמש = ח.פ
     let managerCreated = false;
-    if (isNew && b.manager_username && b.manager_first_name) {
-      const mgExisting = await db.prepare('SELECT id FROM users WHERE username = ?').bind(b.manager_username).first();
-      if (mgExisting) return err('שם המשתמש של המנהל כבר קיים במערכת');
+    if (isNew && b.manager_first_name) {
+      const managerUsername = bizId;
       const hash = await sha256hex('Smarta2026!');
       await db.prepare(
         'INSERT INTO users (id, first_name, last_name, role, community_id, courier_company_id, username, password_hash, phone, active) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, 1)'
-      ).bind(newId(), b.manager_first_name, b.manager_last_name || '', 'courier_manager', companyId_cc, b.manager_username, hash, b.manager_phone || null).run();
+      ).bind(newId(), b.manager_first_name, b.manager_last_name || '', 'courier_manager', companyId_cc, managerUsername, hash, b.manager_phone || null).run();
       managerCreated = true;
     }
 
@@ -2104,18 +2159,22 @@ async function handleCommunity(path, method, request, env, user, url) {
     const company = await db.prepare('SELECT * FROM courier_companies WHERE id = ?').bind(companyId).first();
     if (!company) return notFound();
     const b = await request.json();
-    if (!b.username || !b.first_name) return err('שם פרטי ושם משתמש הם חובה');
+    if (!b.first_name) return err('שם פרטי הוא חובה');
+    const cleanPhone = (b.phone || '').replace(/[-\s]/g, '');
+    if (!cleanPhone) return err('טלפון הוא חובה');
+    // username = טלפון_8תווים-ראשונים-של-company (ייחודי לשליח פר חברה)
+    const username = cleanPhone + '_' + companyId.slice(0, 8);
     const role = user.role === 'courier_manager' ? 'courier' : (b.role || 'courier');
     if (!['courier','courier_manager'].includes(role)) return err('תפקיד לא חוקי');
-    const existing = await db.prepare('SELECT id FROM users WHERE username = ?').bind(b.username).first();
-    if (existing) return err('שם משתמש כבר קיים');
+    const existing = await db.prepare('SELECT id FROM users WHERE username = ?').bind(username).first();
+    if (existing) return err('שליח עם טלפון זה כבר קיים בחברה זו');
     const DEFAULT_PASSWORD = 'Smarta2026!';
     const hash = await sha256hex(DEFAULT_PASSWORD);
     const uid = newId();
     await db.prepare(
       'INSERT INTO users (id, first_name, last_name, role, community_id, courier_company_id, username, password_hash, active, phone) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, 1, ?)'
-    ).bind(uid, b.first_name, b.last_name || '', role, companyId, b.username, hash, b.phone || null).run();
-    return ok({ id: uid, username: b.username, temp_password: DEFAULT_PASSWORD });
+    ).bind(uid, b.first_name, b.last_name || '', role, companyId, username, hash, cleanPhone).run();
+    return ok({ id: uid, username, temp_password: DEFAULT_PASSWORD });
   }
 
   // PUT — עדכון משתמש של חברת שילוח (שם, טלפון, סטטוס)
@@ -2161,6 +2220,126 @@ async function handleCommunity(path, method, request, env, user, url) {
     if (user.role === 'courier_manager' && target.role !== 'courier') return forbidden();
     await db.prepare('UPDATE users SET active=0 WHERE id=?').bind(userId).run();
     return ok({ deactivated: true });
+  }
+
+  // ─── Courier Company Report / Fines / Settings ───────────────────────────
+
+  // GET /api/courier-companies/:id/report?month=M-YYYY
+  if (path.match(/^\/api\/courier-companies\/[^/]+\/report$/) && method === 'GET') {
+    await ensureCCASettings(db);
+    const companyId = path.split('/')[3];
+    if (user.role === 'courier_manager') {
+      if (companyId !== user.courier_company_id) return forbidden();
+    } else if (!ccRoles.includes(user.role)) {
+      return forbidden();
+    } else if (user.role === 'community_manager') {
+      const acc = await db.prepare('SELECT id FROM courier_company_access WHERE company_id = ? AND community_id = ?').bind(companyId, communityId).first();
+      if (!acc) return forbidden();
+    }
+    const month = url.searchParams.get('month') || '';
+    let monthStart = 0, monthEnd = Math.floor(Date.now() / 1000) + 86400;
+    if (month) {
+      const parts2 = month.split('-').map(Number);
+      const m2 = parts2[0], y2 = parts2[1];
+      if (m2 && y2) {
+        monthStart = Math.floor(new Date(y2, m2 - 1, 1).getTime() / 1000);
+        monthEnd   = Math.floor(new Date(y2, m2,     1).getTime() / 1000);
+      }
+    }
+    const nowSec2 = Math.floor(Date.now() / 1000);
+    const { results: reportRows } = await db.prepare(`
+      SELECT
+        s.id   AS community_id,
+        s.name AS community_name,
+        COALESCE(cca.price_per_delivery, 0) AS price_per_delivery,
+        COALESCE(cca.fines_enabled, 0)      AS fines_enabled,
+        COALESCE(cca.fine_amount, 70)       AS fine_amount,
+        COALESCE(cca.fine_days, 5)          AS fine_days,
+        COUNT(p.id)                                                                           AS total,
+        SUM(CASE WHEN p.status IN ('collected','confirmed') THEN 1 ELSE 0 END)                AS delivered,
+        SUM(CASE WHEN p.status = 'waiting'
+                  AND COALESCE(cca.fines_enabled,0) = 1
+                  AND (? - p.assigned_at) > (COALESCE(cca.fine_days,5) * 86400)
+             THEN 1 ELSE 0 END)                                                               AS fined
+      FROM courier_company_access cca
+      LEFT JOIN settlements s ON s.id = cca.community_id
+      LEFT JOIN packages p
+        ON  p.community_id       = cca.community_id
+        AND p.courier_company_id = ?
+        AND p.assigned_at >= ?
+        AND p.assigned_at <  ?
+      WHERE cca.company_id = ?
+      GROUP BY cca.community_id
+      ORDER BY s.name
+    `).bind(nowSec2, companyId, monthStart, monthEnd, companyId).all();
+    return ok(reportRows);
+  }
+
+  // GET /api/courier-companies/:id/fines?month=M-YYYY
+  if (path.match(/^\/api\/courier-companies\/[^/]+\/fines$/) && method === 'GET') {
+    await ensureCCASettings(db);
+    const companyId = path.split('/')[3];
+    if (user.role === 'courier_manager') {
+      if (companyId !== user.courier_company_id) return forbidden();
+    } else if (!ccRoles.includes(user.role)) {
+      return forbidden();
+    } else if (user.role === 'community_manager') {
+      const acc = await db.prepare('SELECT id FROM courier_company_access WHERE company_id = ? AND community_id = ?').bind(companyId, communityId).first();
+      if (!acc) return forbidden();
+    }
+    const month = url.searchParams.get('month') || '';
+    let monthStart = 0, monthEnd = Math.floor(Date.now() / 1000) + 86400;
+    if (month) {
+      const parts2 = month.split('-').map(Number);
+      const m2 = parts2[0], y2 = parts2[1];
+      if (m2 && y2) {
+        monthStart = Math.floor(new Date(y2, m2 - 1, 1).getTime() / 1000);
+        monthEnd   = Math.floor(new Date(y2, m2,     1).getTime() / 1000);
+      }
+    }
+    const nowSec3 = Math.floor(Date.now() / 1000);
+    const { results: fineRows } = await db.prepare(`
+      SELECT
+        p.id, p.community_id, p.cell_id, p.barcode, p.assigned_at,
+        s.name AS community_name,
+        (r.first_name || ' ' || r.last_name) AS resident_name,
+        COALESCE(cca.fine_amount, 70)  AS fine_amount,
+        COALESCE(cca.fine_days,  5)   AS fine_days,
+        (? - p.assigned_at) / 86400   AS days_waiting
+      FROM packages p
+      LEFT JOIN settlements           s   ON s.id   = p.community_id
+      LEFT JOIN residents             r   ON r.id   = p.resident_id
+      LEFT JOIN courier_company_access cca ON cca.company_id = ? AND cca.community_id = p.community_id
+      WHERE p.courier_company_id = ?
+        AND p.status = 'waiting'
+        AND p.assigned_at >= ?
+        AND p.assigned_at <  ?
+        AND COALESCE(cca.fines_enabled, 0) = 1
+        AND (? - p.assigned_at) > (COALESCE(cca.fine_days, 5) * 86400)
+      ORDER BY p.assigned_at DESC
+    `).bind(nowSec3, companyId, companyId, monthStart, monthEnd, nowSec3).all();
+    return ok(fineRows);
+  }
+
+  // PUT /api/courier-companies/:id/settings  (מנהל קהילה מגדיר מחיר/קנסות)
+  if (path.match(/^\/api\/courier-companies\/[^/]+\/settings$/) && method === 'PUT') {
+    await ensureCCASettings(db);
+    const companyId = path.split('/')[3];
+    if (!ccRoles.includes(user.role)) return forbidden();
+    const b = await request.json();
+    const targetCid = user.role === 'community_manager' ? communityId : (b.community_id || null);
+    if (!targetCid) return err('community_id חובה');
+    const acc = await db.prepare('SELECT id FROM courier_company_access WHERE company_id = ? AND community_id = ?').bind(companyId, targetCid).first();
+    if (!acc) return notFound();
+    const fields3 = [], vals3 = [];
+    if (b.price_per_delivery !== undefined) { fields3.push('price_per_delivery=?'); vals3.push(Number(b.price_per_delivery) || 0); }
+    if (b.fines_enabled      !== undefined) { fields3.push('fines_enabled=?');      vals3.push(b.fines_enabled ? 1 : 0); }
+    if (b.fine_amount        !== undefined) { fields3.push('fine_amount=?');        vals3.push(Number(b.fine_amount) || 70); }
+    if (b.fine_days          !== undefined) { fields3.push('fine_days=?');          vals3.push(Number(b.fine_days) || 5); }
+    if (!fields3.length) return ok({ updated: false });
+    vals3.push(companyId, targetCid);
+    await db.prepare(`UPDATE courier_company_access SET ${fields3.join(',')} WHERE company_id=? AND community_id=?`).bind(...vals3).run();
+    return ok({ updated: true });
   }
 
   // ─── Deposit flow ──────────────────────────────────────────────────────────
@@ -2240,7 +2419,23 @@ async function handleCommunity(path, method, request, env, user, url) {
         'SELECT * FROM locker_configs WHERE id = ? AND community_id = ?'
       ).bind(b.locker_id, communityId).first();
     } else {
-      locker = await db.prepare('SELECT * FROM locker_configs WHERE id = ?').bind(b.locker_id).first();
+      // שליח חברה: אמת גישה לאותו ישוב כמו ב-deposit/start
+      let effectiveCompanyId2 = user.courier_company_id || null;
+      if (!effectiveCompanyId2 && Array.isArray(user.courier_company_ids)) {
+        const bodyCompanyId2 = b.company_id || null;
+        if (bodyCompanyId2 && user.courier_company_ids.includes(bodyCompanyId2)) {
+          effectiveCompanyId2 = bodyCompanyId2;
+        }
+      }
+      const lockerRow2 = await db.prepare('SELECT * FROM locker_configs WHERE id = ?').bind(b.locker_id).first();
+      if (lockerRow2 && effectiveCompanyId2) {
+        const access2 = await db.prepare(
+          'SELECT id FROM courier_company_access WHERE company_id = ? AND community_id = ?'
+        ).bind(effectiveCompanyId2, lockerRow2.community_id).first();
+        if (access2) locker = lockerRow2;
+      } else if (lockerRow2 && !effectiveCompanyId2) {
+        locker = lockerRow2; // community_manager / smarta_admin ללא company_id
+      }
     }
     if (!locker)        return notFound();
 
@@ -2304,15 +2499,24 @@ async function handleCommunity(path, method, request, env, user, url) {
     const courierName = user.name || '';
     const packageIds  = [];
 
+    // שליח רב-חברות: courier_company_id לא קיים בטוקן — קח מגוף הבקשה
+    let effectiveCourierCompanyId = user.courier_company_id || null;
+    if (!effectiveCourierCompanyId && Array.isArray(user.courier_company_ids)) {
+      const bodyCompanyId = b.company_id || null;
+      if (bodyCompanyId && user.courier_company_ids.includes(bodyCompanyId)) {
+        effectiveCourierCompanyId = bodyCompanyId;
+      }
+    }
+
     // שמור רשומה נפרדת לכל ברקוד
     for (const bc of barcodes) {
       const pkgId = newId();
       packageIds.push(pkgId);
       await db.prepare(`
-        INSERT INTO packages (id, community_id, resident_id, cell_id, barcode, courier, status, lock_code, assigned_at)
-        VALUES (?, ?, ?, ?, ?, ?, 'waiting', ?, ?)
+        INSERT INTO packages (id, community_id, resident_id, cell_id, barcode, courier, courier_company_id, status, lock_code, assigned_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'waiting', ?, ?)
       `).bind(pkgId, targetCommunityId, b.resident_id || null,
-        cellIdStr, bc, courierName, b.lock_code || null, nowSec()).run();
+        cellIdStr, bc, courierName, effectiveCourierCompanyId, b.lock_code || null, nowSec()).run();
     }
 
     // SMS אחד בלבד — בין אם חבילה אחת ובין אם כמה
