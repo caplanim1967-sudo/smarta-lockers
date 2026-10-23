@@ -537,11 +537,7 @@ tr:hover td { background:rgba(255,255,255,0.015); }
             <input class="form-input" id="cc-mgr-last" placeholder="ישראלי">
           </div>
         </div>
-        <div class="form-row" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
-          <div class="form-group">
-            <label class="form-label">שם משתמש לכניסה *</label>
-            <input class="form-input" id="cc-mgr-username" placeholder="mgr_magavit" dir="ltr" style="text-align:right" autocomplete="off">
-          </div>
+        <div class="form-row" style="grid-template-columns:1fr;gap:12px;margin-bottom:10px">
           <div class="form-group">
             <label class="form-label">טלפון נייד *</label>
             <input class="form-input" id="cc-mgr-phone" placeholder="0501234567" dir="ltr" style="text-align:right" inputmode="tel">
@@ -628,6 +624,14 @@ tr:hover td { background:rgba(255,255,255,0.015); }
     </div>
     <div style="font-size:11px;color:var(--muted);margin-top:-4px;margin-bottom:12px">
       דוגמה: הורה קשיש ללא נייד — הבן/הבת מקבלים הודעה בשמו ויכולים לפתוח את התא.
+    </div>
+
+    <div class="form-row cols-1" style="margin-top:8px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px">
+        <input type="checkbox" id="r-accepts-courier" checked style="width:16px;height:16px;cursor:pointer">
+        מקבל חבילות שליחים
+        <span style="font-size:11px;color:var(--muted)">(ברירת מחדל: כן)</span>
+      </label>
     </div>
 
     <div class="modal-err" id="r-err"></div>
@@ -1055,6 +1059,7 @@ function clearResidentForm() {
   });
   document.getElementById('r-notify').value = 'whatsapp';
   document.getElementById('r-alt-notify').value = 'whatsapp';
+  document.getElementById('r-accepts-courier').checked = true;
   document.getElementById('r-err').style.display = 'none';
 }
 
@@ -1075,7 +1080,8 @@ function openEditResident(id) {
   document.getElementById('r-alt-last').value = r.alt_last_name || '';
   document.getElementById('r-alt-id').value   = r.alt_id_number || '';
   document.getElementById('r-alt-phone').value= r.alt_phone     || '';
-  document.getElementById('r-alt-notify').value= r.alt_notify_method || 'whatsapp';
+  document.getElementById('r-alt-notify').value    = r.alt_notify_method || 'whatsapp';
+  document.getElementById('r-accepts-courier').checked = r.accepts_courier !== 0;
   ['r-id-err','r-phone-err','r-alt-id-err','r-alt-phone-err'].forEach(function(id) {
     document.getElementById(id).style.display = 'none';
   });
@@ -1155,7 +1161,8 @@ function saveResident() {
     alt_last_name:     document.getElementById('r-alt-last').value.trim() || null,
     alt_id_number:     altIdNum  || null,
     alt_phone:         altPhone  || null,
-    alt_notify_method: document.getElementById('r-alt-notify').value || null,
+    alt_notify_method:  document.getElementById('r-alt-notify').value || null,
+    accepts_courier:    document.getElementById('r-accepts-courier').checked,
   };
 
   var promise = editingResidentId
@@ -1524,7 +1531,7 @@ var _mgrCompanyId = null;  // החברה שנבחרה לניהול מנהלים 
 function showCcForm(show) {
   document.getElementById('cc-assign-card').style.display = show ? '' : 'none';
   if (show) {
-    ['cc-new-bizid','cc-new-name','cc-new-phone','cc-mgr-first','cc-mgr-last','cc-mgr-username'].forEach(function(id) {
+    ['cc-new-bizid','cc-new-name','cc-new-phone','cc-mgr-first','cc-mgr-last'].forEach(function(id) {
       document.getElementById(id).value = '';
     });
     document.getElementById('cc-assign-err').style.display = 'none';
@@ -1608,7 +1615,6 @@ function createAndAssignCompany() {
   var name       = document.getElementById('cc-new-name').value.trim();
   var mgrFirst   = document.getElementById('cc-mgr-first').value.trim();
   var mgrLast    = document.getElementById('cc-mgr-last').value.trim();
-  var mgrUser    = document.getElementById('cc-mgr-username').value.trim();
   var mgrPhone   = document.getElementById('cc-mgr-phone').value.trim();
   var errEl      = document.getElementById('cc-assign-err');
   errEl.style.display = 'none';
@@ -1616,7 +1622,6 @@ function createAndAssignCompany() {
   if (!name)     { errEl.textContent = 'שם חברה הוא שדה חובה'; errEl.style.display = 'block'; return; }
   if (!mgrFirst) { errEl.textContent = 'שם פרטי של המנהל הוא שדה חובה';   errEl.style.display = 'block'; return; }
   if (!mgrLast)  { errEl.textContent = 'שם משפחה של המנהל הוא שדה חובה'; errEl.style.display = 'block'; return; }
-  if (!mgrUser)  { errEl.textContent = 'שם משתמש של המנהל הוא שדה חובה'; errEl.style.display = 'block'; return; }
   if (!mgrPhone) { errEl.textContent = 'טלפון נייד של המנהל הוא שדה חובה'; errEl.style.display = 'block'; return; }
   var btn = document.getElementById('cc-assign-btn');
   btn.disabled = true;
@@ -1626,14 +1631,13 @@ function createAndAssignCompany() {
     phone:              document.getElementById('cc-new-phone').value.trim(),
     manager_first_name: mgrFirst,
     manager_last_name:  mgrLast,
-    manager_username:   mgrUser,
     manager_phone:      mgrPhone
   };
   apiPost('/api/courier-companies', body).then(function(data) {
     btn.disabled = false;
     if (data && data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
     var msg = data.is_new
-      ? ('חברה "' + esc(data.name) + '" נוצרה' + (data.manager_created ? ' + מנהל "' + esc(mgrUser) + '" נוצר ✓' : ' ✓'))
+      ? ('חברה "' + esc(data.name) + '" נוצרה' + (data.manager_created ? ' + מנהל נוצר ✓ (שם משתמש: ' + esc(bizId) + ')' : ' ✓'))
       : ('חברת "' + esc(data.name) + '" כבר קיימת — קושרה לישוב ✓');
     showToast(msg, 5000);
     showCcForm(false);

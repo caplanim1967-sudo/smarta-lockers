@@ -1340,6 +1340,10 @@ async function ensurePackageAuditTable(db) {
   )`).run();
 }
 
+async function ensureResidentAcceptsCourier(db) {
+  try { await db.prepare('ALTER TABLE residents ADD COLUMN accepts_courier INTEGER DEFAULT 1').run(); } catch {}
+}
+
 async function ensureCCASettings(db) {
   const cols = [
     'price_per_delivery INTEGER DEFAULT 0',
@@ -1417,13 +1421,15 @@ async function handleCommunity(path, method, request, env, user, url) {
         INSERT INTO residents
           (id, first_name, last_name, phone, community_id, notify_method, active, created_at,
            id_number, street, house_number, notes,
-           alt_first_name, alt_last_name, alt_id_number, alt_phone, alt_notify_method)
-        VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           alt_first_name, alt_last_name, alt_id_number, alt_phone, alt_notify_method, accepts_courier)
+        VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(id, b.first_name || '', b.last_name || '',
         b.phone, communityId, b.notify_method || 'sms', nowSec(),
         b.id_number || null, b.street || null, b.house_number || null, b.notes || null,
         b.alt_first_name || null, b.alt_last_name || null,
-        b.alt_id_number || null, b.alt_phone || null, b.alt_notify_method || null).run();
+        b.alt_id_number || null, b.alt_phone || null, b.alt_notify_method || null,
+        b.accepts_courier !== false ? 1 : 0).run();
+      await ensureResidentAcceptsCourier(db);
       return ok({ id });
     }
   }
@@ -1444,6 +1450,7 @@ async function handleCommunity(path, method, request, env, user, url) {
       SELECT id, first_name, last_name, phone
       FROM residents
       WHERE community_id = ? AND active = 1
+        AND COALESCE(accepts_courier, 1) = 1
         AND (phone LIKE ? OR first_name LIKE ? OR last_name LIKE ?)
       ORDER BY last_name, first_name LIMIT 10
     `).bind(searchCommunityId, pattern, pattern, pattern).all();
@@ -1459,13 +1466,15 @@ async function handleCommunity(path, method, request, env, user, url) {
         UPDATE residents
         SET first_name=?, last_name=?, phone=?, notify_method=?, active=?,
             id_number=?, street=?, house_number=?, notes=?,
-            alt_first_name=?, alt_last_name=?, alt_id_number=?, alt_phone=?, alt_notify_method=?
+            alt_first_name=?, alt_last_name=?, alt_id_number=?, alt_phone=?, alt_notify_method=?,
+            accepts_courier=?
         WHERE id=? AND community_id=?
       `).bind(b.first_name || '', b.last_name || '', b.phone,
         b.notify_method || 'sms', b.active !== false ? 1 : 0,
         b.id_number || null, b.street || null, b.house_number || null, b.notes || null,
         b.alt_first_name || null, b.alt_last_name || null,
         b.alt_id_number || null, b.alt_phone || null, b.alt_notify_method || null,
+        b.accepts_courier !== false ? 1 : 0,
         id, communityId).run();
       return ok({ id });
     }
