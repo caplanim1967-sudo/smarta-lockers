@@ -1416,6 +1416,7 @@ async function handleCommunity(path, method, request, env, user, url) {
     if (method === 'POST') {
       const b = await request.json();
       if (!b.phone) return err('phone חובה');
+      await ensureResidentAcceptsCourier(db);
       const id = newId();
       await db.prepare(`
         INSERT INTO residents
@@ -1429,7 +1430,6 @@ async function handleCommunity(path, method, request, env, user, url) {
         b.alt_first_name || null, b.alt_last_name || null,
         b.alt_id_number || null, b.alt_phone || null, b.alt_notify_method || null,
         b.accepts_courier !== false ? 1 : 0).run();
-      await ensureResidentAcceptsCourier(db);
       return ok({ id });
     }
   }
@@ -1462,6 +1462,7 @@ async function handleCommunity(path, method, request, env, user, url) {
     const id = residentMatch[1];
     if (method === 'PUT') {
       const b = await request.json();
+      await ensureResidentAcceptsCourier(db);
       await db.prepare(`
         UPDATE residents
         SET first_name=?, last_name=?, phone=?, notify_method=?, active=?,
