@@ -616,8 +616,8 @@ tr:hover td { background:rgba(255,255,255,0.015); }
       <div class="form-group">
         <label>ערוץ הודעות</label>
         <select id="r-alt-notify">
-          <option value="whatsapp">WhatsApp</option>
           <option value="sms">SMS</option>
+          <option value="whatsapp">WhatsApp</option>
           <option value="none">ללא</option>
         </select>
       </div>
@@ -1062,7 +1062,7 @@ function clearResidentForm() {
     if (el) el.style.display = 'none';
   });
   document.getElementById('r-notify').value = 'sms';
-  document.getElementById('r-alt-notify').value = 'whatsapp';
+  document.getElementById('r-alt-notify').value = 'sms';
   document.getElementById('r-accepts-courier').checked = true;
   document.getElementById('r-err').style.display = 'none';
 }
@@ -1084,7 +1084,7 @@ function openEditResident(id) {
   document.getElementById('r-alt-last').value = r.alt_last_name || '';
   document.getElementById('r-alt-id').value   = r.alt_id_number || '';
   document.getElementById('r-alt-phone').value= r.alt_phone     || '';
-  document.getElementById('r-alt-notify').value    = r.alt_notify_method || 'whatsapp';
+  document.getElementById('r-alt-notify').value    = r.alt_notify_method || 'sms';
   document.getElementById('r-accepts-courier').checked = r.accepts_courier !== 0;
   ['r-id-err','r-phone-err','r-alt-id-err','r-alt-phone-err'].forEach(function(id) {
     document.getElementById(id).style.display = 'none';
