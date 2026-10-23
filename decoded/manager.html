@@ -586,8 +586,8 @@ tr:hover td { background:rgba(255,255,255,0.015); }
       <div class="form-group">
         <label>ערוץ הודעות</label>
         <select id="r-notify">
-          <option value="whatsapp">📱 WhatsApp</option>
           <option value="sms">💬 SMS</option>
+          <option value="whatsapp">📱 WhatsApp</option>
         </select>
       </div>
       <div class="form-group"><label>הערות</label><input type="text" id="r-notes" placeholder="הערות על הדייר"></div>
@@ -1061,7 +1061,7 @@ function clearResidentForm() {
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
-  document.getElementById('r-notify').value = 'whatsapp';
+  document.getElementById('r-notify').value = 'sms';
   document.getElementById('r-alt-notify').value = 'whatsapp';
   document.getElementById('r-accepts-courier').checked = true;
   document.getElementById('r-err').style.display = 'none';
