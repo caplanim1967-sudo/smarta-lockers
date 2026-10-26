@@ -877,6 +877,42 @@
       <div class="section-title">📦 פירוט תאים תפוסים</div>
       <div id="status-cell-list" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
+
+    <!-- ניתוח עומסים -->
+    <div class="card" style="margin-top:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <div class="section-title" style="margin-bottom:0">📈 ניתוח עומסים</div>
+        <div style="display:flex;gap:6px">
+          <button class="primary-btn app-stats-btn active" data-days="7"   onclick="selectAppStatsRange(7,this)"   style="font-size:11px;padding:4px 10px">שבוע</button>
+          <button class="primary-btn app-stats-btn"        data-days="30"  onclick="selectAppStatsRange(30,this)"  style="font-size:11px;padding:4px 10px;background:var(--surface2);color:var(--text);border:1px solid var(--border)">חודש</button>
+          <button class="primary-btn app-stats-btn"        data-days="365" onclick="selectAppStatsRange(365,this)" style="font-size:11px;padding:4px 10px;background:var(--surface2);color:var(--text);border:1px solid var(--border)">שנה</button>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
+        <div class="stat-card blue"><div class="stat-label">נטענו</div><div class="stat-value" id="app-ls-deposits">—</div></div>
+        <div class="stat-card red" ><div class="stat-label">לא נכנסו</div><div class="stat-value" id="app-ls-overflow">—</div></div>
+        <div class="stat-card" style="border-color:rgba(234,179,8,0.4);background:rgba(234,179,8,0.08)"><div class="stat-label">שיעור גלישה</div><div class="stat-value" style="color:#ca8a04" id="app-ls-rate">—</div></div>
+        <div class="stat-card green"><div class="stat-label">ממוצע פנויים</div><div class="stat-value" id="app-ls-avg-free">—</div></div>
+      </div>
+
+      <div style="margin-bottom:16px">
+        <div style="font-size:12px;color:var(--muted);font-weight:600;margin-bottom:8px">חבילות לפי יום</div>
+        <div style="position:relative;height:180px"><canvas id="app-chart-deposits"></canvas></div>
+        <div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--muted)">
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#3b82f6;margin-left:4px;vertical-align:middle"></span>נטענו</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#ef4444;margin-left:4px;vertical-align:middle"></span>לא נכנסו</span>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:12px;color:var(--muted);font-weight:600;margin-bottom:8px">תאים פנויים בסוף יום</div>
+        <div style="position:relative;height:140px"><canvas id="app-chart-free"></canvas></div>
+      </div>
+
+      <div id="app-ls-loading" style="text-align:center;padding:20px;color:var(--muted);font-size:13px">טוען...</div>
+      <div id="app-ls-error"   style="display:none;color:var(--red);font-size:12px;padding:8px"></div>
+    </div>
   </div>
 
   <!-- HISTORY -->
@@ -2489,7 +2525,7 @@ function buildLockerGrid() {
     } else {
       document.body.classList.remove('dashboard-mode');
     }
-    if (name === 'status') loadPackagesFromAPI().then(updateStatusScreen);
+    if (name === 'status') { loadPackagesFromAPI().then(updateStatusScreen); loadAppLockerStats(7); }
   }
 
   function updateStatusScreen() {
@@ -3696,7 +3732,90 @@ window.addEventListener('message', function(e) {
   }
   // ══════════════════════════════════════════════════════════
 
+  // ─── ניתוח עומסים (סטטוס) ────────────────────────────────
+  var _appStatsChartDep  = null;
+  var _appStatsChartFree = null;
+
+  function selectAppStatsRange(days, btn) {
+    document.querySelectorAll('.app-stats-btn').forEach(function(b) {
+      b.style.background = 'var(--surface2)';
+      b.style.color = 'var(--text)';
+      b.style.border = '1px solid var(--border)';
+    });
+    btn.style.background = 'var(--accent)';
+    btn.style.color = '#fff';
+    btn.style.border = 'none';
+    loadAppLockerStats(days);
+  }
+
+  function loadAppLockerStats(days) {
+    var cid = _jwtPayload && _jwtPayload.community_id;
+    if (!cid) { var el = document.getElementById('app-ls-loading'); if(el) el.style.display='none'; return; }
+    var loadEl = document.getElementById('app-ls-loading');
+    var errEl  = document.getElementById('app-ls-error');
+    if (loadEl) { loadEl.style.display='block'; loadEl.textContent='טוען...'; }
+    if (errEl)  errEl.style.display='none';
+    apiGet('/api/communities/' + cid + '/locker-stats?days=' + days).then(function(data) {
+      if (loadEl) loadEl.style.display='none';
+      if (!data || data.error) { if(errEl){ errEl.textContent='שגיאה'; errEl.style.display='block'; } return; }
+      renderAppLockerStats(data);
+    }).catch(function() {
+      if (loadEl) loadEl.style.display='none';
+      if (errEl) { errEl.textContent='שגיאת תקשורת'; errEl.style.display='block'; }
+    });
+  }
+
+  function renderAppLockerStats(data) {
+    var s = data.summary || {};
+    var setEl = function(id, val) { var e=document.getElementById(id); if(e) e.textContent=val!=null?val:'—'; };
+    setEl('app-ls-deposits', s.total_deposits);
+    setEl('app-ls-overflow', s.total_overflow);
+    setEl('app-ls-rate',     s.overflow_rate != null ? s.overflow_rate+'%' : null);
+    setEl('app-ls-avg-free', s.avg_free_eod);
+
+    var days     = data.days || [];
+    var labels   = days.map(function(d){ return d.date.slice(5); });
+    var deposits = days.map(function(d){ return d.deposits; });
+    var overflow = days.map(function(d){ return d.overflow; });
+    var free     = days.map(function(d){ return d.free_eod; });
+
+    if (typeof Chart === 'undefined') return;
+    var isDark = document.documentElement.getAttribute('data-theme')==='dark' ||
+      (!document.documentElement.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme:dark)').matches);
+    var gridColor = isDark?'rgba(255,255,255,0.07)':'rgba(0,0,0,0.06)';
+    var textColor = isDark?'#9ca3af':'#6b7280';
+    var opts = { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{rtl:true} },
+      scales:{
+        x:{ticks:{color:textColor,maxRotation:45,font:{size:9}},grid:{color:gridColor}},
+        y:{ticks:{color:textColor,stepSize:1},grid:{color:gridColor},beginAtZero:true}
+      }
+    };
+    var ctx1 = document.getElementById('app-chart-deposits');
+    if (!ctx1) return;
+    if (_appStatsChartDep) _appStatsChartDep.destroy();
+    _appStatsChartDep = new Chart(ctx1.getContext('2d'), {
+      type:'bar', data:{ labels:labels, datasets:[
+        {label:'נטענו',data:deposits,backgroundColor:'rgba(59,130,246,0.75)',borderRadius:3,order:1},
+        {label:'לא נכנסו',data:overflow,backgroundColor:'rgba(239,68,68,0.75)',borderRadius:3,order:2}
+      ]}, options: Object.assign({},opts,{scales:{
+        x:opts.scales.x, y:Object.assign({},opts.scales.y,{stacked:true})
+      }, plugins:Object.assign({},opts.plugins)})
+    });
+    var ctx2 = document.getElementById('app-chart-free');
+    if (!ctx2) return;
+    if (_appStatsChartFree) _appStatsChartFree.destroy();
+    _appStatsChartFree = new Chart(ctx2.getContext('2d'), {
+      type:'line', data:{ labels:labels, datasets:[{
+        label:'פנויים',data:free,borderColor:'rgba(16,185,129,0.9)',
+        backgroundColor:'rgba(16,185,129,0.1)',fill:true,tension:0.3,pointRadius:2,
+        pointBackgroundColor:'rgba(16,185,129,1)'
+      }]}, options: opts
+    });
+  }
+
   </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 
 <!-- BARCODE SCANNER MODAL -->
 <div id="barcode-scanner-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9998;align-items:center;justify-content:center">
