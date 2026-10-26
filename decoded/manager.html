@@ -242,6 +242,10 @@ tr:hover td { background:rgba(255,255,255,0.015); }
   <button class="sidebar-item" id="sb-courier-co" onclick="showPage('courier-co',this)">
     <span class="icon">🚚</span> חברת שילוח
   </button>
+  <div class="sidebar-section">ניתוח</div>
+  <button class="sidebar-item" id="sb-locker-stats" onclick="showPage('locker-stats',this)">
+    <span class="icon">📈</span> ניתוח עומסים
+  </button>
 </aside>
 
 <main>
@@ -551,6 +555,45 @@ tr:hover td { background:rgba(255,255,255,0.015); }
       <div id="cc-assign-err" style="display:none;color:var(--red);font-size:12px;margin-bottom:10px"></div>
       <button class="btn btn-primary" id="cc-assign-btn" onclick="createAndAssignCompany()">צור חברה ומנהל</button>
     </div>
+  </div>
+
+  <!-- LOCKER STATS -->
+  <div class="page" id="page-locker-stats">
+    <div class="page-header">
+      <div><div class="page-title">ניתוח עומסים</div><div class="page-sub">היסטוריית טעינות ותאים פנויים</div></div>
+      <div class="btn-group" id="stats-range-btns">
+        <button class="btn btn-secondary btn-sm stats-range-btn active" data-days="14" onclick="selectStatsRange(14,this)">14 יום</button>
+        <button class="btn btn-secondary btn-sm stats-range-btn" data-days="30" onclick="selectStatsRange(30,this)">30 יום</button>
+        <button class="btn btn-secondary btn-sm stats-range-btn" data-days="60" onclick="selectStatsRange(60,this)">60 יום</button>
+      </div>
+    </div>
+
+    <!-- KPI tiles -->
+    <div class="stat-grid" style="margin-bottom:24px">
+      <div class="stat-card"><div class="label">נטענו</div><div class="val val-blue" id="ls-total-deposits">—</div><div class="sub">חבילות בתקופה</div></div>
+      <div class="stat-card"><div class="label">לא נכנסו</div><div class="val val-red" id="ls-total-overflow">—</div><div class="sub">חבילות גלישה</div></div>
+      <div class="stat-card"><div class="label">שיעור גלישה</div><div class="val val-yellow" id="ls-overflow-rate">—</div><div class="sub">מכלל הניסיונות</div></div>
+      <div class="stat-card"><div class="label">ממוצע פנויים</div><div class="val val-green" id="ls-avg-free">—</div><div class="sub">תאים בסוף יום</div></div>
+    </div>
+
+    <!-- גרף עמודות: נטענו vs גלישה -->
+    <div class="card" style="margin-bottom:20px;padding:20px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:16px">חבילות לפי יום</div>
+      <div style="position:relative;height:220px"><canvas id="chart-deposits"></canvas></div>
+      <div style="display:flex;gap:20px;margin-top:12px;font-size:12px;color:var(--muted)">
+        <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#3b82f6;margin-left:6px;vertical-align:middle"></span>נטענו</span>
+        <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#ef4444;margin-left:6px;vertical-align:middle"></span>לא נכנסו</span>
+      </div>
+    </div>
+
+    <!-- גרף קו: תאים פנויים -->
+    <div class="card" style="padding:20px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:16px">תאים פנויים בסוף יום</div>
+      <div style="position:relative;height:180px"><canvas id="chart-free-cells"></canvas></div>
+    </div>
+
+    <div id="ls-loading" style="text-align:center;padding:40px;color:var(--muted);font-size:14px">בחר טווח לטעינת נתונים...</div>
+    <div id="ls-error" style="display:none;color:var(--red);padding:16px;font-size:13px"></div>
   </div>
 
 </main>
@@ -945,9 +988,10 @@ function showPage(name, el) {
   document.querySelectorAll('.sidebar-item').forEach(function(b) { b.classList.remove('active'); });
   document.getElementById('page-' + name).classList.add('active');
   el.classList.add('active');
-  if (name === 'residents') renderResidents();
-  if (name === 'staff') loadStaff();
-  if (name === 'reminders') loadReminders();
+  if (name === 'residents')    renderResidents();
+  if (name === 'staff')        loadStaff();
+  if (name === 'reminders')    loadReminders();
+  if (name === 'locker-stats') loadLockerStats(14);
 }
 
 // ─── MODAL ───────────────────────────────────────────────
@@ -1821,7 +1865,113 @@ showPage = function(name, el) {
   _mgr_origShowPage(name, el);
   if (name === 'courier-co') loadCourierCoPage();
 };
+
+// ─── ניתוח עומסים ────────────────────────────────────────
+var _statsChartDeposits = null;
+var _statsChartFree     = null;
+var _statsCurrentDays   = 14;
+
+function selectStatsRange(days, btn) {
+  document.querySelectorAll('.stats-range-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  loadLockerStats(days);
+}
+
+function loadLockerStats(days) {
+  _statsCurrentDays = days || _statsCurrentDays;
+  var _user = JSON.parse(sessionStorage.getItem('manager_user') || sessionStorage.getItem('smarta_user') || 'null');
+  var cid = _user && _user.community_id;
+  if (!cid) return;
+
+  var loadingEl = document.getElementById('ls-loading');
+  var errEl     = document.getElementById('ls-error');
+  if (loadingEl) { loadingEl.style.display = 'block'; loadingEl.textContent = 'טוען נתונים...'; }
+  if (errEl)     errEl.style.display = 'none';
+
+  apiGet('/api/communities/' + cid + '/locker-stats?days=' + _statsCurrentDays).then(function(data) {
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (!data || data.error) {
+      if (errEl) { errEl.textContent = 'שגיאה בטעינת נתונים'; errEl.style.display = 'block'; }
+      return;
+    }
+    renderLockerStats(data);
+  }).catch(function(e) {
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (errEl) { errEl.textContent = 'שגיאת תקשורת'; errEl.style.display = 'block'; }
+  });
+}
+
+function renderLockerStats(data) {
+  var s = data.summary || {};
+  document.getElementById('ls-total-deposits').textContent = s.total_deposits != null ? s.total_deposits : '—';
+  document.getElementById('ls-total-overflow').textContent = s.total_overflow != null ? s.total_overflow : '—';
+  document.getElementById('ls-overflow-rate').textContent  = s.overflow_rate  != null ? s.overflow_rate + '%' : '—';
+  document.getElementById('ls-avg-free').textContent       = s.avg_free_eod   != null ? s.avg_free_eod : '—';
+
+  var days     = data.days || [];
+  var labels   = days.map(function(d) { return d.date.slice(5); }); // MM-DD
+  var deposits = days.map(function(d) { return d.deposits; });
+  var overflow = days.map(function(d) { return d.overflow; });
+  var free     = days.map(function(d) { return d.free_eod; });
+
+  var isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+    (!document.documentElement.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  var gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)';
+  var textColor = isDark ? '#9ca3af' : '#6b7280';
+
+  if (typeof Chart === 'undefined') return;
+
+  // גרף עמודות
+  var ctx1 = document.getElementById('chart-deposits').getContext('2d');
+  if (_statsChartDeposits) _statsChartDeposits.destroy();
+  _statsChartDeposits = new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        { label: 'נטענו', data: deposits, backgroundColor: 'rgba(59,130,246,0.75)', borderRadius: 4, order: 1 },
+        { label: 'לא נכנסו', data: overflow, backgroundColor: 'rgba(239,68,68,0.75)', borderRadius: 4, order: 2 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { rtl: true } },
+      scales: {
+        x: { stacked: true, ticks: { color: textColor, maxRotation: 45, font: { size: 10 } }, grid: { color: gridColor } },
+        y: { stacked: true, ticks: { color: textColor, stepSize: 1 }, grid: { color: gridColor }, beginAtZero: true }
+      }
+    }
+  });
+
+  // גרף קו
+  var ctx2 = document.getElementById('chart-free-cells').getContext('2d');
+  if (_statsChartFree) _statsChartFree.destroy();
+  _statsChartFree = new Chart(ctx2, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'תאים פנויים',
+        data: free,
+        borderColor: 'rgba(16,185,129,0.9)',
+        backgroundColor: 'rgba(16,185,129,0.1)',
+        fill: true, tension: 0.3, pointRadius: 3,
+        pointBackgroundColor: 'rgba(16,185,129,1)'
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { rtl: true } },
+      scales: {
+        x: { ticks: { color: textColor, maxRotation: 45, font: { size: 10 } }, grid: { color: gridColor } },
+        y: { ticks: { color: textColor, stepSize: 1 }, grid: { color: gridColor }, beginAtZero: true,
+             max: data.total_cells ? data.total_cells + 1 : undefined }
+      }
+    }
+  });
+}
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 
 <!-- MODAL: עריכת חברת שילוח -->
 <div class="modal-overlay" id="edit-company-modal">

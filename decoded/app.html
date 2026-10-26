@@ -1061,6 +1061,23 @@
   </div>
 </div>
 
+<!-- OVERFLOW MODAL -->
+<div class="modal-overlay" id="overflow-modal">
+  <div class="modal" style="width:360px">
+    <div class="modal-title">📦 חבילות שלא נכנסו היום</div>
+    <div class="modal-sub" style="margin-bottom:16px">כמה חבילות לא הצלחת להכניס ללוקר היום בגלל שכל התאים היו מלאים?</div>
+    <div style="margin-bottom:8px">
+      <input type="number" id="overflow-count-input" min="0" value="0"
+        style="width:100%;padding:14px;font-size:22px;font-weight:700;text-align:center;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:Heebo,sans-serif">
+    </div>
+    <div id="overflow-modal-err" style="display:none;color:var(--red);font-size:12px;margin-bottom:8px"></div>
+    <div class="modal-actions">
+      <button class="modal-btn confirm" id="overflow-submit-btn" onclick="submitOverflow()">אשר וממשך</button>
+      <button class="modal-btn cancel" onclick="closeModal('overflow-modal')">ביטול</button>
+    </div>
+  </div>
+</div>
+
 <!-- OPEN ALL MODAL -->
 <div class="modal-overlay" id="open-all-modal">
   <div class="modal" style="width:440px">
@@ -2864,6 +2881,52 @@ function buildLockerGrid() {
   }
 
   function openSendAllModal() {
+    var cid = _jwtPayload && _jwtPayload.community_id;
+    if (cid) {
+      apiGet('/api/communities/' + cid + '/package-overflow/today').then(function(res) {
+        if (!res || !res.recorded) {
+          showToast('יש למלא כמה חבילות לא נכנסו היום לפני השליחה', true);
+          openOverflowModal(function() { _doOpenSendAllModal(); });
+        } else {
+          _doOpenSendAllModal();
+        }
+      }).catch(function() { _doOpenSendAllModal(); });
+      return;
+    }
+    _doOpenSendAllModal();
+  }
+
+  function openOverflowModal(onDone) {
+    _overflowOnDone = onDone || null;
+    document.getElementById('overflow-count-input').value = '0';
+    document.getElementById('overflow-modal-err').style.display = 'none';
+    openModal('overflow-modal');
+  }
+  var _overflowOnDone = null;
+
+  function submitOverflow() {
+    var cid = _jwtPayload && _jwtPayload.community_id;
+    if (!cid) { closeModal('overflow-modal'); if (_overflowOnDone) _overflowOnDone(); return; }
+    var val = parseInt(document.getElementById('overflow-count-input').value);
+    if (isNaN(val) || val < 0) {
+      document.getElementById('overflow-modal-err').textContent = 'יש להזין מספר תקין (0 ומעלה)';
+      document.getElementById('overflow-modal-err').style.display = 'block';
+      return;
+    }
+    var btn = document.getElementById('overflow-submit-btn');
+    btn.disabled = true; btn.textContent = 'שומר...';
+    apiPost('/api/communities/' + cid + '/package-overflow', { count: val }).then(function() {
+      closeModal('overflow-modal');
+      btn.disabled = false; btn.textContent = 'אשר וממשך';
+      if (_overflowOnDone) _overflowOnDone();
+    }).catch(function() {
+      btn.disabled = false; btn.textContent = 'אשר וממשך';
+      document.getElementById('overflow-modal-err').textContent = 'שגיאת תקשורת — נסה שוב';
+      document.getElementById('overflow-modal-err').style.display = 'block';
+    });
+  }
+
+  function _doOpenSendAllModal() {
     var s = _msgSettingsCache || {};
     var isBasic = (typeof lockerConfig !== 'undefined' && lockerConfig && lockerConfig.tier === 'basic') ||
                   (_jwtPayload && _jwtPayload.plan === 'basic');
