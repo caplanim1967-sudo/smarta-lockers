@@ -1344,6 +1344,20 @@ async function ensureResidentAcceptsCourier(db) {
   try { await db.prepare('ALTER TABLE residents ADD COLUMN accepts_courier INTEGER DEFAULT 1').run(); } catch {}
 }
 
+async function ensurePackageOverflow(db) {
+  try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS package_overflow (
+      id TEXT PRIMARY KEY,
+      community_id TEXT NOT NULL,
+      date TEXT NOT NULL,
+      count INTEGER NOT NULL DEFAULT 0,
+      user_id TEXT,
+      created_at INTEGER DEFAULT (unixepoch()),
+      UNIQUE(community_id, date)
+    )`).run();
+  } catch {}
+}
+
 async function ensureCCASettings(db) {
   const cols = [
     'price_per_delivery INTEGER DEFAULT 0',
@@ -2350,6 +2364,118 @@ async function handleCommunity(path, method, request, env, user, url) {
     vals3.push(companyId, targetCid);
     await db.prepare(`UPDATE courier_company_access SET ${fields3.join(',')} WHERE company_id=? AND community_id=?`).bind(...vals3).run();
     return ok({ updated: true });
+  }
+
+  // ─── Package overflow (אחראית דואר) ────────────────────────────────────────
+  const cmRoles = ['community_manager', 'smarta_admin', 'mail_manager'];
+
+  // GET /api/communities/:id/package-overflow/today — האם כבר הוזן היום?
+  if (path.match(/^\/api\/communities\/[^/]+\/package-overflow\/today$/) && method === 'GET') {
+    const cid = path.split('/')[3];
+    if (!cmRoles.includes(user.role) && user.role !== 'mail_manager') return forbidden();
+    if (user.role === 'community_manager' && communityId !== cid) return forbidden();
+    await ensurePackageOverflow(db);
+    const today = new Date().toISOString().slice(0, 10);
+    const row = await db.prepare('SELECT count FROM package_overflow WHERE community_id=? AND date=?').bind(cid, today).first();
+    return ok({ recorded: !!row, count: row ? row.count : null, date: today });
+  }
+
+  // POST /api/communities/:id/package-overflow — רישום כמה חבילות לא נכנסו היום
+  if (path.match(/^\/api\/communities\/[^/]+\/package-overflow$/) && method === 'POST') {
+    const cid = path.split('/')[3];
+    if (!cmRoles.includes(user.role) && user.role !== 'mail_manager') return forbidden();
+    if (user.role === 'community_manager' && communityId !== cid) return forbidden();
+    await ensurePackageOverflow(db);
+    const b = await request.json();
+    const count = Math.max(0, parseInt(b.count) || 0);
+    const today = new Date().toISOString().slice(0, 10);
+    await db.prepare(`
+      INSERT INTO package_overflow (id, community_id, date, count, user_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(community_id, date) DO UPDATE SET count=excluded.count, user_id=excluded.user_id, created_at=excluded.created_at
+    `).bind(newId(), cid, today, count, user.id || null, nowSec()).run();
+    return ok({ recorded: true, date: today, count });
+  }
+
+  // GET /api/communities/:id/locker-stats?days=30 — ניתוח עומסים
+  if (path.match(/^\/api\/communities\/[^/]+\/locker-stats$/) && method === 'GET') {
+    const cid = path.split('/')[3];
+    if (!cmRoles.includes(user.role)) return forbidden();
+    if (['community_manager', 'mail_manager'].includes(user.role) && communityId !== cid) return forbidden();
+    await ensurePackageOverflow(db);
+    const nowTs   = nowSec();
+    const todayStr = new Date(nowTs * 1000).toISOString().slice(0, 10);
+    const fromDate = url.searchParams.get('from_date') || new Date((nowTs - 30 * 86400) * 1000).toISOString().slice(0, 10);
+    const toDate   = url.searchParams.get('to_date')   || todayStr;
+    const startTs  = Math.floor(new Date(fromDate + 'T00:00:00Z').getTime() / 1000);
+    const endTs    = Math.floor(new Date(toDate   + 'T23:59:59Z').getTime() / 1000);
+    const days     = Math.max(1, Math.ceil((endTs - startTs) / 86400));
+
+    // סה"כ תאים בישוב (מ-locker_configs)
+    const lockers = await db.prepare('SELECT columns_json FROM locker_configs WHERE community_id=?').bind(cid).all();
+    let totalCells = 0;
+    for (const lk of (lockers.results || [])) {
+      try {
+        const { numbering, cols } = parseLockerColumns(lk.columns_json);
+        totalCells += buildCellList(cols, numbering).length;
+      } catch {}
+    }
+
+    // חבילות שנכנסו בטווח (assigned_at)
+    const pkgs = await db.prepare(`
+      SELECT assigned_at, collected_at FROM packages
+      WHERE community_id=? AND assigned_at >= ? AND assigned_at <= ? AND status != 'fault'
+    `).bind(cid, startTs, endTs).all();
+
+    // חבילות שהוקצו לפני הטווח אך עדיין חיכו בתוכו
+    const priorPkgs = await db.prepare(`
+      SELECT assigned_at, collected_at FROM packages
+      WHERE community_id=? AND assigned_at < ? AND (collected_at IS NULL OR collected_at >= ?) AND status != 'fault'
+    `).bind(cid, startTs, startTs).all();
+
+    // overflow לפי יום
+    const overflows = await db.prepare(`
+      SELECT date, count FROM package_overflow
+      WHERE community_id=? AND date >= ? AND date <= ?
+    `).bind(cid, fromDate, toDate).all();
+
+    const ovMap = {};
+    for (const ov of (overflows.results || [])) ovMap[ov.date] = ov.count;
+
+    const allPkgs = [...(pkgs.results || []), ...(priorPkgs.results || [])];
+    const dayArr = [];
+    let totalDeposits = 0, totalOverflow = 0, totalFree = 0;
+
+    for (let d = 0; d < days; d++) {
+      const dayStartTs = startTs + d * 86400;
+      const dayEndTs   = dayStartTs + 86399;
+      const dateStr    = new Date(dayStartTs * 1000).toISOString().slice(0, 10);
+
+      const deposits = (pkgs.results || []).filter(p => p.assigned_at >= dayStartTs && p.assigned_at <= dayEndTs).length;
+      const overflow = ovMap[dateStr] || 0;
+      const waiting  = allPkgs.filter(p => p.assigned_at <= dayEndTs && (p.collected_at === null || p.collected_at > dayEndTs)).length;
+      const freeEod  = Math.max(0, totalCells - waiting);
+
+      dayArr.push({ date: dateStr, deposits, overflow, free_eod: freeEod });
+      totalDeposits += deposits;
+      totalOverflow += overflow;
+      totalFree     += freeEod;
+    }
+
+    const peakDay = dayArr.reduce((m, d) => d.deposits > (m ? m.deposits : -1) ? d : m, null);
+
+    return ok({
+      total_cells: totalCells,
+      days: dayArr,
+      summary: {
+        total_deposits: totalDeposits,
+        total_overflow: totalOverflow,
+        overflow_rate: totalDeposits + totalOverflow > 0
+          ? Math.round(totalOverflow / (totalDeposits + totalOverflow) * 100) : 0,
+        avg_free_eod: days > 0 ? parseFloat((totalFree / days).toFixed(1)) : 0,
+        peak_day: peakDay
+      }
+    });
   }
 
   // ─── Deposit flow ──────────────────────────────────────────────────────────

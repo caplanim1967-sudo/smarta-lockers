@@ -714,6 +714,7 @@
     <button class="nav-tab" onclick="showScreen('status')">📊 סטטוס</button>
     <button class="nav-tab" onclick="showScreen('new-package')">חבילה חדשה</button>
     <button class="nav-tab" onclick="showScreen('history')">היסטוריה</button>
+    <button class="nav-tab" onclick="showScreen('analytics')">📈 עומסים</button>
   </div>
   <button class="back-btn" onclick="goBack()">&#8592; חזרה</button>
   <div class="user-badge">
@@ -878,14 +879,19 @@
       <div id="status-cell-list" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
 
-    <!-- ניתוח עומסים -->
-    <div class="card" style="margin-top:16px">
+  </div>
+
+  <!-- ANALYTICS -->
+  <div class="screen" id="screen-analytics">
+    <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
         <div class="section-title" style="margin-bottom:0">📈 ניתוח עומסים</div>
-        <div style="display:flex;gap:6px">
-          <button class="primary-btn app-stats-btn active" data-days="7"   onclick="selectAppStatsRange(7,this)"   style="font-size:11px;padding:4px 10px">שבוע</button>
-          <button class="primary-btn app-stats-btn"        data-days="30"  onclick="selectAppStatsRange(30,this)"  style="font-size:11px;padding:4px 10px;background:var(--surface2);color:var(--text);border:1px solid var(--border)">חודש</button>
-          <button class="primary-btn app-stats-btn"        data-days="365" onclick="selectAppStatsRange(365,this)" style="font-size:11px;padding:4px 10px;background:var(--surface2);color:var(--text);border:1px solid var(--border)">שנה</button>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <label style="font-size:11px;color:var(--text-secondary)">מ:</label>
+          <input type="date" id="app-ls-from" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text)">
+          <label style="font-size:11px;color:var(--text-secondary)">עד:</label>
+          <input type="date" id="app-ls-to" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text)">
+          <button class="primary-btn" onclick="loadAppLockerStats()" style="font-size:11px;padding:4px 10px">טען</button>
         </div>
       </div>
 
@@ -1101,11 +1107,19 @@
 <div class="modal-overlay" id="overflow-modal">
   <div class="modal" style="width:360px">
     <div class="modal-title">📦 חבילות שלא נכנסו היום</div>
-    <div class="modal-sub" style="margin-bottom:16px">כמה חבילות לא הצלחת להכניס ללוקר היום בגלל שכל התאים היו מלאים?</div>
+    <div class="modal-sub" style="margin-bottom:12px">כמה חבילות לא הצלחת להכניס ללוקר היום בגלל שכל התאים היו מלאים?</div>
+    <div id="overflow-ctx" style="display:none;gap:12px;margin-bottom:14px;font-size:12px;background:var(--surface2);border-radius:8px;padding:9px 12px;color:var(--text2)">
+      <span>סה"כ תאים: <strong id="ov-ctx-total" style="color:var(--text)">—</strong></span>
+      <span>·</span>
+      <span>תפוסים: <strong id="ov-ctx-occ" style="color:var(--red)">—</strong></span>
+      <span>·</span>
+      <span>פנויים: <strong id="ov-ctx-free" style="color:var(--green)">—</strong></span>
+    </div>
     <div style="margin-bottom:8px">
-      <input type="number" id="overflow-count-input" min="0" value="0"
+      <input type="number" id="overflow-count-input" min="0" value=""
         style="width:100%;padding:14px;font-size:22px;font-weight:700;text-align:center;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:Heebo,sans-serif">
     </div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.5">הנתון הזה מאפשר לנו לשפר את השירות לציבור. גם 0 צריך לאשר.</div>
     <div id="overflow-modal-err" style="display:none;color:var(--red);font-size:12px;margin-bottom:8px"></div>
     <div class="modal-actions">
       <button class="modal-btn confirm" id="overflow-submit-btn" onclick="submitOverflow()">אשר וממשך</button>
@@ -2525,7 +2539,8 @@ function buildLockerGrid() {
     } else {
       document.body.classList.remove('dashboard-mode');
     }
-    if (name === 'status') { loadPackagesFromAPI().then(updateStatusScreen); loadAppLockerStats(7); }
+    if (name === 'status')    { loadPackagesFromAPI().then(updateStatusScreen); }
+    if (name === 'analytics') { _initAppStatsDates(); loadAppLockerStats(); }
   }
 
   function updateStatusScreen() {
@@ -2627,6 +2642,22 @@ function buildLockerGrid() {
     var num = _currentCellNum;
     if (!num) return;
     closeModal('modal');
+    var cid = _jwtPayload && _jwtPayload.community_id;
+    if (cid) {
+      apiGet('/api/communities/' + cid + '/package-overflow/today').then(function(res) {
+        if (!res || !res.recorded) {
+          showToast('יש למלא כמה חבילות לא נכנסו היום לפני השליחה', true);
+          openOverflowModal(function() { _doSendCellMessage(num); });
+        } else {
+          _doSendCellMessage(num);
+        }
+      }).catch(function() { _doSendCellMessage(num); });
+      return;
+    }
+    _doSendCellMessage(num);
+  }
+
+  function _doSendCellMessage(num) {
     if (packageData[num]) {
       packageData[num].status = 'occupied';
       savePackageData();
@@ -2934,8 +2965,26 @@ function buildLockerGrid() {
 
   function openOverflowModal(onDone) {
     _overflowOnDone = onDone || null;
-    document.getElementById('overflow-count-input').value = '0';
+    document.getElementById('overflow-count-input').value = '';
     document.getElementById('overflow-modal-err').style.display = 'none';
+    // inject context: total cells + currently occupied
+    try {
+      var cfg = null;
+      try { var _s = localStorage.getItem('smarta_locker_config_v2'); if (_s) cfg = JSON.parse(_s); } catch(e) {}
+      var total = 0;
+      if (cfg && cfg.layout) {
+        cfg.layout.forEach(function(col) { col.forEach(function(c) { if (!c.disabled) total++; }); });
+      }
+      var occ  = Object.keys(packageData).length;
+      var free = Math.max(0, total - occ);
+      var ctxEl = document.getElementById('overflow-ctx');
+      if (ctxEl && total > 0) {
+        document.getElementById('ov-ctx-total').textContent = total;
+        document.getElementById('ov-ctx-occ').textContent   = occ;
+        document.getElementById('ov-ctx-free').textContent  = free;
+        ctxEl.style.display = 'flex';
+      }
+    } catch(e) {}
     openModal('overflow-modal');
   }
   var _overflowOnDone = null;
@@ -3736,28 +3785,30 @@ window.addEventListener('message', function(e) {
   var _appStatsChartDep  = null;
   var _appStatsChartFree = null;
 
-  function selectAppStatsRange(days, btn) {
-    document.querySelectorAll('.app-stats-btn').forEach(function(b) {
-      b.style.background = 'var(--surface2)';
-      b.style.color = 'var(--text)';
-      b.style.border = '1px solid var(--border)';
-    });
-    btn.style.background = 'var(--accent)';
-    btn.style.color = '#fff';
-    btn.style.border = 'none';
-    loadAppLockerStats(days);
+  function _initAppStatsDates() {
+    var today = new Date().toISOString().slice(0, 10);
+    var week  = new Date(Date.now() - 7 * 86400 * 1000).toISOString().slice(0, 10);
+    var fromEl = document.getElementById('app-ls-from');
+    var toEl   = document.getElementById('app-ls-to');
+    if (fromEl && !fromEl.value) fromEl.value = week;
+    if (toEl   && !toEl.value)   toEl.value   = today;
   }
 
-  function loadAppLockerStats(days) {
+  function loadAppLockerStats() {
+    var fromEl   = document.getElementById('app-ls-from');
+    var toEl     = document.getElementById('app-ls-to');
+    var fromDate = fromEl && fromEl.value;
+    var toDate   = toEl   && toEl.value;
+    if (!fromDate || !toDate) return;
     var cid = _jwtPayload && _jwtPayload.community_id;
     if (!cid) { var el = document.getElementById('app-ls-loading'); if(el) el.style.display='none'; return; }
     var loadEl = document.getElementById('app-ls-loading');
     var errEl  = document.getElementById('app-ls-error');
     if (loadEl) { loadEl.style.display='block'; loadEl.textContent='טוען...'; }
     if (errEl)  errEl.style.display='none';
-    apiGet('/api/communities/' + cid + '/locker-stats?days=' + days).then(function(data) {
+    apiGet('/api/communities/' + cid + '/locker-stats?from_date=' + fromDate + '&to_date=' + toDate).then(function(data) {
       if (loadEl) loadEl.style.display='none';
-      if (!data || data.error) { if(errEl){ errEl.textContent='שגיאה'; errEl.style.display='block'; } return; }
+      if (!data || data.error) { if(errEl){ errEl.textContent=(data && data.error) ? data.error : 'שגיאה'; errEl.style.display='block'; } return; }
       renderAppLockerStats(data);
     }).catch(function() {
       if (loadEl) loadEl.style.display='none';
