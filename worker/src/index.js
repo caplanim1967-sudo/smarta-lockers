@@ -1409,6 +1409,14 @@ async function handleCommunity(path, method, request, env, user, url) {
     if (!locker) return err('לוקר לא נמצא לקהילה זו');
     if (!locker.esp_id) return err('לוקר לא מחובר — esp_id חסר');
 
+    // בדיקת חיבור — ESP חייב להיות פעיל ב-3 דקות האחרונות
+    const espStatus = await db.prepare(
+      'SELECT last_seen FROM esp_status WHERE esp_id = ?'
+    ).bind(locker.esp_id).first().catch(() => null);
+    if (!espStatus || (nowSec() - espStatus.last_seen) > 180) {
+      return err('הלוקר לא מחובר כרגע — נסה שוב בעוד דקה');
+    }
+
     // הכנסת כל התאים ב-batch אטומי אחד — מונע race condition עם poll של ESP32
     const now = nowSec();
     const stmts = cells.map((cell, i) =>
