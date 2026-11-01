@@ -97,6 +97,29 @@ function generateLockCode() {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
 
+// ── Email sender — Resend ─────────────────────────────────────────────────────
+async function sendResendEmail(subject, html, env) {
+  const key = env.RESEND_API_KEY;
+  if (!key) { console.warn('[email] RESEND_API_KEY חסר'); return false; }
+  try {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: 'onboarding@resend.dev',
+        to:   'caplanim1967@gmail.com',
+        subject,
+        html,
+      }),
+    });
+    if (!r.ok) { console.error('[email] Resend:', await r.text()); return false; }
+    return true;
+  } catch (e) {
+    console.error('[email] שגיאה:', e.message);
+    return false;
+  }
+}
+
 // ── Message sender — InforUMobile SMS/WhatsApp ────────────────────────────────
 async function sendMessage(to, body, channel, env) {
   // נרמול מספר טלפון → פורמט בינלאומי (972XXXXXXXXX)
@@ -291,9 +314,56 @@ async function runReminders(env) {
   console.log(`[reminders cron] sent=${sent} skipped=${skipped}`);
 }
 
+// ── בדיקת מכשירים לא מחוברים כל 5 דקות ──────────────────────────────────────
+async function checkOfflineAlerts(env) {
+  const db = env.smarta_db;
+  const now = nowSec();
+  const OFFLINE_THRESHOLD = 10 * 60; // ניתוק > 10 דקות
+  const ALERT_COOLDOWN    = 60 * 60; // לא יותר מהתראה אחת בשעה לאותו מכשיר
+
+  await db.prepare('ALTER TABLE esp_status ADD COLUMN alert_sent_at INTEGER').run().catch(() => {});
+
+  const { results } = await db.prepare(`
+    SELECT e.esp_id, e.last_seen, e.alert_sent_at,
+           s.name AS community_name
+    FROM esp_status e
+    LEFT JOIN locker_configs lc ON lc.esp_id = e.esp_id
+    LEFT JOIN settlements s ON s.id = lc.community_id
+    WHERE e.last_seen < ?
+    AND (e.alert_sent_at IS NULL OR e.alert_sent_at < ?)
+  `).bind(now - OFFLINE_THRESHOLD, now - ALERT_COOLDOWN).all();
+
+  for (const esp of (results || [])) {
+    const minsOffline = Math.round((now - esp.last_seen) / 60);
+    const name = esp.community_name || esp.esp_id;
+    const lastSeenStr = new Date(esp.last_seen * 1000)
+      .toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem', hour12: false });
+
+    const smsText = `Smarta: ${name} לא מחובר ${minsOffline} דקות. בדוק חבילת SIM.`;
+
+    const htmlBody = `<div dir="rtl" style="font-family:Arial;font-size:14px">
+      <h3>⚠️ Smarta — התראת ניתוק</h3>
+      <p><b>ישוב:</b> ${name}</p>
+      <p><b>מכשיר:</b> ${esp.esp_id}</p>
+      <p><b>לא מחובר:</b> ${minsOffline} דקות</p>
+      <p><b>חיבור אחרון:</b> ${lastSeenStr}</p>
+      <p style="color:#888;font-size:12px">הודעה אוטומטית מ-Smarta Lockers</p>
+    </div>`;
+
+    await sendMessage('+972522497446', smsText, 'sms', env);
+    await sendResendEmail(`⚠️ Smarta: ${name} לא מחובר`, htmlBody, env);
+
+    await db.prepare('UPDATE esp_status SET alert_sent_at = ? WHERE esp_id = ?')
+      .bind(now, esp.esp_id).run();
+
+    console.log(`[offline-alert] ${esp.esp_id} offline ${minsOffline}min — alerts sent`);
+  }
+}
+
 export default {
-  async scheduled(_event, env) {
-    await runReminders(env);
+  async scheduled(event, env) {
+    if (event.cron === '0 6 * * *') await runReminders(env);
+    if (event.cron === '*/5 * * * *') await checkOfflineAlerts(env);
   },
 
   async fetch(request, env) {
@@ -1307,10 +1377,12 @@ async function ensureDoorEventsTable(db) {
 // ── esp_status — last_seen לכל מכשיר ────────────────────────────────────
 async function ensureEspStatusTable(db) {
   await db.prepare(`CREATE TABLE IF NOT EXISTS esp_status (
-    esp_id      TEXT PRIMARY KEY,
-    last_seen   INTEGER NOT NULL,
-    fw_version  TEXT
+    esp_id        TEXT PRIMARY KEY,
+    last_seen     INTEGER NOT NULL,
+    fw_version    TEXT,
+    alert_sent_at INTEGER
   )`).run();
+  await db.prepare('ALTER TABLE esp_status ADD COLUMN alert_sent_at INTEGER').run().catch(() => {});
 }
 
 // ── device_logs — לוג אירועים ממכשירי ESP32 ──────────────────────────────

@@ -9,5 +9,5 @@ database_name = "smarta-db"
 database_id = "1e9ab32c-c6fb-4001-aaca-a2c21913dc36"
 
 [triggers]
-crons = ["0 6 * * *"]
+crons = ["0 6 * * *", "*/5 * * * *"]
 
