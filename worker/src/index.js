@@ -97,29 +97,6 @@ function generateLockCode() {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
 
-// ── Email sender — Resend ─────────────────────────────────────────────────────
-async function sendResendEmail(subject, html, env) {
-  const key = env.RESEND_API_KEY;
-  if (!key) { console.warn('[email] RESEND_API_KEY חסר'); return false; }
-  try {
-    const r = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from: 'onboarding@resend.dev',
-        to:   'caplanim1967@gmail.com',
-        subject,
-        html,
-      }),
-    });
-    if (!r.ok) { console.error('[email] Resend:', await r.text()); return false; }
-    return true;
-  } catch (e) {
-    console.error('[email] שגיאה:', e.message);
-    return false;
-  }
-}
-
 // ── Message sender — InforUMobile SMS/WhatsApp ────────────────────────────────
 async function sendMessage(to, body, channel, env) {
   // נרמול מספר טלפון → פורמט בינלאומי (972XXXXXXXXX)
@@ -341,17 +318,7 @@ async function checkOfflineAlerts(env) {
 
     const smsText = `Smarta: ${name} לא מחובר ${minsOffline} דקות. בדוק חבילת SIM.`;
 
-    const htmlBody = `<div dir="rtl" style="font-family:Arial;font-size:14px">
-      <h3>⚠️ Smarta — התראת ניתוק</h3>
-      <p><b>ישוב:</b> ${name}</p>
-      <p><b>מכשיר:</b> ${esp.esp_id}</p>
-      <p><b>לא מחובר:</b> ${minsOffline} דקות</p>
-      <p><b>חיבור אחרון:</b> ${lastSeenStr}</p>
-      <p style="color:#888;font-size:12px">הודעה אוטומטית מ-Smarta Lockers</p>
-    </div>`;
-
     await sendMessage('+972522497446', smsText, 'sms', env);
-    await sendResendEmail(`⚠️ Smarta: ${name} לא מחובר`, htmlBody, env);
 
     await db.prepare('UPDATE esp_status SET alert_sent_at = ? WHERE esp_id = ?')
       .bind(now, esp.esp_id).run();
