@@ -601,7 +601,9 @@ export default {
         const base = cmds.length > 0
           ? { cells: cmds.map(c => c.cell_number) }
           : { no_command: true };
-        return ok({ ...base, authorized_callers: authorizedCallers, ...(otaMeta ? { ota: otaMeta } : {}) });
+        // אל תשלח OTA כשיש פקודות ממתינות — הפירמוור עושה return אחרי OTA ולא פותח תאים
+        const sendOta = cmds.length === 0 ? otaMeta : null;
+        return ok({ ...base, authorized_callers: authorizedCallers, ...(sendOta ? { ota: sendOta } : {}) });
       }
 
       // ── ESP32 ring detection — public, no JWT ──────────────
