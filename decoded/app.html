@@ -2621,7 +2621,7 @@ function buildLockerGrid() {
     t.style.background = color || 'var(--green)';
     t.classList.add('show');
     if (_toastTimer) clearTimeout(_toastTimer);
-    _toastTimer = setTimeout(() => { t.classList.remove('show'); _toastTimer = null; }, 3000);
+    _toastTimer = setTimeout(() => { t.classList.remove('show'); _toastTimer = null; }, 5000);
   }
 
   function openModal(id) { document.getElementById(id).classList.add('open'); }
