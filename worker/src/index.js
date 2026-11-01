@@ -312,11 +312,13 @@ async function checkOfflineAlerts(env) {
 
   for (const esp of (results || [])) {
     const minsOffline = Math.round((now - esp.last_seen) / 60);
-    const name = esp.community_name || esp.esp_id;
+    const locationLabel = esp.community_name
+      ? `${esp.community_name} (${esp.esp_id})`
+      : esp.esp_id;
     const lastSeenStr = new Date(esp.last_seen * 1000)
       .toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem', hour12: false });
 
-    const smsText = `Smarta: ${name} לא מחובר ${minsOffline} דקות. בדוק חבילת SIM.`;
+    const smsText = `Smarta: ${locationLabel} לא מחובר ${minsOffline} דקות. בדוק חבילת SIM.`;
 
     await sendMessage('+972522497446', smsText, 'sms', env);
 
