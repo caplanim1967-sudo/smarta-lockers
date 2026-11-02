@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════
-//  Smarta Lockers — ESP32 Firmware v1.36
+//  Smarta Lockers — ESP32 Firmware v1.49
 //  Hardware: LilyGo T-SIM7600G-H
 //  v1.4:  WDT=90s, resetHttpState חכם, WDT resets
 //  v1.5:  atDiag
@@ -18,6 +18,9 @@
 //  v1.41: WiFi+GPRS dual mode — WiFi HTTP כשזמין, GPRS fallback; Captive Portal ראשון
 //  v1.42: תיקון WDT בלולאת Captive Portal (90s timeout → reset)
 //  v1.43: OTA HTTP/1.0 — מונע chunked encoding שגרם ל-MD5 Check Failed
+//  v1.48: gprs_fail: אחרי 6 ניסיונות ב-resetHttpState → ESP.restart() (לולאה אינסופית תוקנה)
+//  v1.49: checkConnection: אחרי 10 כישלונות ברצף (5 דק) → ESP.restart() (ניתוק ארוך תוקן)
+//  v1.50: X-ESP-Secret header — אימות ESP מול ה-Worker
 // ════════════════════════════════════════════════════════════════════
 
 #define TINY_GSM_MODEM_SIM7600
@@ -35,12 +38,13 @@
 #include <ArduinoJson.h>
 #include <Update.h>     // [v1.35] OTA
 #include "trust_anchors.h"
+#include "secrets.h"
 
 // ────────────────────────────────────────────────────────────────────
 //  ⚙️  הגדרות
 // ────────────────────────────────────────────────────────────────────
 #define ESP_ID          "MEFA-01"
-#define FIRMWARE_VERSION "1.43"   // [v1.43] OTA HTTP/1.0 fix (chunked encoding)
+#define FIRMWARE_VERSION "1.50"   // [v1.50] X-ESP-Secret header
 #define APN             "internet"
 #define API_HOST     "smarta-api.smarta-api.workers.dev"
 // [v1.28] Cloudflare anycast IPs — עוקף DNS של 019+ שנכשל
@@ -98,8 +102,9 @@ unsigned long lastPollMs      = 0;
 unsigned long lastReconnectMs = 0;
 unsigned long lastLteCheckMs  = 0;   // [v1.10] בדיקת LTE כל 30 דקות
 String        modemLineBuf    = "";
-int           s_httpFailCount = 0;
-int           s_resetCount   = 0;   // [v1.11] כמה resets רצופים ללא success
+int           s_httpFailCount  = 0;
+int           s_resetCount    = 0;   // [v1.11] כמה resets רצופים ללא success
+int           s_gprsFailCount = 0;   // [v1.49] כמה פעמים gprsConnect נכשל ברצף
 
 bool          otaFailed       = false;   // [v1.35] מונע retry אחרי כישלון OTA
 
@@ -356,7 +361,16 @@ void resetHttpState() {
       att++;
       Serial.printf("[HTTP] GPRS ניסיון %d\n", att);
       ok = modem.gprsConnect(APN);
-      if (!ok) { delay(10000); esp_task_wdt_reset(); }
+      if (!ok) {
+        if (att >= 6) {  // [v1.48] 6 × 10s = 1 דקה — אז restart (setup מטפל ב-PWRKEY)
+          queueLog("error", "gprs_fail", "max_retries");
+          flushLogs();
+          delay(500);
+          ESP.restart();
+        }
+        delay(10000);
+        esp_task_wdt_reset();
+      }
     }
     modem.sendAT("+CDNSCFG=\"8.8.8.8\",\"8.8.4.4\"");
     modem.waitResponse(2000L);
@@ -413,7 +427,7 @@ String wifiGet(const String& path) {
   if (!c.connect(API_HOST, 443)) {
     Serial.println("[WIFI-HTTP] GET connect failed"); _wifiMode = false; return "";
   }
-  c.printf("GET %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n", path.c_str(), API_HOST);
+  c.printf("GET %s HTTP/1.0\r\nHost: %s\r\nX-ESP-Secret: %s\r\nConnection: close\r\n\r\n", path.c_str(), API_HOST, ESP_SECRET);
   // קרא שורת סטטוס
   String status = c.readStringUntil('\n');
   int code = status.indexOf("200") >= 0 ? 200 : 0;
@@ -480,7 +494,10 @@ String httpGet(const String& path) {
   if (!secureClient.connected()) { s_httpFailCount++; return ""; }
   persistentHttp.connectionKeepAlive();
   persistentHttp.setTimeout(6000);  // [v1.33] 6s — לא לחסום RING
+  persistentHttp.beginRequest();
   int err = persistentHttp.get(path);
+  persistentHttp.sendHeader("X-ESP-Secret", ESP_SECRET);
+  persistentHttp.endRequest();
   if (err != 0) {
     s_httpFailCount++;
     Serial.printf("[HTTP] GET error: %d (fail#%d)\n", err, s_httpFailCount);
@@ -560,39 +577,55 @@ void onRingDetected(const String& caller) {
 }
 
 // ────────────────────────────────────────────────────────────────────
-//  [v1.35] OTA — הורדת פירמוור חדש דרך GPRS ועדכון Flash
+//  [v1.35] OTA — הורדת פירמוור חדש דרך GPRS/WiFi ועדכון Flash
 //  path   = נתיב ב-Worker (למשל /api/esp/ota/firmware.bin)
 //  size   = גודל בbytes (0 = אוטומטי מ-Content-Length)
 //  md5str = MD5 לאימות (ריק = ללא אימות)
+//  [v1.45] WiFi mode — משתמש ב-WiFiClientSecure (port 443) במקום SSLClient (GPRS)
 // ────────────────────────────────────────────────────────────────────
 void performOTA(const String& path, int size, const String& md5str) {
-  Serial.printf("[OTA] מתחיל: %d bytes מ-%s\n", size, path.c_str());
+  Serial.printf("[OTA] מתחיל (%s): %d bytes מ-%s\n",
+                _wifiMode ? "WiFi" : "GPRS", size, path.c_str());
   esp_task_wdt_delete(NULL);   // OTA אורך זמן — הסר מה-WDT
 
-  // סגור חיבור SSL קיים
+  // סגור חיבור GPRS קיים בכל מקרה
   persistentHttp.stop();
   secureClient.stop();
   secureClient.clearWriteError();
   delay(1000);
 
-  // חיבור SSL חדש
-  Serial.println("[OTA] מתחבר SSL...");
-  if (!secureClient.connect(API_HOST, API_PORT)) {
-    Serial.println("[OTA] כישלון SSL — מסמן כישלון ולא מנסה שוב");
-    otaFailed = true;
-    return;
+  // [v1.45] בחר transport לפי מצב רשת
+  WiFiClientSecure _wifiOtaClient;
+  Client* conn = nullptr;
+
+  if (_wifiMode) {
+    Serial.println("[OTA] מתחבר SSL דרך WiFi...");
+    _wifiOtaClient.setInsecure();
+    if (!_wifiOtaClient.connect(API_HOST, 443)) {
+      Serial.println("[OTA] WiFi SSL כישלון");
+      otaFailed = true;
+      return;
+    }
+    conn = &_wifiOtaClient;
+  } else {
+    Serial.println("[OTA] מתחבר SSL דרך GPRS...");
+    if (!secureClient.connect(API_HOST, API_PORT)) {
+      Serial.println("[OTA] GPRS SSL כישלון");
+      otaFailed = true;
+      return;
+    }
+    conn = &secureClient;
   }
 
   // HTTP GET ידני — HTTP/1.0 מונע chunked encoding שיפגום ב-MD5
-  secureClient.printf("GET %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n",
-                      path.c_str(), API_HOST);
+  conn->print(String("GET ") + path + " HTTP/1.0\r\nHost: " + API_HOST + "\r\nConnection: close\r\n\r\n");
 
   // קרא headers — אסוף Content-Length
   int actualSize = size;
   unsigned long hdrStart = millis();
-  while (secureClient.connected() && millis() - hdrStart < 15000) {
-    if (!secureClient.available()) { delay(5); continue; }
-    String line = secureClient.readStringUntil('\n');
+  while ((conn->connected() || conn->available()) && millis() - hdrStart < 15000) {
+    if (!conn->available()) { delay(5); continue; }
+    String line = conn->readStringUntil('\n');
     line.trim();
     if (line.startsWith("Content-Length:")) {
       String lenStr = line.substring(15);
@@ -604,7 +637,7 @@ void performOTA(const String& path, int size, const String& md5str) {
   Serial.printf("[OTA] Content-Length=%d\n", actualSize);
   if (actualSize <= 0) {
     Serial.println("[OTA] גודל לא ידוע — מבטל");
-    secureClient.stop();
+    conn->stop();
     otaFailed = true;
     return;
   }
@@ -612,7 +645,7 @@ void performOTA(const String& path, int size, const String& md5str) {
   // התחל Update partition
   if (!Update.begin(actualSize)) {
     Serial.printf("[OTA] Update.begin כישלון: %s\n", Update.errorString());
-    secureClient.stop();
+    conn->stop();
     otaFailed = true;
     return;
   }
@@ -625,15 +658,7 @@ void performOTA(const String& path, int size, const String& md5str) {
   unsigned long lastData = millis();
 
   while (written < actualSize) {
-    if (!secureClient.available()) {
-      if (!secureClient.connected() || millis() - lastData > 30000) {
-        Serial.println("[OTA] timeout או חיבור נסגר");
-        break;
-      }
-      delay(5);
-      continue;
-    }
-    int n = secureClient.read(buf, min((int)sizeof(buf), actualSize - written));
+    int n = conn->read(buf, min((int)sizeof(buf), actualSize - written));
     if (n > 0) {
       if (Update.write(buf, n) != (size_t)n) {
         Serial.printf("[OTA] כתיבה כשלה: %s\n", Update.errorString());
@@ -641,6 +666,12 @@ void performOTA(const String& path, int size, const String& md5str) {
       }
       written += n;
       lastData = millis();
+    } else {
+      if (millis() - lastData > 30000) {
+        Serial.println("[OTA] timeout — לא התקבל נתון ב-30 שניות");
+        break;
+      }
+      delay(5);
     }
     if (millis() - lastLog > 10000) {
       lastLog = millis();
@@ -649,7 +680,7 @@ void performOTA(const String& path, int size, const String& md5str) {
     }
   }
 
-  secureClient.stop();
+  conn->stop();
   Serial.printf("[OTA] הורד %d / %d bytes\n", written, actualSize);
 
   if (Update.end(true)) {
@@ -700,7 +731,8 @@ void pollCourierCommands() {
   flushLogs();
 
   // [v1.35] גרסת פירמוור בURL — Worker משווה ומחזיר ota:{} אם יש עדכון
-  String resp = httpGet("/api/esp/commands?esp_id=" ESP_ID "&fw=" FIRMWARE_VERSION);
+  // [v1.44] net_type מדווח בכל poll — wifi/gprs
+  String resp = httpGet("/api/esp/commands?esp_id=" ESP_ID "&fw=" FIRMWARE_VERSION "&net=" + String(_wifiMode ? "wifi" : "gprs"));
   handleModemInput();   // [v1.15] תפוס RING שהגיע בזמן HTTP
   if (resp.isEmpty()) return;
 
@@ -734,6 +766,7 @@ void pollCourierCommands() {
       // [v1.41] פקודות מיוחדות
       if (cell == 999) { Serial.println("[WIFI] איפוס WiFi credentials"); clearWifiCreds(); delay(500); ESP.restart(); }
       if (cell == 998) { Serial.println("[WIFI] פותח Captive Portal"); flushLogs(); startCaptivePortal(); }
+      if (cell == 997) { Serial.println("[CMD] אתחול מרחוק"); queueLog("info", "restart", "remote"); flushLogs(); delay(500); ESP.restart(); }
       char detail[24]; snprintf(detail, sizeof(detail), "board=1 ch=%d", cell);
       queueLog("info", "door_open", detail);
       openCell(1, (uint8_t)cell);
@@ -792,17 +825,29 @@ void handleModemInput() {
 void checkConnection() {
   if (_wifiMode) {
     // [v1.41] בדוק WiFi — אם נפל, נסה reconnect
-    if (WiFi.status() == WL_CONNECTED) return;
+    if (WiFi.status() == WL_CONNECTED) { s_gprsFailCount = 0; return; }
     String ssid, pass;
     if (loadWifiCreds(ssid, pass)) _wifiMode = tryConnectWifi(ssid, pass);
-    if (_wifiMode) return;
+    if (_wifiMode) { s_gprsFailCount = 0; return; }
     Serial.println("[WIFI] נפל — עובר ל-GPRS");
   }
-  if (modem.isGprsConnected()) return;
+  if (modem.isGprsConnected()) { s_gprsFailCount = 0; return; }
   Serial.println("[NET] מתחבר מחדש...");
   queueLog("warn", "gprs_reconnect", "");
   esp_task_wdt_reset();                // [v1.4-WDT2] לפני gprsConnect
-  if (!modem.gprsConnect(APN)) { Serial.println("[NET] כישלון — יינסה בסיבוב הבא"); return; }
+  if (!modem.gprsConnect(APN)) {
+    s_gprsFailCount++;
+    Serial.printf("[NET] כישלון %d — יינסה בסיבוב הבא\n", s_gprsFailCount);
+    // [v1.49] אחרי 10 × 30s = 5 דקות כישלון ← restart אוטומטי
+    if (s_gprsFailCount >= 10) {
+      queueLog("error", "gprs_fail", "reconnect_timeout");
+      flushLogs();
+      delay(500);
+      ESP.restart();
+    }
+    return;
+  }
+  s_gprsFailCount = 0;
   modem.sendAT("+CDNSCFG=\"8.8.8.8\",\"8.8.4.4\"");  // [v1.27] Google DNS
   modem.waitResponse(2000L);
   Serial.println("[NET] מחובר");
@@ -1083,7 +1128,7 @@ void setup() {
     for (int i = 1; i <= 30 && warmResp.isEmpty(); i++) {
       Serial.printf("[WARMUP] ניסיון %d/30\n", i);
       s_httpFailCount = 0;   // reset כדי לא לגרור resetHttpState מ-httpGet עצמו
-      warmResp = httpGet("/api/esp/commands?esp_id=" ESP_ID);
+      warmResp = httpGet("/api/esp/commands?esp_id=" ESP_ID "&net=" + String(_wifiMode ? "wifi" : "gprs"));
       if (warmResp.isEmpty()) {
         warmFails++;
         // [v1.18] כל 3 כשלונות — resetHttpState לניקוי TCP stack (סוקטים תקועים)
