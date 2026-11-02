@@ -1716,6 +1716,7 @@ async function handleCommunity(path, method, request, env, user, url) {
 
   const collectMatch = path.match(/^\/api\/packages\/([^/]+)\/collect$/);
   if (collectMatch && method === 'POST') {
+    if (!['mail_manager', 'smarta_admin'].includes(user.role)) return forbidden();
     const id = collectMatch[1];
     await db.prepare(`
       UPDATE packages SET status = 'collected', collected_at = ? WHERE id = ?
