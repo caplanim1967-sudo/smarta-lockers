@@ -3615,10 +3615,18 @@ window.addEventListener('message', function(e) {
     var inp = document.getElementById('tres-'+num);
     if (inp) {
       var rect = inp.getBoundingClientRect();
-      drop.style.top = (rect.bottom + 2) + 'px';
+      var dropH = Math.min(matched.length * 44, 200);
+      var spaceBelow = window.innerHeight - rect.bottom;
       drop.style.left = 'auto';
       drop.style.right = (window.innerWidth - rect.right) + 'px';
       drop.style.width = rect.width + 'px';
+      if (spaceBelow < dropH + 8) {
+        drop.style.top = 'auto';
+        drop.style.bottom = (window.innerHeight - rect.top + 2) + 'px';
+      } else {
+        drop.style.top = (rect.bottom + 2) + 'px';
+        drop.style.bottom = 'auto';
+      }
     }
     drop.style.display = 'block';
   }
