@@ -561,10 +561,12 @@ tr:hover td { background:rgba(255,255,255,0.015); }
   <div class="page" id="page-locker-stats">
     <div class="page-header">
       <div><div class="page-title">ניתוח עומסים</div><div class="page-sub">היסטוריית טעינות ותאים פנויים</div></div>
-      <div class="btn-group" id="stats-range-btns">
-        <button class="btn btn-secondary btn-sm stats-range-btn active" data-days="7"   onclick="selectStatsRange(7,this)">שבוע אחרון</button>
-        <button class="btn btn-secondary btn-sm stats-range-btn"        data-days="30"  onclick="selectStatsRange(30,this)">חודש אחרון</button>
-        <button class="btn btn-secondary btn-sm stats-range-btn"        data-days="365" onclick="selectStatsRange(365,this)">שנה אחרונה</button>
+      <div id="stats-range-btns" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <label style="font-size:12px;color:var(--text-secondary)">מ:</label>
+        <input type="date" id="ls-from-date" class="form-input" style="width:140px;font-size:12px;padding:4px 8px">
+        <label style="font-size:12px;color:var(--text-secondary)">עד:</label>
+        <input type="date" id="ls-to-date" class="form-input" style="width:140px;font-size:12px;padding:4px 8px">
+        <button class="btn btn-primary btn-sm" onclick="loadLockerStats()">טען</button>
       </div>
     </div>
 
@@ -621,9 +623,10 @@ tr:hover td { background:rgba(255,255,255,0.015); }
         <div class="field-err" id="r-phone-err">נייד חייב להיות 10 ספרות ולהתחיל ב-05</div>
       </div>
     </div>
-    <div class="form-row cols-2">
+    <div class="form-row cols-3">
       <div class="form-group"><label>רחוב</label><input type="text" id="r-street" placeholder="שם הרחוב"></div>
       <div class="form-group"><label>מספר בית</label><input type="text" id="r-house" placeholder="12א"></div>
+      <div class="form-group"><label>תיבת דואר מעטפות</label><input type="text" id="r-mailbox" placeholder="תא 7" maxlength="20"></div>
     </div>
     <div class="form-row cols-2">
       <div class="form-group">
@@ -991,7 +994,7 @@ function showPage(name, el) {
   if (name === 'residents')    renderResidents();
   if (name === 'staff')        loadStaff();
   if (name === 'reminders')    loadReminders();
-  if (name === 'locker-stats') loadLockerStats(14);
+  if (name === 'locker-stats') { _initLockerStatsDates(); loadLockerStats(); }
 }
 
 // ─── MODAL ───────────────────────────────────────────────
@@ -1044,7 +1047,7 @@ function loadResidents() {
   apiGet('/api/residents').then(function(data) {
     if (!data || !Array.isArray(data)) return;
     allResidents = data;
-    renderResidents();
+    filterResidents();
     document.getElementById('badge-residents').textContent = data.length;
     document.getElementById('residents-sub').textContent = data.length + ' דיירים רשומים';
   });
@@ -1096,7 +1099,7 @@ function filterResidents() {
 }
 
 function clearResidentForm() {
-  ['r-first','r-last','r-id','r-phone','r-street','r-house','r-notes',
+  ['r-first','r-last','r-id','r-phone','r-street','r-house','r-mailbox','r-notes',
    'r-alt-first','r-alt-last','r-alt-id','r-alt-phone'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.value = '';
@@ -1122,6 +1125,7 @@ function openEditResident(id) {
   document.getElementById('r-phone').value    = r.phone         || '';
   document.getElementById('r-street').value   = r.street        || '';
   document.getElementById('r-house').value    = r.house_number  || '';
+  document.getElementById('r-mailbox').value  = r.mailbox       || '';
   document.getElementById('r-notify').value   = r.notify_method || 'whatsapp';
   document.getElementById('r-notes').value    = r.notes         || '';
   document.getElementById('r-alt-first').value= r.alt_first_name|| '';
@@ -1204,6 +1208,7 @@ function saveResident() {
     notify_method:     document.getElementById('r-notify').value,
     street:            document.getElementById('r-street').value.trim() || null,
     house_number:      document.getElementById('r-house').value.trim() || null,
+    mailbox:           document.getElementById('r-mailbox').value.trim() || null,
     notes:             document.getElementById('r-notes').value.trim() || null,
     alt_first_name:    document.getElementById('r-alt-first').value.trim() || null,
     alt_last_name:     document.getElementById('r-alt-last').value.trim() || null,
@@ -1869,16 +1874,23 @@ showPage = function(name, el) {
 // ─── ניתוח עומסים ────────────────────────────────────────
 var _statsChartDeposits = null;
 var _statsChartFree     = null;
-var _statsCurrentDays   = 14;
 
-function selectStatsRange(days, btn) {
-  document.querySelectorAll('.stats-range-btn').forEach(function(b) { b.classList.remove('active'); });
-  btn.classList.add('active');
-  loadLockerStats(days);
+function _initLockerStatsDates() {
+  var today = new Date().toISOString().slice(0, 10);
+  var week  = new Date(Date.now() - 7 * 86400 * 1000).toISOString().slice(0, 10);
+  var fromEl = document.getElementById('ls-from-date');
+  var toEl   = document.getElementById('ls-to-date');
+  if (fromEl && !fromEl.value) fromEl.value = week;
+  if (toEl   && !toEl.value)   toEl.value   = today;
 }
 
-function loadLockerStats(days) {
-  _statsCurrentDays = days || _statsCurrentDays;
+function loadLockerStats() {
+  var fromEl   = document.getElementById('ls-from-date');
+  var toEl     = document.getElementById('ls-to-date');
+  var fromDate = fromEl && fromEl.value;
+  var toDate   = toEl   && toEl.value;
+  if (!fromDate || !toDate) return;
+
   var _user = JSON.parse(sessionStorage.getItem('manager_user') || sessionStorage.getItem('smarta_user') || 'null');
   var cid = _user && _user.community_id;
   if (!cid) return;
@@ -1888,10 +1900,10 @@ function loadLockerStats(days) {
   if (loadingEl) { loadingEl.style.display = 'block'; loadingEl.textContent = 'טוען נתונים...'; }
   if (errEl)     errEl.style.display = 'none';
 
-  apiGet('/api/communities/' + cid + '/locker-stats?days=' + _statsCurrentDays).then(function(data) {
+  apiGet('/api/communities/' + cid + '/locker-stats?from_date=' + fromDate + '&to_date=' + toDate).then(function(data) {
     if (loadingEl) loadingEl.style.display = 'none';
     if (!data || data.error) {
-      if (errEl) { errEl.textContent = 'שגיאה בטעינת נתונים'; errEl.style.display = 'block'; }
+      if (errEl) { errEl.textContent = data && data.error ? data.error : 'שגיאה בטעינת נתונים'; errEl.style.display = 'block'; }
       return;
     }
     renderLockerStats(data);
